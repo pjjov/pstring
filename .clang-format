@@ -1,0 +1,16 @@
+# SPDX-FileCopyrightText: 2025 Predrag Jovanović
+# SPDX-License-Identifier: Apache-2.0
+
+BasedOnStyle: WebKit
+AlignAfterOpenBracket: BlockIndent
+AlignEscapedNewlines: LeftWithLastLine
+BinPackArguments: false
+BinPackParameters: false
+BreakBeforeBraces: Attach
+ColumnLimit: 80
+IndentPPDirectives: BeforeHash
+Language: Cpp
+LineEnding: LF
+PointerAlignment: Right
+ReflowComments: false
+# SkipMacroDefinitionBody: true
