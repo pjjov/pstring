@@ -86,14 +86,20 @@ int pstralloc(pstring_t *out, size_t capacity, allocator_t *alloc) {
     return PSTRING_OK;
 }
 
-int pstrwrap(pstring_t *out, char *buffer, size_t capacity) {
-    if (!out || !buffer || capacity == 0)
+int pstrwrap(pstring_t *out, char *buffer, size_t length, size_t capacity) {
+    if (!out || !buffer)
         return PSTRING_EINVAL;
+
+    if (length == 0 && capacity != 0)
+        length = strnlen(buffer, capacity);
+
+    if (capacity == 0)
+        capacity = length;
 
     out->allocator = NULL;
     out->buffer = buffer;
     out->capacity = capacity;
-    out->length = 0;
+    out->length = length;
     return PSTRING_OK;
 }
 
@@ -113,7 +119,7 @@ int pstrslice(pstring_t *out, pstring_t *str, size_t from, size_t to) {
     if (from > to)
         from = to;
 
-    return pstrwrap(out, &pstrbuf(str)[from], to - from);
+    return pstrwrap(out, &pstrbuf(str)[from], to - from, to - from);
 }
 
 void pstrfree(pstring_t *str) {

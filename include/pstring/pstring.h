@@ -60,7 +60,7 @@ static inline size_t pstrcap(const pstring_t *str) {
 }
 
 int pstrnew(pstring_t *out, const char *str, size_t len, allocator_t *alloc);
-int pstrwrap(pstring_t *out, char *buffer, size_t capacity);
+int pstrwrap(pstring_t *out, char *buffer, size_t length, size_t capacity);
 int pstrdup(pstring_t *out, pstring_t *str, allocator_t *allocator);
 int pstrslice(pstring_t *out, pstring_t *str, size_t from, size_t to);
 int pstralloc(pstring_t *out, size_t capacity, allocator_t *alloc);
