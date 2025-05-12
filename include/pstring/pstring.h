@@ -47,9 +47,17 @@ enum {
     PSTRING_ENODATA = -61,
 };
 
-static inline char *pstrbuf(pstring_t *str) { return str ? str->buffer : NULL; }
-static inline size_t pstrlen(pstring_t *str) { return str ? str->length : 0; }
-static inline size_t pstrcap(pstring_t *str) { return str ? str->capacity : 0; }
+static inline char *pstrbuf(const pstring_t *str) {
+    return str ? str->buffer : NULL;
+}
+
+static inline size_t pstrlen(const pstring_t *str) {
+    return str ? str->length : 0;
+}
+
+static inline size_t pstrcap(const pstring_t *str) {
+    return str ? str->capacity : 0;
+}
 
 int pstrnew(pstring_t *out, const char *str, size_t len, allocator_t *alloc);
 int pstrwrap(pstring_t *out, char *buffer, size_t capacity);
@@ -61,5 +69,8 @@ void pstrfree(pstring_t *str);
 int pstrreserve(pstring_t *str, size_t count);
 int pstrgrow(pstring_t *str, size_t count);
 int pstrshrink(pstring_t *str);
+
+int pstrequal(const pstring_t *left, const pstring_t *right);
+int pstrcmp(const pstring_t *left, const pstring_t *right);
 
 #endif

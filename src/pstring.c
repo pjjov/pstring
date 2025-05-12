@@ -23,8 +23,19 @@
 
 #include "allocator_std.h"
 
-#ifdef __SSE2__
+#if !defined(PSTRING_NO_AVX) && defined(__AVX__)
+    #include <immintrin.h>
+    #define PSTRING_AVX
+#endif
+
+#if !defined(PSTRING_NO_SSE) && defined(__SSE2__)
     #include <emmintrin.h>
+    #define PSTRING_SSE
+#endif
+
+#ifdef PSTRING_AVX
+    #define ALIGNMENT (_Alignof(__m256i))
+#elif defined(PSTRING_SSE)
     #define ALIGNMENT (_Alignof(__m128i))
 #else
     #define ALIGNMENT (_Alignof(char))
@@ -55,7 +66,7 @@ int pstrnew(pstring_t *out, const char *str, size_t len, allocator_t *alloc) {
 }
 
 int pstralloc(pstring_t *out, size_t capacity, allocator_t *alloc) {
-    if (!out || capacity == 0)
+    if (!out)
         return PSTRING_EINVAL;
 
     if (!alloc)
@@ -152,4 +163,93 @@ int pstrshrink(pstring_t *str) {
     str->buffer = buffer;
     str->capacity = capacity - 1;
     return PSTRING_OK;
+}
+
+int pstrequal(const pstring_t *left, const pstring_t *right) {
+    if (left == right)
+        return PSTRING_TRUE;
+
+    size_t length = pstrlen(left);
+    if (length != pstrlen(right))
+        return PSTRING_FALSE;
+
+    const char *leftBuf = pstrbuf(left);
+    const char *rightBuf = pstrbuf(right);
+
+#ifdef PSTRING_AVX
+    for (; length >= 32; length -= 32) {
+        __m256i leftVec = _mm256_loadu_si256((const __m256i *)leftBuf);
+        __m256i rightVec = _mm256_loadu_si256((const __m256i *)rightBuf);
+        if (_mm256_movemask_epi8(_mm256_cmpeq_epi8(leftVec, rightVec)))
+            return PSTRING_FALSE;
+
+        leftBuf += 32;
+        rightBuf += 32;
+    }
+#endif
+
+#ifdef PSTRING_SSE
+    for (; length >= 16; length -= 16) {
+        __m128i leftVec = _mm_loadu_si128((const __m128i *)leftBuf);
+        __m128i rightVec = _mm_loadu_si128((const __m128i *)rightBuf);
+        if (_mm_movemask_epi8(_mm_cmpeq_epi8(leftVec, rightVec)))
+            return PSTRING_FALSE;
+
+        leftBuf += 16;
+        rightBuf += 16;
+    }
+#endif
+
+    for (int i = 0; i < length; i++)
+        if (leftBuf[i] != rightBuf[i])
+            return PSTRING_FALSE;
+
+    return PSTRING_TRUE;
+}
+
+int pstrcmp(const pstring_t *left, const pstring_t *right) {
+    if (left == right)
+        return 0;
+
+    size_t length = MIN(pstrlen(left), pstrlen(right));
+    const char *leftBuf = pstrbuf(left);
+    const char *rightBuf = pstrbuf(right);
+
+#ifdef PSTRING_AVX
+    for (; length >= 32; length -= 32) {
+        __m256i leftVec = _mm256_loadu_si256((const __m256i *)leftBuf);
+        __m256i rightVec = _mm256_loadu_si256((const __m256i *)rightBuf);
+        int diff = _mm256_movemask_epi8(_mm256_cmpeq_epi8(leftVec, rightVec));
+
+        if (diff == 0) {
+            leftBuf += 32;
+            rightBuf += 32;
+        } else {
+            int bit = __builtin_clz(diff);
+            return leftBuf[bit] - rightBuf[bit];
+        }
+    }
+#endif
+
+#ifdef PSTRING_SSE
+    for (; length >= 16; length -= 16) {
+        __m128i leftVec = _mm_loadu_si128((const __m128i *)leftBuf);
+        __m128i rightVec = _mm_loadu_si128((const __m128i *)rightBuf);
+        int diff = _mm_movemask_epi8(_mm_cmpeq_epi8(leftVec, rightVec));
+
+        if (diff == 0) {
+            leftBuf += 16;
+            rightBuf += 16;
+        } else {
+            int bit = __builtin_clz(diff);
+            return leftBuf[bit] - rightBuf[bit];
+        }
+    }
+#endif
+
+    for (int i = 0; i < length; i++)
+        if (leftBuf[i] != rightBuf[i])
+            return leftBuf[i] - rightBuf[i];
+
+    return 0;
 }
