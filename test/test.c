@@ -120,11 +120,38 @@ static int test_pstring_resize(int seed, int repetition) {
     return 0;
 }
 
+static int test_pstring_compare(int seed, int repetitition) {
+    pstring_t a = { 0 }, b = { 0 };
+
+    pf_assert_ok(pstrwrap(&a, "Hello, world!", 0, 0));
+    pf_assert_ok(pstrwrap(&b, "Hello, world!\0", 0, 0));
+    pf_assert_true(pstrequal(&a, &b));
+    pf_assert(0 == pstrcmp(&a, &b));
+
+    pf_assert_ok(pstrwrap(&a, "foo", 0, 0));
+    pf_assert_ok(pstrwrap(&b, "fo0", 0, 0));
+    pf_assert_false(pstrequal(&a, &b));
+    pf_assert(0 < pstrcmp(&a, &b));
+
+    pf_assert_ok(pstrwrap(&a, "bar", 0, 0));
+    pf_assert_ok(pstrwrap(&b, "foo", 0, 0));
+    pf_assert_false(pstrequal(&a, &b));
+    pf_assert(0 > pstrcmp(&a, &b));
+
+    pf_assert_ok(pstrwrap(&a, "", 0, 0));
+    pf_assert_ok(pstrwrap(&b, "\0", 0, 0));
+    pf_assert_true(pstrequal(&a, &b));
+    pf_assert(0 == pstrcmp(&a, &b));
+
+    return 0;
+}
+
 static const struct pf_test suite[] = {
     { test_pstring_new, "/pstring/new", 1 },
     { test_pstring_alloc, "/pstring/alloc", 1 },
     { test_pstring_wrap_slice, "/pstring/wrap_slice", 1 },
     { test_pstring_resize, "/pstring/resize", 1 },
+    { test_pstring_compare, "/pstring/compare", 1 },
     { 0 },
 };
 
