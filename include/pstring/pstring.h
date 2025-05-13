@@ -60,11 +60,14 @@ static inline size_t pstrcap(const pstring_t *str) {
 }
 
 int pstrnew(pstring_t *out, const char *str, size_t len, allocator_t *alloc);
-int pstrwrap(pstring_t *out, char *buffer, size_t length, size_t capacity);
 int pstrdup(pstring_t *out, pstring_t *str, allocator_t *allocator);
-int pstrslice(pstring_t *out, pstring_t *str, size_t from, size_t to);
 int pstralloc(pstring_t *out, size_t capacity, allocator_t *alloc);
 void pstrfree(pstring_t *str);
+
+#define PSTRWRAP(str)                                                \
+    ((pstring_t) { 0, sizeof((str)) - 1, sizeof((str)) - 1, (str) })
+int pstrwrap(pstring_t *out, char *buffer, size_t length, size_t capacity);
+int pstrslice(pstring_t *out, pstring_t *str, size_t from, size_t to);
 
 int pstrreserve(pstring_t *str, size_t count);
 int pstrgrow(pstring_t *str, size_t count);
@@ -72,5 +75,10 @@ int pstrshrink(pstring_t *str);
 
 int pstrequal(const pstring_t *left, const pstring_t *right);
 int pstrcmp(const pstring_t *left, const pstring_t *right);
+
+int pstrcat(pstring_t *dst, const pstring_t *src);
+int pstrjoin(pstring_t *dst, const pstring_t *srcs, size_t count);
+
+void pstr__setlen(pstring_t *str, size_t length);
 
 #endif

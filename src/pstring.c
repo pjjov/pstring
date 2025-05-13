@@ -59,9 +59,8 @@ int pstrnew(pstring_t *out, const char *str, size_t len, allocator_t *alloc) {
     if (pstralloc(out, len, alloc))
         return PSTRING_ENOMEM;
 
-    out->length = len;
-    out->buffer[len] = '\0';
     memcpy(out->buffer, str, len);
+    pstr__setlen(out, len);
     return PSTRING_OK;
 }
 
@@ -133,10 +132,10 @@ void pstrfree(pstring_t *str) {
 }
 
 int pstrreserve(pstring_t *str, size_t count) {
-    if (!str || count == 0)
+    if (!str)
         return PSTRING_EINVAL;
 
-    if (pstrlen(str) + count > pstrcap(str))
+    if (count > 0 && pstrlen(str) + count > pstrcap(str))
         if (pstrgrow(str, GROWTH(pstrlen(str), count)))
             return PSTRING_ENOMEM;
 
@@ -262,4 +261,46 @@ int pstrcmp(const pstring_t *left, const pstring_t *right) {
             return leftBuf[i] - rightBuf[i];
 
     return 0;
+}
+
+int pstrcat(pstring_t *dst, const pstring_t *src) {
+    if (!dst || !src)
+        return PSTRING_EINVAL;
+
+    if (pstrlen(src) > 0) {
+        if (pstrreserve(dst, pstrlen(src)))
+            return PSTRING_ENOMEM;
+
+        memcpy(&pstrbuf(dst)[pstrlen(dst)], pstrbuf(src), pstrlen(src));
+        pstr__setlen(dst, pstrlen(dst) + pstrlen(src));
+    }
+    return PSTRING_OK;
+}
+
+int pstrjoin(pstring_t *dst, const pstring_t *srcs, size_t count) {
+    if (!dst || !srcs)
+        return PSTRING_EINVAL;
+
+    size_t req = 0;
+    for (size_t i = 0; i < count; i++)
+        req += pstrlen(&srcs[i]);
+
+    if (req > 0) {
+        if (pstrreserve(dst, req))
+            return PSTRING_ENOMEM;
+
+        req = pstrlen(dst);
+        for (size_t i = 0; i < count; i++) {
+            memcpy(&pstrbuf(dst)[req], pstrbuf(&srcs[i]), pstrlen(&srcs[i]));
+            req += pstrlen(&srcs[i]);
+        }
+
+        pstr__setlen(dst, req);
+    }
+    return PSTRING_OK;
+}
+
+void pstr__setlen(pstring_t *str, size_t length) {
+    str->length = length;
+    str->buffer[length] = '\0';
 }
