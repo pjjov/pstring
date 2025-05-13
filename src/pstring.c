@@ -90,8 +90,12 @@ int pstrwrap(pstring_t *out, char *buffer, size_t length, size_t capacity) {
     if (!out || !buffer)
         return PSTRING_EINVAL;
 
-    if (length == 0 && capacity != 0)
-        length = strnlen(buffer, capacity);
+    if (length == 0) {
+        if (capacity > 0)
+            length = strnlen(buffer, capacity);
+        else
+            length = strlen(buffer);
+    }
 
     if (capacity == 0)
         capacity = length;
