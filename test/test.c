@@ -146,12 +146,70 @@ static int test_pstring_compare(int seed, int repetitition) {
     return 0;
 }
 
+static int test_pstring_concat(int seed, int repetition) {
+    pstring_t a = { 0 }, b = { 0 };
+    pf_assert_ok(pstralloc(&a, 32, NULL));
+
+    pf_assert_ok(pstrwrap(&b, "Hello", 0, 0));
+    pf_assert_ok(pstrcat(&a, &b));
+    pf_assert(pstrlen(&a) == 5);
+    pf_assert_memcmp(pstrbuf(&a), "Hello", 5);
+    pf_assert(pstrbuf(&a)[pstrlen(&a)] == '\0');
+
+    pf_assert_ok(pstrwrap(&b, ", ", 0, 0));
+    pf_assert_ok(pstrcat(&a, &b));
+    pf_assert(pstrlen(&a) == 7);
+    pf_assert_memcmp(pstrbuf(&a), "Hello, ", 7);
+    pf_assert(pstrbuf(&a)[pstrlen(&a)] == '\0');
+
+    pf_assert_ok(pstrwrap(&b, "world", 0, 0));
+    pf_assert_ok(pstrcat(&a, &b));
+    pf_assert(pstrlen(&a) == 12);
+    pf_assert_memcmp(pstrbuf(&a), "Hello, world", 12);
+    pf_assert(pstrbuf(&a)[pstrlen(&a)] == '\0');
+
+    pf_assert_ok(pstrwrap(&b, "!", 0, 0));
+    pf_assert_ok(pstrcat(&a, &b));
+    pf_assert(pstrlen(&a) == 13);
+    pf_assert_memcmp(pstrbuf(&a), "Hello, world!", 13);
+    pf_assert(pstrbuf(&a)[pstrlen(&a)] == '\0');
+
+    pf_assert_ok(pstrwrap(&b, "", 0, 0));
+    pf_assert_ok(pstrcat(&a, &b));
+    pf_assert(pstrlen(&a) == 13);
+    pf_assert_memcmp(pstrbuf(&a), "Hello, world!", 13);
+    pf_assert(pstrbuf(&a)[pstrlen(&a)] == '\0');
+
+    pstrfree(&a);
+    return 0;
+}
+
+static int test_pstring_join(int seed, int repetition) {
+    pstring_t src[5] = {
+        PSTRWRAP("Hello"), PSTRWRAP(", "), PSTRWRAP("world"),
+        PSTRWRAP(""),      PSTRWRAP("!"),
+    };
+
+    pstring_t out = { 0 };
+    pf_assert_ok(pstralloc(&out, 32, NULL));
+
+    pf_assert_ok(pstrjoin(&out, src, 5));
+    pf_assert(pstrlen(&out) == 13);
+    pf_assert_memcmp(pstrbuf(&out), "Hello, world!", 13);
+    pf_assert(pstrbuf(&out)[pstrlen(&out)] == '\0');
+
+    pstrfree(&out);
+    return 0;
+}
+
 static const struct pf_test suite[] = {
     { test_pstring_new, "/pstring/new", 1 },
     { test_pstring_alloc, "/pstring/alloc", 1 },
     { test_pstring_wrap_slice, "/pstring/wrap_slice", 1 },
     { test_pstring_resize, "/pstring/resize", 1 },
     { test_pstring_compare, "/pstring/compare", 1 },
+    { test_pstring_concat, "/pstring/concat", 1 },
+    { test_pstring_join, "/pstring/join", 1 },
     { 0 },
 };
 
