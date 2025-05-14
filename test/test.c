@@ -202,6 +202,19 @@ static int test_pstring_join(int seed, int repetition) {
     return 0;
 }
 
+static int test_pstring_copy(int seed, int repetition) {
+    pstring_t dst = { 0 }, src = PSTRWRAP("Hello, world!");
+    pf_assert_ok(pstralloc(&dst, pstrlen(&src), NULL));
+
+    pf_assert_ok(pstrcpy(&dst, &src));
+    pf_assert(pstrlen(&dst) == pstrlen(&src));
+    pf_assert_memcmp(pstrbuf(&dst), "Hello, world!", 13);
+    pf_assert(pstrbuf(&dst)[pstrlen(&dst)] == '\0');
+
+    pstrfree(&dst);
+    return 0;
+}
+
 static const struct pf_test suite[] = {
     { test_pstring_new, "/pstring/new", 1 },
     { test_pstring_alloc, "/pstring/alloc", 1 },
@@ -210,6 +223,7 @@ static const struct pf_test suite[] = {
     { test_pstring_compare, "/pstring/compare", 1 },
     { test_pstring_concat, "/pstring/concat", 1 },
     { test_pstring_join, "/pstring/join", 1 },
+    { test_pstring_copy, "/pstring/copy", 1 },
     { 0 },
 };
 

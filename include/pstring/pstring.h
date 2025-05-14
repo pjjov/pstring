@@ -77,6 +77,7 @@ int pstrequal(const pstring_t *left, const pstring_t *right);
 int pstrcmp(const pstring_t *left, const pstring_t *right);
 
 int pstrcat(pstring_t *dst, const pstring_t *src);
+int pstrcpy(pstring_t *dst, const pstring_t *src);
 int pstrjoin(pstring_t *dst, const pstring_t *srcs, size_t count);
 
 void pstr__setlen(pstring_t *str, size_t length);

@@ -277,6 +277,14 @@ int pstrcat(pstring_t *dst, const pstring_t *src) {
     return PSTRING_OK;
 }
 
+int pstrcpy(pstring_t *dst, const pstring_t *src) {
+    if (!dst || !src)
+        return PSTRING_EINVAL;
+
+    pstr__setlen(dst, 0);
+    return pstrcat(dst, src);
+}
+
 int pstrjoin(pstring_t *dst, const pstring_t *srcs, size_t count) {
     if (!dst || !srcs)
         return PSTRING_EINVAL;
