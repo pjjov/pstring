@@ -24,11 +24,26 @@
 #include "allocator.h"
 #include <stddef.h>
 
+#ifndef PSTRING_SSO_EXTEND
+    #define PSTRING_SSO_EXTEND 0
+#endif
+
+#define PSTRING_SSO_SIZE (sizeof(struct pstring_base) + PSTRING_SSO_EXTEND - 2)
+#define PSTRING_BLEND(x, y, mask) ((x) ^ (((x) ^ (y)) & (mask)))
+
 typedef struct pstring_t {
-    allocator_t *allocator;
-    size_t capacity;
-    size_t length;
     char *buffer;
+    union {
+        struct pstring_base {
+            size_t length;
+            size_t capacity;
+            allocator_t *allocator;
+        } base;
+        struct pstring_sso {
+            char buffer[PSTRING_SSO_SIZE + 1];
+            unsigned char length;
+        } sso;
+    };
 } pstring_t;
 
 enum {
@@ -37,7 +52,7 @@ enum {
 };
 
 enum {
-    PSTRING_OK = -0,
+    PSTRING_OK = 0,
     PSTRING_ENOENT = -2,
     PSTRING_EINTR = -4,
     PSTRING_ENOMEM = -12,
@@ -52,11 +67,17 @@ static inline char *pstrbuf(const pstring_t *str) {
 }
 
 static inline size_t pstrlen(const pstring_t *str) {
-    return str ? str->length : 0;
+    size_t mask = (str->buffer == str->sso.buffer) - 1;
+    return PSTRING_BLEND(str->sso.length, str->base.length, mask);
 }
 
 static inline size_t pstrcap(const pstring_t *str) {
-    return str ? str->capacity : 0;
+    size_t mask = (str->buffer == str->sso.buffer) - 1;
+    return PSTRING_BLEND(PSTRING_SSO_SIZE, str->base.capacity, mask);
+}
+
+static inline allocator_t *pstrallocator(const pstring_t *str) {
+    return str->buffer != str->sso.buffer ? str->base.allocator : NULL;
 }
 
 int pstrnew(pstring_t *out, const char *str, size_t len, allocator_t *alloc);
@@ -64,8 +85,11 @@ int pstrdup(pstring_t *out, pstring_t *str, allocator_t *allocator);
 int pstralloc(pstring_t *out, size_t capacity, allocator_t *alloc);
 void pstrfree(pstring_t *str);
 
-#define PSTRWRAP(str)                                                \
-    ((pstring_t) { 0, sizeof((str)) - 1, sizeof((str)) - 1, (str) })
+#define PSTRWRAP(str)                                  \
+    ((pstring_t) { .buffer = (str),                    \
+                   .base.length = sizeof((str)) - 1,   \
+                   .base.capacity = sizeof((str)) - 1, \
+                   .base.allocator = 0 })
 int pstrwrap(pstring_t *out, char *buffer, size_t length, size_t capacity);
 int pstrslice(pstring_t *out, pstring_t *str, size_t from, size_t to);
 

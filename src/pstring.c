@@ -78,9 +78,9 @@ int pstralloc(pstring_t *out, size_t capacity, allocator_t *alloc) {
         return PSTRING_ENOMEM;
     }
 
-    out->allocator = alloc;
-    out->capacity = capacity - 1;
-    out->length = 0;
+    out->base.allocator = alloc;
+    out->base.capacity = capacity - 1;
+    out->base.length = 0;
     out->buffer = buffer;
     return PSTRING_OK;
 }
@@ -99,10 +99,10 @@ int pstrwrap(pstring_t *out, char *buffer, size_t length, size_t capacity) {
     if (capacity == 0)
         capacity = length;
 
-    out->allocator = NULL;
     out->buffer = buffer;
-    out->capacity = capacity;
-    out->length = length;
+    out->base.allocator = NULL;
+    out->base.capacity = capacity;
+    out->base.length = length;
     return PSTRING_OK;
 }
 
@@ -110,7 +110,7 @@ int pstrdup(pstring_t *out, pstring_t *str, allocator_t *allocator) {
     if (!out || !str)
         return PSTRING_EINVAL;
 
-    return pstrnew(out, pstrbuf(str), pstrlen(str), str->allocator);
+    return pstrnew(out, pstrbuf(str), pstrlen(str), pstrallocator(str));
 }
 
 int pstrslice(pstring_t *out, pstring_t *str, size_t from, size_t to) {
@@ -126,8 +126,8 @@ int pstrslice(pstring_t *out, pstring_t *str, size_t from, size_t to) {
 }
 
 void pstrfree(pstring_t *str) {
-    if (str && str->allocator) {
-        deallocate(str->allocator, pstrbuf(str), pstrcap(str) + 1);
+    if (str && pstrallocator(str)) {
+        deallocate(pstrallocator(str), pstrbuf(str), pstrcap(str) + 1);
     }
 }
 
@@ -143,34 +143,34 @@ int pstrreserve(pstring_t *str, size_t count) {
 }
 
 int pstrgrow(pstring_t *str, size_t count) {
-    if (!str || !str->allocator || count == 0)
+    if (!str || !pstrallocator(str) || count == 0)
         return PSTRING_EINVAL;
 
     size_t old = pstrcap(str) + 1;
     size_t capacity = ALIGN(old + count, ALIGNMENT);
-    char *buffer = reallocate(str->allocator, pstrbuf(str), old, capacity);
+    char *buffer = reallocate(pstrallocator(str), pstrbuf(str), old, capacity);
 
     if (!buffer)
         return PSTRING_ENOMEM;
 
     str->buffer = buffer;
-    str->capacity = capacity - 1;
+    str->base.capacity = capacity - 1;
     return PSTRING_OK;
 }
 
 int pstrshrink(pstring_t *str) {
-    if (!str || !str->allocator)
+    if (!str || !pstrallocator(str))
         return PSTRING_EINVAL;
 
     size_t old = pstrcap(str) + 1;
     size_t capacity = ALIGN(pstrlen(str) + 1, ALIGNMENT);
-    char *buffer = reallocate(str->allocator, pstrbuf(str), old, capacity);
+    char *buffer = reallocate(pstrallocator(str), pstrbuf(str), old, capacity);
 
     if (!buffer)
         return PSTRING_ENOMEM;
 
     str->buffer = buffer;
-    str->capacity = capacity - 1;
+    str->base.capacity = capacity - 1;
     return PSTRING_OK;
 }
 
@@ -309,6 +309,6 @@ int pstrjoin(pstring_t *dst, const pstring_t *srcs, size_t count) {
 }
 
 void pstr__setlen(pstring_t *str, size_t length) {
-    str->length = length;
+    str->base.length = length;
     str->buffer[length] = '\0';
 }
