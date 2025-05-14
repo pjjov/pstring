@@ -77,7 +77,15 @@ static inline size_t pstrcap(const pstring_t *str) {
 }
 
 static inline allocator_t *pstrallocator(const pstring_t *str) {
-    return str->buffer != str->sso.buffer ? str->base.allocator : NULL;
+    return str && str->buffer != str->sso.buffer ? str->base.allocator : NULL;
+}
+
+static inline int pstrsso(pstring_t *str) {
+    return str->buffer == str->sso.buffer;
+}
+
+static inline int pstrowned(pstring_t *str) {
+    return pstrsso(str) || pstrallocator(str) != NULL;
 }
 
 int pstrnew(pstring_t *out, const char *str, size_t len, allocator_t *alloc);
@@ -104,6 +112,11 @@ int pstrcat(pstring_t *dst, const pstring_t *src);
 int pstrcpy(pstring_t *dst, const pstring_t *src);
 int pstrjoin(pstring_t *dst, const pstring_t *srcs, size_t count);
 
-void pstr__setlen(pstring_t *str, size_t length);
+static inline void pstr__setlen(pstring_t *str, size_t length) {
+    if (pstrsso(str))
+        str->sso.length = length;
+    else
+        str->base.length = length;
+}
 
 #endif

@@ -68,8 +68,15 @@ int pstralloc(pstring_t *out, size_t capacity, allocator_t *alloc) {
     if (!out)
         return PSTRING_EINVAL;
 
-    if (!alloc)
+    if (!alloc) {
         alloc = &standard_allocator;
+        if (capacity <= PSTRING_SSO_SIZE) {
+            out->buffer = out->sso.buffer;
+            out->buffer[PSTRING_SSO_SIZE] = '\0';
+            out->sso.length = 0;
+            return PSTRING_OK;
+        }
+    }
 
     capacity = ALIGN(capacity + 1, ALIGNMENT);
     char *buffer = allocate_aligned(alloc, capacity, ALIGNMENT);
@@ -143,8 +150,19 @@ int pstrreserve(pstring_t *str, size_t count) {
 }
 
 int pstrgrow(pstring_t *str, size_t count) {
-    if (!str || !pstrallocator(str) || count == 0)
+    if (!str || count == 0 || (!pstrsso(str) && !pstrallocator(str)))
         return PSTRING_EINVAL;
+
+    if (pstrsso(str)) {
+        pstring_t tmp;
+        if (pstralloc(&tmp, PSTRING_SSO_SIZE + count, NULL))
+            return PSTRING_ENOMEM;
+
+        memcpy(tmp.buffer, str->buffer, pstrlen(str));
+        tmp.base.length = pstrlen(str);
+        *str = tmp;
+        return PSTRING_OK;
+    }
 
     size_t old = pstrcap(str) + 1;
     size_t capacity = ALIGN(old + count, ALIGNMENT);
@@ -306,9 +324,4 @@ int pstrjoin(pstring_t *dst, const pstring_t *srcs, size_t count) {
         pstr__setlen(dst, req);
     }
     return PSTRING_OK;
-}
-
-void pstr__setlen(pstring_t *str, size_t length) {
-    str->base.length = length;
-    str->buffer[length] = '\0';
 }

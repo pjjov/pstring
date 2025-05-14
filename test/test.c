@@ -39,6 +39,8 @@ static int test_pstring_new(int seed, int repetition) {
 
     pf_assert_ok(pstrnew(&str, t_empty, 0, NULL));
     pf_assert(pstrlen(&str) == 0);
+    pf_assert_true(pstrsso(&str));
+    pf_assert_true(pstrowned(&str));
     pstrfree(&str);
 
     pf_assert_ok(pstrnew(&str, t_short, 0, NULL));
@@ -46,6 +48,8 @@ static int test_pstring_new(int seed, int repetition) {
     pf_assert(pstrlen(&str) == strlen(t_short));
     pf_assert(pstrcap(&str) >= strlen(t_short));
     pf_assert_memcmp(pstrbuf(&str), t_short, strlen(t_short) + 1);
+    pf_assert_true(pstrsso(&str));
+    pf_assert_true(pstrowned(&str));
     pstrfree(&str);
 
     pf_assert_ok(pstrnew(&str, t_str, 0, NULL));
@@ -53,6 +57,8 @@ static int test_pstring_new(int seed, int repetition) {
     pf_assert(pstrlen(&str) == strlen(t_str));
     pf_assert(pstrcap(&str) >= strlen(t_str));
     pf_assert_memcmp(pstrbuf(&str), t_str, strlen(t_str) + 1);
+    pf_assert_true(pstrsso(&str));
+    pf_assert_true(pstrowned(&str));
     pstrfree(&str);
 
     pf_assert_ok(pstrnew(&str, t_long, 0, NULL));
@@ -60,6 +66,8 @@ static int test_pstring_new(int seed, int repetition) {
     pf_assert(pstrlen(&str) == strlen(t_long));
     pf_assert(pstrcap(&str) >= strlen(t_long));
     pf_assert_memcmp(pstrbuf(&str), t_long, strlen(t_long) + 1);
+    pf_assert_false(pstrsso(&str));
+    pf_assert_true(pstrowned(&str));
     pstrfree(&str);
 
     return 0;
@@ -72,6 +80,8 @@ static int test_pstring_alloc(int seed, int repetition) {
     pf_assert_not_null(pstrbuf(&str));
     pf_assert(pstrlen(&str) == 0);
     pf_assert(pstrcap(&str) >= 10);
+    pf_assert_true(pstrsso(&str));
+    pf_assert_true(pstrowned(&str));
     pstrfree(&str);
 
     return 0;
@@ -86,6 +96,8 @@ static int test_pstring_wrap_slice(int seed, int repetition) {
     pf_assert(pstrlen(&str) == strlen(buffer));
     pf_assert(pstrcap(&str) == 1024);
     pf_assert(pstrbuf(&str) == buffer);
+    pf_assert_false(pstrsso(&str));
+    pf_assert_false(pstrowned(&str));
     pf_assert(PSTRING_EINVAL == pstrgrow(&str, 1));
     pf_assert(PSTRING_EINVAL == pstrshrink(&str));
 
@@ -94,6 +106,8 @@ static int test_pstring_wrap_slice(int seed, int repetition) {
     pf_assert(pstrcap(&slice) == 5);
     pf_assert_not_null(pstrbuf(&slice));
     pf_assert_memcmp(pstrbuf(&slice), "world", 5);
+    pf_assert_false(pstrsso(&str));
+    pf_assert_false(pstrowned(&str));
 
     return 0;
 }
@@ -112,6 +126,13 @@ static int test_pstring_resize(int seed, int repetition) {
     pf_assert_not_null(pstrbuf(&str));
     pf_assert(pstrlen(&str) == 0);
     pf_assert(pstrcap(&str) >= 8);
+    pf_assert_false(pstrsso(&str));
+
+    pf_assert_ok(pstrreserve(&str, 32));
+    pf_assert_not_null(pstrbuf(&str));
+    pf_assert(pstrlen(&str) == 0);
+    pf_assert(pstrcap(&str) >= 32);
+    pf_assert_false(pstrsso(&str));
 
     pf_assert_ok(pstrshrink(&str));
     pf_assert(pstrlen(&str) == 0);
