@@ -120,7 +120,7 @@ int pstrdup(pstring_t *out, pstring_t *str, allocator_t *allocator) {
     return pstrnew(out, pstrbuf(str), pstrlen(str), pstrallocator(str));
 }
 
-int pstrslice(pstring_t *out, pstring_t *str, size_t from, size_t to) {
+int pstrslice(pstring_t *out, const pstring_t *str, size_t from, size_t to) {
     if (!out || !str)
         return PSTRING_EINVAL;
 
@@ -227,7 +227,7 @@ int pstrequal(const pstring_t *left, const pstring_t *right) {
     }
 #endif
 
-    for (int i = 0; i < length; i++)
+    for (size_t i = 0; i < length; i++)
         if (leftBuf[i] != rightBuf[i])
             return PSTRING_FALSE;
 
@@ -274,7 +274,7 @@ int pstrcmp(const pstring_t *left, const pstring_t *right) {
     }
 #endif
 
-    for (int i = 0; i < length; i++)
+    for (size_t i = 0; i < length; i++)
         if (leftBuf[i] != rightBuf[i])
             return leftBuf[i] - rightBuf[i];
 
@@ -324,4 +324,91 @@ int pstrjoin(pstring_t *dst, const pstring_t *srcs, size_t count) {
         pstr__setlen(dst, req);
     }
     return PSTRING_OK;
+}
+
+char *pstrchr(const pstring_t *str, int ch) {
+    if (!str)
+        return NULL;
+
+    size_t length = pstrlen(str);
+    char *buffer = pstrbuf(str);
+
+#ifdef PSTRING_AVX
+    __m256i vec = _mm256_set1_epi8((char)ch);
+    for (; length >= 32; length -= 32) {
+        __m256i chars = _mm256_loadu_si256((const __m256i *)buffer);
+        int diff = _mm256_movemask_epi8(_mm256_cmpeq_epi8(vec, chars));
+
+        if (diff != 0) {
+            int bit = __builtin_ctz(diff);
+            return &buffer[bit];
+        }
+
+        buffer += 32;
+    }
+#endif
+
+#ifdef PSTRING_SSE
+    __m128i vec = _mm_set1_epi8((char)ch);
+    for (; length >= 16; length -= 16) {
+        __m128i chars = _mm_loadu_si128((const __m128i *)buffer);
+        int diff = _mm_movemask_epi8(_mm_cmpeq_epi8(vec, chars));
+
+        if (diff != 0) {
+            int bit = __builtin_ctz(diff);
+            return &buffer[bit];
+        }
+
+        buffer += 16;
+    }
+#endif
+
+    for (size_t i = 0; i < length; i++)
+        if (buffer[i] == (char)ch)
+            return &buffer[i];
+
+    return NULL;
+}
+
+char *pstrrchr(const pstring_t *str, int ch) {
+    if (!str)
+        return NULL;
+
+    size_t length = pstrlen(str);
+    char *buffer = &pstrbuf(str)[length];
+
+#ifdef PSTRING_AVX
+    __m256i vec = _mm256_set1_epi8((char)ch);
+    for (; length >= 32; length -= 32) {
+        __m256i chars = _mm256_loadu_si256((const __m256i *)&buffer[-32]);
+        int diff = _mm256_movemask_epi8(_mm256_cmpeq_epi8(vec, chars));
+
+        if (diff != 0) {
+            int bit = __builtin_clz(diff) - (sizeof(int) * 8 - 32);
+            return &buffer[31 - bit];
+        }
+
+        buffer -= 32;
+    }
+#endif
+
+#ifdef PSTRING_SSE
+    __m128i vec = _mm_set1_epi8((char)ch);
+    for (; length >= 16; length -= 16) {
+        buffer -= 16;
+
+        __m128i chars = _mm_loadu_si128((const __m128i *)buffer);
+        int diff = _mm_movemask_epi8(_mm_cmpeq_epi8(vec, chars));
+        if (diff != 0) {
+            int bit = __builtin_clz(diff) - (sizeof(int) * 8 - 16);
+            return &buffer[15 - bit];
+        }
+    }
+#endif
+
+    for (size_t i = 0; i < length; i++)
+        if (buffer[length - i - 1] == (char)ch)
+            return &buffer[length - i - 1];
+
+    return NULL;
 }

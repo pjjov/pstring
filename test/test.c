@@ -236,6 +236,26 @@ static int test_pstring_copy(int seed, int repetition) {
     return 0;
 }
 
+static int test_pstring_chr(int seed, int repetition) {
+    char str[] = "foo foo bar buzz";
+    pstring_t pstr = PSTRWRAP(str);
+
+    pf_assert(&str[0] == pstrchr(&pstr, 'f'));
+    pf_assert(&str[1] == pstrchr(&pstr, 'o'));
+    pf_assert(&str[8] == pstrchr(&pstr, 'b'));
+    pf_assert(&str[14] == pstrchr(&pstr, 'z'));
+
+    pf_assert(&str[4] == pstrrchr(&pstr, 'f'));
+    pf_assert(&str[6] == pstrrchr(&pstr, 'o'));
+    pf_assert(&str[12] == pstrrchr(&pstr, 'b'));
+    pf_assert(&str[15] == pstrrchr(&pstr, 'z'));
+
+    pf_assert_null(pstrchr(&pstr, 'A'));
+    pf_assert_null(pstrrchr(&pstr, 'A'));
+
+    return 0;
+}
+
 static const struct pf_test suite[] = {
     { test_pstring_new, "/pstring/new", 1 },
     { test_pstring_alloc, "/pstring/alloc", 1 },
@@ -245,6 +265,7 @@ static const struct pf_test suite[] = {
     { test_pstring_concat, "/pstring/concat", 1 },
     { test_pstring_join, "/pstring/join", 1 },
     { test_pstring_copy, "/pstring/copy", 1 },
+    { test_pstring_chr, "/pstring/chr", 1 },
     { 0 },
 };
 

@@ -99,7 +99,7 @@ void pstrfree(pstring_t *str);
                    .base.capacity = sizeof((str)) - 1, \
                    .base.allocator = 0 })
 int pstrwrap(pstring_t *out, char *buffer, size_t length, size_t capacity);
-int pstrslice(pstring_t *out, pstring_t *str, size_t from, size_t to);
+int pstrslice(pstring_t *out, const pstring_t *str, size_t from, size_t to);
 
 int pstrreserve(pstring_t *str, size_t count);
 int pstrgrow(pstring_t *str, size_t count);
@@ -107,6 +107,9 @@ int pstrshrink(pstring_t *str);
 
 int pstrequal(const pstring_t *left, const pstring_t *right);
 int pstrcmp(const pstring_t *left, const pstring_t *right);
+
+char *pstrchr(const pstring_t *str, int ch);
+char *pstrrchr(const pstring_t *str, int ch);
 
 int pstrcat(pstring_t *dst, const pstring_t *src);
 int pstrcpy(pstring_t *dst, const pstring_t *src);
