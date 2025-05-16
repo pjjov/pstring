@@ -256,6 +256,40 @@ static int test_pstring_chr(int seed, int repetition) {
     return 0;
 }
 
+static int test_pstring_span(int seed, int repetition) {
+    pstring_t str = PSTRWRAP("AbccDef%$a3145bcb");
+
+    pf_assert(1 == pstrspn(&str, "AD%5"));
+    pf_assert(4 == pstrspn(&str, "Abc"));
+    pf_assert(0 == pstrspn(&str, "%$"));
+    pf_assert(0 == pstrspn(&str, " "));
+    pf_assert(0 == pstrspn(&str, "\0"));
+    pf_assert(0 == pstrspn(NULL, NULL));
+
+    pf_assert(0 == pstrcspn(&str, "AD%5"));
+    pf_assert(0 == pstrcspn(&str, "Abc"));
+    pf_assert(7 == pstrcspn(&str, "%$"));
+    pf_assert(17 == pstrcspn(&str, " "));
+    pf_assert(17 == pstrcspn(&str, "\0"));
+    pf_assert(0 == pstrcspn(NULL, NULL));
+
+    pf_assert(0 == pstrrspn(&str, "AD%5"));
+    pf_assert(3 == pstrrspn(&str, "Abc"));
+    pf_assert(0 == pstrrspn(&str, "%$"));
+    pf_assert(0 == pstrrspn(&str, " "));
+    pf_assert(0 == pstrrspn(&str, "\0"));
+    pf_assert(0 == pstrrspn(NULL, NULL));
+
+    pf_assert(3 == pstrrcspn(&str, "AD%5"));
+    pf_assert(0 == pstrrcspn(&str, "Abc"));
+    pf_assert(8 == pstrrcspn(&str, "%$"));
+    pf_assert(17 == pstrrcspn(&str, " "));
+    pf_assert(17 == pstrrcspn(&str, "\0"));
+    pf_assert(0 == pstrrcspn(NULL, NULL));
+
+    return 0;
+}
+
 static const struct pf_test suite[] = {
     { test_pstring_new, "/pstring/new", 1 },
     { test_pstring_alloc, "/pstring/alloc", 1 },
@@ -266,6 +300,7 @@ static const struct pf_test suite[] = {
     { test_pstring_join, "/pstring/join", 1 },
     { test_pstring_copy, "/pstring/copy", 1 },
     { test_pstring_chr, "/pstring/chr", 1 },
+    { test_pstring_span, "/pstring/span", 1 },
     { 0 },
 };
 

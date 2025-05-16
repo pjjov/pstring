@@ -412,3 +412,219 @@ char *pstrrchr(const pstring_t *str, int ch) {
 
     return NULL;
 }
+
+#ifdef PSTRING_AVX
+static int pstr__spn_avx(const char *buffer, const char *set, size_t length) {
+    __m256i vec = _mm256_loadu_si256((const __m256i *)buffer);
+    int result = 0;
+
+    #ifndef PSTRING_ALT_SPN
+    __m256i tmp = _mm256_setzero_si256();
+    for (size_t ch = 0; ch < length; ch++) {
+        __m256i check = _mm256_set1_epi8(set[ch]);
+        tmp = _mm256_or_si256(tmp, _mm256_cmpeq_epi8(vec, check));
+    }
+    result = _mm256_movemask_epi8(tmp);
+    #else
+    for (size_t ch = 0; ch < length; ch++) {
+        __m256i check = _mm256_set1_epi8(set[ch]);
+        result |= _mm256_movemask_epi8(_mm256_cmpeq_epi8(vec, check));
+    }
+    #endif
+
+    return result;
+}
+#endif
+
+#ifdef PSTRING_SSE
+static int pstr__spn_sse(const char *buffer, const char *set, size_t length) {
+    __m128i vec = _mm_loadu_si128((const __m128i *)buffer);
+    int result = 0;
+
+    #ifndef PSTRING_ALT_SPN
+    __m128i tmp = _mm_setzero_si128();
+    for (size_t ch = 0; ch < length; ch++) {
+        __m128i check = _mm_set1_epi8(set[ch]);
+        tmp = _mm_or_si128(tmp, _mm_cmpeq_epi8(vec, check));
+    }
+    result = _mm_movemask_epi8(tmp);
+    #else
+    for (size_t ch = 0; ch < length; ch++) {
+        __m128i check = _mm_set1_epi8(set[ch]);
+        result |= _mm_movemask_epi8(_mm_cmpeq_epi8(vec, check));
+    }
+    #endif
+
+    return result;
+}
+#endif
+
+size_t pstrspn(const pstring_t *str, const char *set) {
+    if (!str || !set)
+        return 0;
+
+    const char *buffer = pstrbuf(str);
+    size_t length = pstrlen(str);
+    size_t setlen = strnlen(set, 256);
+    int result = 0;
+
+#ifdef PSTRING_AVX
+    for (; length >= 32; length -= 32, buffer += 32) {
+        result = pstr__spn_avx(buffer, set, setlen);
+
+        if (~result) {
+            int bit = result ? __builtin_ctz(~result) : 0;
+            return buffer - pstrbuf(str) + bit;
+        }
+    }
+#endif
+
+#ifdef PSTRING_SSE
+    for (; length >= 16; length -= 16, buffer += 16) {
+        result = pstr__spn_sse(buffer, set, setlen);
+
+        if (~result) {
+            int bit = result ? __builtin_ctz(~result) : 0;
+            return buffer - pstrbuf(str) + bit;
+        }
+    }
+#endif
+
+    for (size_t i = 0; i < length; i++, result = 0) {
+        for (size_t j = 0; !result && j < setlen; j++)
+            result |= buffer[i] == set[j];
+
+        if (!result)
+            return buffer - pstrbuf(str) + i;
+    }
+
+    return 0;
+}
+
+size_t pstrcspn(const pstring_t *str, const char *set) {
+    if (!str || !set)
+        return 0;
+
+    const char *buffer = pstrbuf(str);
+    size_t length = pstrlen(str);
+    size_t setlen = strnlen(set, 256);
+    int result = 0;
+
+#ifdef PSTRING_AVX
+    for (; length >= 32; length -= 32, buffer += 32) {
+        result = pstr__spn_avx(buffer, set, setlen);
+
+        if (result) {
+            int bit = ~result ? __builtin_ctz(result) : 0;
+            return buffer - pstrbuf(str) + bit;
+        }
+    }
+#endif
+
+#ifdef PSTRING_SSE
+    for (; length >= 16; length -= 16, buffer += 16) {
+        result = pstr__spn_sse(buffer, set, setlen);
+
+        if (result) {
+            int bit = ~result ? __builtin_ctz(result) : 0;
+            return buffer - pstrbuf(str) + bit;
+        }
+    }
+#endif
+
+    for (size_t i = 0; i < length; i++) {
+        for (size_t j = 0; !result && j < setlen; j++)
+            result |= buffer[i] == set[j];
+
+        if (result)
+            return buffer - pstrbuf(str) + i;
+    }
+
+    return pstrlen(str);
+}
+
+size_t pstrrspn(const pstring_t *str, const char *set) {
+    if (!str || !set)
+        return 0;
+
+    size_t length = pstrlen(str);
+    size_t setlen = strnlen(set, 256);
+    const char *buffer = &pstrbuf(str)[length];
+    int result = 0;
+
+#ifdef PSTRING_AVX
+    for (; length >= 32; length -= 32, buffer -= 32) {
+        result = pstr__spn_avx(buffer - 32, set, setlen);
+
+        if (~result) {
+            int bit = result ? __builtin_clz(~result & 0xFFFFFFFF) - 32 : 0;
+            return pstrlen(str) - length + bit;
+        }
+    }
+#endif
+
+#ifdef PSTRING_SSE
+    for (; length >= 16; length -= 16, buffer -= 16) {
+        result = pstr__spn_sse(buffer - 16, set, setlen);
+
+        if (~result) {
+            int bit = result ? __builtin_clz(~result & 0xFFFF) - 16 : 0;
+            return pstrlen(str) - length + bit;
+        }
+    }
+#endif
+
+    buffer -= length;
+    for (size_t i = 0; i < length; i++, result = 0) {
+        for (size_t j = 0; !result && j < setlen; j++)
+            result |= buffer[length - i - 1] == set[j];
+
+        if (!result)
+            return pstrlen(str) - length + i;
+    }
+
+    return 0;
+}
+
+size_t pstrrcspn(const pstring_t *str, const char *set) {
+    if (!str || !set)
+        return 0;
+
+    size_t length = pstrlen(str);
+    size_t setlen = strnlen(set, 256);
+    const char *buffer = &pstrbuf(str)[length];
+    int result = 0;
+
+#ifdef PSTRING_AVX
+    for (; length >= 32; length -= 32, buffer -= 32) {
+        result = pstr__spn_avx(buffer - 32, set, setlen);
+
+        if (result) {
+            int bit = ~result ? __builtin_clz(result) - 32 : 0;
+            return pstrlen(str) - length + bit;
+        }
+    }
+#endif
+
+#ifdef PSTRING_SSE
+    for (; length >= 16; length -= 16, buffer -= 16) {
+        result = pstr__spn_sse(buffer - 16, set, setlen);
+
+        if (result) {
+            int bit = ~result ? __builtin_clz(result) - 16 : 0;
+            return pstrlen(str) - length + bit;
+        }
+    }
+#endif
+
+    buffer -= length;
+    for (size_t i = 0; i < length; i++) {
+        for (size_t j = 0; !result && j < setlen; j++)
+            result |= buffer[length - i - 1] == set[j];
+
+        if (result)
+            return pstrlen(str) - length + i;
+    }
+
+    return pstrlen(str);
+}
