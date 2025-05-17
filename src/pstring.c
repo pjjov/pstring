@@ -59,7 +59,7 @@ int pstrnew(pstring_t *out, const char *str, size_t len, allocator_t *alloc) {
     if (pstralloc(out, len, alloc))
         return PSTRING_ENOMEM;
 
-    memcpy(out->buffer, str, len);
+    memcpy(pstrbuf(out), str, len);
     pstr__setlen(out, len);
     return PSTRING_OK;
 }
@@ -71,8 +71,8 @@ int pstralloc(pstring_t *out, size_t capacity, allocator_t *alloc) {
     if (!alloc) {
         alloc = &standard_allocator;
         if (capacity <= PSTRING_SSO_SIZE) {
-            out->buffer = out->sso.buffer;
-            out->buffer[PSTRING_SSO_SIZE] = '\0';
+            out->buffer = NULL;
+            out->sso.buffer[PSTRING_SSO_SIZE] = '\0';
             out->sso.length = 0;
             return PSTRING_OK;
         }

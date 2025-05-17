@@ -63,26 +63,24 @@ enum {
 };
 
 static inline char *pstrbuf(const pstring_t *str) {
-    return str ? str->buffer : NULL;
+    return str->buffer ? str->buffer : (char *)str->sso.buffer;
 }
 
 static inline size_t pstrlen(const pstring_t *str) {
-    size_t mask = (str->buffer == str->sso.buffer) - 1;
+    size_t mask = (str->buffer == NULL) - 1;
     return PSTRING_BLEND(str->sso.length, str->base.length, mask);
 }
 
 static inline size_t pstrcap(const pstring_t *str) {
-    size_t mask = (str->buffer == str->sso.buffer) - 1;
+    size_t mask = (str->buffer == NULL) - 1;
     return PSTRING_BLEND(PSTRING_SSO_SIZE, str->base.capacity, mask);
 }
 
 static inline allocator_t *pstrallocator(const pstring_t *str) {
-    return str && str->buffer != str->sso.buffer ? str->base.allocator : NULL;
+    return str && str->buffer ? str->base.allocator : NULL;
 }
 
-static inline int pstrsso(pstring_t *str) {
-    return str->buffer == str->sso.buffer;
-}
+static inline int pstrsso(pstring_t *str) { return str->buffer == NULL; }
 
 static inline int pstrowned(pstring_t *str) {
     return pstrsso(str) || pstrallocator(str) != NULL;
