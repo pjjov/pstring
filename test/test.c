@@ -290,6 +290,19 @@ static int test_pstring_span(int seed, int repetition) {
     return 0;
 }
 
+int test_pstring_breakset(int seed, int repetition) {
+    pstring_t str = PSTRWRAP("AbccDef%$a3145bcb");
+
+    pf_assert(&pstrbuf(&str)[7] == pstrpbrk(&str, "%$"));
+    pf_assert(&pstrbuf(&str)[10] == pstrpbrk(&str, "12345"));
+    pf_assert(&pstrbuf(&str)[7] == pstrpbrk(&str, "%$"));
+    pf_assert(NULL == pstrpbrk(&str, " "));
+    pf_assert(NULL == pstrpbrk(&str, "\0"));
+    pf_assert(NULL == pstrpbrk(NULL, NULL));
+
+    return 0;
+}
+
 static const struct pf_test suite[] = {
     { test_pstring_new, "/pstring/new", 1 },
     { test_pstring_alloc, "/pstring/alloc", 1 },
@@ -301,6 +314,7 @@ static const struct pf_test suite[] = {
     { test_pstring_copy, "/pstring/copy", 1 },
     { test_pstring_chr, "/pstring/chr", 1 },
     { test_pstring_span, "/pstring/span", 1 },
+    { test_pstring_breakset, "/pstring/breakset", 1 },
     { 0 },
 };
 
