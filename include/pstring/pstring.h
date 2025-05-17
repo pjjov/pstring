@@ -109,6 +109,7 @@ int pstrcmp(const pstring_t *left, const pstring_t *right);
 char *pstrchr(const pstring_t *str, int ch);
 char *pstrrchr(const pstring_t *str, int ch);
 char *pstrpbrk(const pstring_t *str, const char *set);
+char *pstrstr(const pstring_t *str, const pstring_t *sub);
 size_t pstrspn(const pstring_t *str, const char *set);
 size_t pstrcspn(const pstring_t *str, const char *set);
 size_t pstrrspn(const pstring_t *str, const char *set);

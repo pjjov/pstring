@@ -667,3 +667,21 @@ char *pstrpbrk(const pstring_t *str, const char *set) {
 
     return NULL;
 }
+
+char *pstrstr(const pstring_t *str, const pstring_t *sub) {
+    if (!str || !sub || pstrlen(sub) > pstrlen(str))
+        return NULL;
+
+    if (pstrlen(sub) == 0)
+        return pstrbuf(str);
+
+    char ch = pstrbuf(sub)[0];
+    char *search = pstrbuf(str);
+    char *end = &search[pstrlen(str)];
+    while ((search = pstrchr(str, ch)) && search < end) {
+        if (0 == memcmp(search, pstrbuf(sub), pstrlen(sub)))
+            return search;
+    }
+
+    return NULL;
+}
