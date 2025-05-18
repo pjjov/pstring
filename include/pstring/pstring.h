@@ -91,6 +91,8 @@ int pstrdup(pstring_t *out, pstring_t *str, allocator_t *allocator);
 int pstralloc(pstring_t *out, size_t capacity, allocator_t *alloc);
 void pstrfree(pstring_t *str);
 
+void pstrdetect(void);
+
 #define PSTRWRAP(str)                                  \
     ((pstring_t) { .buffer = (str),                    \
                    .base.length = sizeof((str)) - 1,   \

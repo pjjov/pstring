@@ -49,6 +49,91 @@
 
 #define GROWTH(old, req) (((old) + (req)) * 2 - (old))
 
+#ifdef PSTRING_AVX
+static int
+pstr__match_set_avx(const char *buffer, const char *set, size_t length) {
+    __m256i vec = _mm256_loadu_si256((const __m256i *)buffer);
+    int result = 0;
+
+    #ifndef PSTRING_ALT_SPN
+    __m256i tmp = _mm256_setzero_si256();
+    for (size_t ch = 0; ch < length; ch++) {
+        __m256i check = _mm256_set1_epi8(set[ch]);
+        tmp = _mm256_or_si256(tmp, _mm256_cmpeq_epi8(vec, check));
+    }
+    result = _mm256_movemask_epi8(tmp);
+    #else
+    for (size_t ch = 0; ch < length; ch++) {
+        __m256i check = _mm256_set1_epi8(set[ch]);
+        result |= _mm256_movemask_epi8(_mm256_cmpeq_epi8(vec, check));
+    }
+    #endif
+
+    return result;
+}
+#endif
+
+#ifdef PSTRING_SSE
+static int
+pstr__match_set_sse(const char *buffer, const char *set, size_t length) {
+    __m128i vec = _mm_loadu_si128((const __m128i *)buffer);
+    int result = 0;
+
+    #ifndef PSTRING_ALT_SPN
+    __m128i tmp = _mm_setzero_si128();
+    for (size_t ch = 0; ch < length; ch++) {
+        __m128i check = _mm_set1_epi8(set[ch]);
+        tmp = _mm_or_si128(tmp, _mm_cmpeq_epi8(vec, check));
+    }
+    result = _mm_movemask_epi8(tmp);
+    #else
+    for (size_t ch = 0; ch < length; ch++) {
+        __m128i check = _mm_set1_epi8(set[ch]);
+        result |= _mm_movemask_epi8(_mm_cmpeq_epi8(vec, check));
+    }
+    #endif
+
+    return result;
+}
+#endif
+
+static struct {
+    size_t size; /* vector size */
+    int (*match_set)(const char *buffer, const char *set, size_t length);
+} g_impl = {
+#if !defined(PSTRING_DETECT) && defined(PSTRING_AVX)
+    .size = 32,
+    .match_set = &pstr__match_set_avx,
+#elif !defined(PSTRING_DETECT) && defined(PSTRING_SSE)
+    .size = 16,
+    .match_set = &pstr__match_set_sse,
+#else
+    .size = 0,
+    .match_set = &NULL,
+#endif
+};
+
+#ifdef PSTRING_DETECT
+    #include "pf_cpuinfo.h"
+#endif
+
+void pstrdetect(void) {
+#ifdef PSTRING_DETECT
+    #ifdef PSTRING_AVX
+    if (PF_HAS_AVX) {
+        g_impl.size = 32;
+        g_impl.match_set = &pstr__match_set_avx;
+    }
+    #endif
+    #ifdef PSTRING_SSE
+    if (PF_HAS_SSE) {
+        g_impl.size = 16;
+        g_impl.match_set = &pstr__match_set_sse;
+    }
+    #endif
+#endif
+}
+
 int pstrnew(pstring_t *out, const char *str, size_t len, allocator_t *alloc) {
     if (!out || !str)
         return PSTRING_EINVAL;
@@ -413,52 +498,6 @@ char *pstrrchr(const pstring_t *str, int ch) {
     return NULL;
 }
 
-#ifdef PSTRING_AVX
-static int pstr__spn_avx(const char *buffer, const char *set, size_t length) {
-    __m256i vec = _mm256_loadu_si256((const __m256i *)buffer);
-    int result = 0;
-
-    #ifndef PSTRING_ALT_SPN
-    __m256i tmp = _mm256_setzero_si256();
-    for (size_t ch = 0; ch < length; ch++) {
-        __m256i check = _mm256_set1_epi8(set[ch]);
-        tmp = _mm256_or_si256(tmp, _mm256_cmpeq_epi8(vec, check));
-    }
-    result = _mm256_movemask_epi8(tmp);
-    #else
-    for (size_t ch = 0; ch < length; ch++) {
-        __m256i check = _mm256_set1_epi8(set[ch]);
-        result |= _mm256_movemask_epi8(_mm256_cmpeq_epi8(vec, check));
-    }
-    #endif
-
-    return result;
-}
-#endif
-
-#ifdef PSTRING_SSE
-static int pstr__spn_sse(const char *buffer, const char *set, size_t length) {
-    __m128i vec = _mm_loadu_si128((const __m128i *)buffer);
-    int result = 0;
-
-    #ifndef PSTRING_ALT_SPN
-    __m128i tmp = _mm_setzero_si128();
-    for (size_t ch = 0; ch < length; ch++) {
-        __m128i check = _mm_set1_epi8(set[ch]);
-        tmp = _mm_or_si128(tmp, _mm_cmpeq_epi8(vec, check));
-    }
-    result = _mm_movemask_epi8(tmp);
-    #else
-    for (size_t ch = 0; ch < length; ch++) {
-        __m128i check = _mm_set1_epi8(set[ch]);
-        result |= _mm_movemask_epi8(_mm_cmpeq_epi8(vec, check));
-    }
-    #endif
-
-    return result;
-}
-#endif
-
 size_t pstrspn(const pstring_t *str, const char *set) {
     if (!str || !set)
         return 0;
@@ -470,7 +509,7 @@ size_t pstrspn(const pstring_t *str, const char *set) {
 
 #ifdef PSTRING_AVX
     for (; length >= 32; length -= 32, buffer += 32) {
-        result = pstr__spn_avx(buffer, set, setlen);
+        result = pstr__match_set_avx(buffer, set, setlen);
 
         if (~result) {
             int bit = result ? __builtin_ctz(~result) : 0;
@@ -481,7 +520,7 @@ size_t pstrspn(const pstring_t *str, const char *set) {
 
 #ifdef PSTRING_SSE
     for (; length >= 16; length -= 16, buffer += 16) {
-        result = pstr__spn_sse(buffer, set, setlen);
+        result = pstr__match_set_sse(buffer, set, setlen);
 
         if (~result) {
             int bit = result ? __builtin_ctz(~result) : 0;
@@ -512,7 +551,7 @@ size_t pstrcspn(const pstring_t *str, const char *set) {
 
 #ifdef PSTRING_AVX
     for (; length >= 32; length -= 32, buffer += 32) {
-        result = pstr__spn_avx(buffer, set, setlen);
+        result = pstr__match_set_avx(buffer, set, setlen);
 
         if (result) {
             int bit = ~result ? __builtin_ctz(result) : 0;
@@ -523,7 +562,7 @@ size_t pstrcspn(const pstring_t *str, const char *set) {
 
 #ifdef PSTRING_SSE
     for (; length >= 16; length -= 16, buffer += 16) {
-        result = pstr__spn_sse(buffer, set, setlen);
+        result = pstr__match_set_sse(buffer, set, setlen);
 
         if (result) {
             int bit = ~result ? __builtin_ctz(result) : 0;
@@ -554,7 +593,7 @@ size_t pstrrspn(const pstring_t *str, const char *set) {
 
 #ifdef PSTRING_AVX
     for (; length >= 32; length -= 32, buffer -= 32) {
-        result = pstr__spn_avx(buffer - 32, set, setlen);
+        result = pstr__match_set_avx(buffer - 32, set, setlen);
 
         if (~result) {
             int bit = result ? __builtin_clz(~result & 0xFFFFFFFF) - 32 : 0;
@@ -565,7 +604,7 @@ size_t pstrrspn(const pstring_t *str, const char *set) {
 
 #ifdef PSTRING_SSE
     for (; length >= 16; length -= 16, buffer -= 16) {
-        result = pstr__spn_sse(buffer - 16, set, setlen);
+        result = pstr__match_set_sse(buffer - 16, set, setlen);
 
         if (~result) {
             int bit = result ? __builtin_clz(~result & 0xFFFF) - 16 : 0;
@@ -597,7 +636,7 @@ size_t pstrrcspn(const pstring_t *str, const char *set) {
 
 #ifdef PSTRING_AVX
     for (; length >= 32; length -= 32, buffer -= 32) {
-        result = pstr__spn_avx(buffer - 32, set, setlen);
+        result = pstr__match_set_avx(buffer - 32, set, setlen);
 
         if (result) {
             int bit = ~result ? __builtin_clz(result) - 32 : 0;
@@ -608,7 +647,7 @@ size_t pstrrcspn(const pstring_t *str, const char *set) {
 
 #ifdef PSTRING_SSE
     for (; length >= 16; length -= 16, buffer -= 16) {
-        result = pstr__spn_sse(buffer - 16, set, setlen);
+        result = pstr__match_set_sse(buffer - 16, set, setlen);
 
         if (result) {
             int bit = ~result ? __builtin_clz(result) - 16 : 0;
@@ -639,7 +678,7 @@ char *pstrpbrk(const pstring_t *str, const char *set) {
 
 #ifdef PSTRING_AVX
     for (; length >= 32; length -= 32, buffer += 32) {
-        int result = pstr__spn_avx(buffer, set, setlen);
+        int result = pstr__match_set_avx(buffer, set, setlen);
 
         if (result) {
             int bit = __builtin_ctz(result);
@@ -650,7 +689,7 @@ char *pstrpbrk(const pstring_t *str, const char *set) {
 
 #ifdef PSTRING_SSE
     for (; length >= 16; length -= 16, buffer += 16) {
-        int result = pstr__spn_sse(buffer, set, setlen);
+        int result = pstr__match_set_sse(buffer, set, setlen);
 
         if (result) {
             int bit = __builtin_ctz(result);
