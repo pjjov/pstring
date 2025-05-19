@@ -214,7 +214,30 @@ static inline int pstr__clz2(int x, int bits) {
 }
 
 static inline int pstr__nlen(const char *str, size_t max) {
+#if __STDC_VERSION__ >= 201112L && __STDC_LIB_EXT1__
+    return strnlen_s(str, max);
+#elif _POSIX_C_SOURCE >= 200809L
     return strnlen(str, max);
+#else
+    if (!str)
+        return 0;
+
+    size_t i = 0;
+    if (g_impl.size > 0) {
+        for (int result; max - i >= g_impl.size; i += g_impl.size) {
+            if ((result = g_impl.match_chr(str, '\0'))) {
+                int bit = pstr__ctz(result);
+                return i + bit;
+            }
+        }
+    }
+
+    for (; i < max; i++)
+        if (str[i] == '\0')
+            break;
+
+    return i;
+#endif
 }
 
 int pstrnew(pstring_t *out, const char *str, size_t len, allocator_t *alloc) {
@@ -266,7 +289,7 @@ int pstrwrap(pstring_t *out, char *buffer, size_t length, size_t capacity) {
 
     if (length == 0) {
         if (capacity > 0)
-            length = strnlen(buffer, capacity);
+            length = pstr__nlen(buffer, capacity);
         else
             length = strlen(buffer);
     }
