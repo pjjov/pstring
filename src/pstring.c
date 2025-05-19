@@ -48,6 +48,7 @@
 #define MAX(x, y) ((x) > (y) ? (x) : (y))
 
 #define GROWTH(old, req) (((old) + (req)) * 2 - (old))
+#define PSTRING_MAX_SET 256
 
 #ifdef PSTRING_AVX
 static int
@@ -132,6 +133,17 @@ void pstrdetect(void) {
     }
     #endif
 #endif
+}
+
+static inline int pstr__ctz(int x) { return __builtin_ctz(x); }
+static inline int pstr__clz(int x) { return __builtin_clz(x); }
+
+static inline int pstr__clz2(int x, int bits) {
+    return __builtin_clz(x & ((1 << bits) - 1)) - bits;
+}
+
+static inline int pstr__nlen(const char *str, size_t max) {
+    return strnlen(str, max);
 }
 
 int pstrnew(pstring_t *out, const char *str, size_t len, allocator_t *alloc) {
@@ -504,37 +516,28 @@ size_t pstrspn(const pstring_t *str, const char *set) {
 
     const char *buffer = pstrbuf(str);
     size_t length = pstrlen(str);
-    size_t setlen = strnlen(set, 256);
+    size_t setlen = pstr__nlen(set, PSTRING_MAX_SET);
+    size_t i = 0;
     int result = 0;
 
-#ifdef PSTRING_AVX
-    for (; length >= 32; length -= 32, buffer += 32) {
-        result = pstr__match_set_avx(buffer, set, setlen);
+    if (g_impl.size > 0) {
+        for (; length - i >= g_impl.size; i += g_impl.size) {
+            result = g_impl.match_set(&buffer[i], set, setlen);
 
-        if (~result) {
-            int bit = result ? __builtin_ctz(~result) : 0;
-            return buffer - pstrbuf(str) + bit;
+            if (~result) {
+                int bit = result ? pstr__ctz(~result) : 0;
+                return i + bit;
+            }
         }
     }
-#endif
 
-#ifdef PSTRING_SSE
-    for (; length >= 16; length -= 16, buffer += 16) {
-        result = pstr__match_set_sse(buffer, set, setlen);
-
-        if (~result) {
-            int bit = result ? __builtin_ctz(~result) : 0;
-            return buffer - pstrbuf(str) + bit;
-        }
-    }
-#endif
-
-    for (size_t i = 0; i < length; i++, result = 0) {
+    for (result = 0; i < length; i++) {
         for (size_t j = 0; !result && j < setlen; j++)
             result |= buffer[i] == set[j];
 
         if (!result)
-            return buffer - pstrbuf(str) + i;
+            return i;
+        result = 0;
     }
 
     return 0;
@@ -546,40 +549,27 @@ size_t pstrcspn(const pstring_t *str, const char *set) {
 
     const char *buffer = pstrbuf(str);
     size_t length = pstrlen(str);
-    size_t setlen = strnlen(set, 256);
+    size_t setlen = pstr__nlen(set, PSTRING_MAX_SET);
+    size_t i = 0;
     int result = 0;
 
-#ifdef PSTRING_AVX
-    for (; length >= 32; length -= 32, buffer += 32) {
-        result = pstr__match_set_avx(buffer, set, setlen);
+    if (g_impl.size > 0) {
+        for (; length - i >= g_impl.size; i += g_impl.size) {
+            result = g_impl.match_set(&buffer[i], set, setlen);
 
-        if (result) {
-            int bit = ~result ? __builtin_ctz(result) : 0;
-            return buffer - pstrbuf(str) + bit;
+            if (result) {
+                int bit = ~result ? pstr__ctz(result) : 0;
+                return i + bit;
+            }
         }
     }
-#endif
 
-#ifdef PSTRING_SSE
-    for (; length >= 16; length -= 16, buffer += 16) {
-        result = pstr__match_set_sse(buffer, set, setlen);
-
-        if (result) {
-            int bit = ~result ? __builtin_ctz(result) : 0;
-            return buffer - pstrbuf(str) + bit;
-        }
+    for (result = 0; i < length; i++) {
+        for (size_t j = 0; j < setlen; j++)
+            if (buffer[i] == set[j])
+                return i;
     }
-#endif
-
-    for (size_t i = 0; i < length; i++) {
-        for (size_t j = 0; !result && j < setlen; j++)
-            result |= buffer[i] == set[j];
-
-        if (result)
-            return buffer - pstrbuf(str) + i;
-    }
-
-    return pstrlen(str);
+    return length;
 }
 
 size_t pstrrspn(const pstring_t *str, const char *set) {
@@ -587,39 +577,30 @@ size_t pstrrspn(const pstring_t *str, const char *set) {
         return 0;
 
     size_t length = pstrlen(str);
-    size_t setlen = strnlen(set, 256);
-    const char *buffer = &pstrbuf(str)[length];
+    size_t setlen = pstr__nlen(set, PSTRING_MAX_SET);
+    const char *buffer = pstrbuf(str);
+    size_t i = 0;
     int result = 0;
 
-#ifdef PSTRING_AVX
-    for (; length >= 32; length -= 32, buffer -= 32) {
-        result = pstr__match_set_avx(buffer - 32, set, setlen);
+    if (g_impl.size > 0) {
+        for (; length - i >= g_impl.size; i += g_impl.size) {
+            const char *slot = &buffer[length - i - g_impl.size];
+            result = g_impl.match_set(slot, set, setlen);
 
-        if (~result) {
-            int bit = result ? __builtin_clz(~result & 0xFFFFFFFF) - 32 : 0;
-            return pstrlen(str) - length + bit;
+            if (~result) {
+                int bit = result ? pstr__clz2(~result, g_impl.size) : 0;
+                return i + bit;
+            }
         }
     }
-#endif
 
-#ifdef PSTRING_SSE
-    for (; length >= 16; length -= 16, buffer -= 16) {
-        result = pstr__match_set_sse(buffer - 16, set, setlen);
-
-        if (~result) {
-            int bit = result ? __builtin_clz(~result & 0xFFFF) - 16 : 0;
-            return pstrlen(str) - length + bit;
-        }
-    }
-#endif
-
-    buffer -= length;
-    for (size_t i = 0; i < length; i++, result = 0) {
+    for (result = 0; i < length; i++) {
         for (size_t j = 0; !result && j < setlen; j++)
             result |= buffer[length - i - 1] == set[j];
 
         if (!result)
-            return pstrlen(str) - length + i;
+            return i;
+        result = 0;
     }
 
     return 0;
@@ -630,42 +611,30 @@ size_t pstrrcspn(const pstring_t *str, const char *set) {
         return 0;
 
     size_t length = pstrlen(str);
-    size_t setlen = strnlen(set, 256);
-    const char *buffer = &pstrbuf(str)[length];
+    size_t setlen = pstr__nlen(set, PSTRING_MAX_SET);
+    const char *buffer = pstrbuf(str);
+    size_t i = 0;
     int result = 0;
 
-#ifdef PSTRING_AVX
-    for (; length >= 32; length -= 32, buffer -= 32) {
-        result = pstr__match_set_avx(buffer - 32, set, setlen);
+    if (g_impl.size > 0) {
+        for (; length - i >= g_impl.size; i += g_impl.size) {
+            const char *slot = &buffer[length - i - g_impl.size];
+            result = g_impl.match_set(slot, set, setlen);
 
-        if (result) {
-            int bit = ~result ? __builtin_clz(result) - 32 : 0;
-            return pstrlen(str) - length + bit;
+            if (result) {
+                int bit = ~result ? pstr__clz2(result, g_impl.size) : 0;
+                return i + bit;
+            }
         }
     }
-#endif
 
-#ifdef PSTRING_SSE
-    for (; length >= 16; length -= 16, buffer -= 16) {
-        result = pstr__match_set_sse(buffer - 16, set, setlen);
-
-        if (result) {
-            int bit = ~result ? __builtin_clz(result) - 16 : 0;
-            return pstrlen(str) - length + bit;
-        }
-    }
-#endif
-
-    buffer -= length;
-    for (size_t i = 0; i < length; i++) {
-        for (size_t j = 0; !result && j < setlen; j++)
-            result |= buffer[length - i - 1] == set[j];
-
-        if (result)
-            return pstrlen(str) - length + i;
+    for (; i < length; i++) {
+        for (size_t j = 0; j < setlen; j++)
+            if (buffer[length - i - 1] == set[j])
+                return i;
     }
 
-    return pstrlen(str);
+    return length;
 }
 
 char *pstrpbrk(const pstring_t *str, const char *set) {
