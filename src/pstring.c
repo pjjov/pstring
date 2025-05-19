@@ -169,11 +169,48 @@ void pstrdetect(void) {
 #endif
 }
 
-static inline int pstr__ctz(int x) { return __builtin_ctz(x); }
-static inline int pstr__clz(int x) { return __builtin_clz(x); }
+#ifndef __has_builtin
+    #define __has_builtin(...) 0
+#endif
+
+static inline int pstr__ctz(int x) {
+#if __has_builtin(__builtin_ctz)
+    return __builtin_ctz(x);
+#else
+    /* graphics.stanford.edu/~seander/bithacks.html#ZerosOnRightLinear */
+    static const int MultiplyDeBruijnBitPos[32]
+        = { 0,  1,  28, 2,  29, 14, 24, 3, 30, 22, 20, 15, 25, 17, 4,  8,
+            31, 27, 13, 23, 21, 19, 16, 7, 26, 12, 18, 6,  11, 5,  10, 9 };
+
+    unsigned int v = x;
+    return MultiplyDeBruijnBitPos[((uint32_t)((v & -v) * 0x077CB531U)) >> 27];
+#endif
+}
+
+static inline int pstr__clz(int x) {
+#if __has_builtin(__builtin_clz)
+    return __builtin_clz(x);
+#else
+    /* en.wikipedia.org/wiki/Find_first_set */
+    int r, q;
+    r = (x > 0xFFFF) << 4;
+    x >>= r;
+    q = (x > 0xFF) << 3;
+    x >>= q;
+    r |= q;
+    q = (x > 0xF) << 2;
+    x >>= q;
+    r |= q;
+    q = (x > 0x3) << 1;
+    x >>= q;
+    r |= q;
+    r |= (x >> 1);
+    return r;
+#endif
+}
 
 static inline int pstr__clz2(int x, int bits) {
-    return __builtin_clz(x & ((1 << bits) - 1)) - bits;
+    return pstr__clz(x & ((1 << bits) - 1)) - bits;
 }
 
 static inline int pstr__nlen(const char *str, size_t max) {
