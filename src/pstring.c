@@ -78,6 +78,12 @@ static int pstr__match_chr_avx(const char *buffer, int ch) {
     __m256i chars = _mm256_loadu_si256((const __m256i *)buffer);
     return _mm256_movemask_epi8(_mm256_cmpeq_epi8(vec, chars));
 }
+
+static int pstr__compare_avx(const char *left, const char *right) {
+    __m256i leftVec = _mm256_loadu_si256((const __m256i *)left);
+    __m256i rightVec = _mm256_loadu_si256((const __m256i *)right);
+    return _mm256_movemask_epi8(_mm256_cmpeq_epi8(leftVec, rightVec));
+}
 #endif
 
 #ifdef PSTRING_SSE
@@ -108,21 +114,31 @@ static int pstr__match_chr_sse(const char *buffer, int ch) {
     __m128i chars = _mm_loadu_si128((const __m128i *)buffer);
     return _mm_movemask_epi8(_mm_cmpeq_epi8(vec, chars));
 }
+
+static int pstr__compare_sse(const char *left, const char *right) {
+    __m128i leftVec = _mm_loadu_si128((const __m128i *)left);
+    __m128i rightVec = _mm_loadu_si128((const __m128i *)right);
+    return _mm_movemask_epi8(_mm_cmpeq_epi8(leftVec, rightVec));
+}
+
 #endif
 
 static struct {
     size_t size; /* vector size */
     int (*match_set)(const char *buffer, const char *set, size_t length);
     int (*match_chr)(const char *buffer, int ch);
+    int (*compare)(const char *left, const char *right);
 } g_impl = {
 #if !defined(PSTRING_DETECT) && defined(PSTRING_AVX)
     .size = 32,
     .match_set = &pstr__match_set_avx,
     .match_chr = &pstr__match_chr_avx,
+    .compare = &pstr__compare_avx,
 #elif !defined(PSTRING_DETECT) && defined(PSTRING_SSE)
     .size = 16,
     .match_set = &pstr__match_set_sse,
     .match_chr = &pstr__match_chr_sse,
+    .compare = &pstr__compare_sse,
 #else
     0
 #endif
@@ -139,6 +155,7 @@ void pstrdetect(void) {
         g_impl.size = 32;
         g_impl.match_set = &pstr__match_set_avx;
         g_impl.match_chr = &pstr__match_chr_avx;
+        g_impl.compare = &pstr__compare_avx;
     }
     #endif
     #ifdef PSTRING_SSE
@@ -146,6 +163,7 @@ void pstrdetect(void) {
         g_impl.size = 16;
         g_impl.match_set = &pstr__match_set_sse;
         g_impl.match_chr = &pstr__match_chr_sse;
+        g_impl.compare = &pstr__compare_sse;
     }
     #endif
 #endif
@@ -315,32 +333,16 @@ int pstrequal(const pstring_t *left, const pstring_t *right) {
 
     const char *leftBuf = pstrbuf(left);
     const char *rightBuf = pstrbuf(right);
+    size_t i = 0;
 
-#ifdef PSTRING_AVX
-    for (; length >= 32; length -= 32) {
-        __m256i leftVec = _mm256_loadu_si256((const __m256i *)leftBuf);
-        __m256i rightVec = _mm256_loadu_si256((const __m256i *)rightBuf);
-        if (_mm256_movemask_epi8(_mm256_cmpeq_epi8(leftVec, rightVec)))
-            return PSTRING_FALSE;
-
-        leftBuf += 32;
-        rightBuf += 32;
+    if (g_impl.size > 0) {
+        for (; length - i >= g_impl.size; i += g_impl.size) {
+            if (g_impl.compare(&leftBuf[i], &rightBuf[i]))
+                return PSTRING_FALSE;
+        }
     }
-#endif
 
-#ifdef PSTRING_SSE
-    for (; length >= 16; length -= 16) {
-        __m128i leftVec = _mm_loadu_si128((const __m128i *)leftBuf);
-        __m128i rightVec = _mm_loadu_si128((const __m128i *)rightBuf);
-        if (_mm_movemask_epi8(_mm_cmpeq_epi8(leftVec, rightVec)))
-            return PSTRING_FALSE;
-
-        leftBuf += 16;
-        rightBuf += 16;
-    }
-#endif
-
-    for (size_t i = 0; i < length; i++)
+    for (; i < length; i++)
         if (leftBuf[i] != rightBuf[i])
             return PSTRING_FALSE;
 
@@ -354,40 +356,19 @@ int pstrcmp(const pstring_t *left, const pstring_t *right) {
     size_t length = MIN(pstrlen(left), pstrlen(right));
     const char *leftBuf = pstrbuf(left);
     const char *rightBuf = pstrbuf(right);
+    size_t i = 0;
 
-#ifdef PSTRING_AVX
-    for (; length >= 32; length -= 32) {
-        __m256i leftVec = _mm256_loadu_si256((const __m256i *)leftBuf);
-        __m256i rightVec = _mm256_loadu_si256((const __m256i *)rightBuf);
-        int diff = _mm256_movemask_epi8(_mm256_cmpeq_epi8(leftVec, rightVec));
-
-        if (diff == 0) {
-            leftBuf += 32;
-            rightBuf += 32;
-        } else {
-            int bit = __builtin_clz(diff);
-            return leftBuf[bit] - rightBuf[bit];
+    if (g_impl.size > 0) {
+        for (; length - i >= g_impl.size; i += g_impl.size) {
+            int result = g_impl.compare(&leftBuf[i], &rightBuf[i]);
+            if (result) {
+                int bit = pstr__clz2(result, g_impl.size);
+                return leftBuf[bit] - rightBuf[bit];
+            }
         }
     }
-#endif
 
-#ifdef PSTRING_SSE
-    for (; length >= 16; length -= 16) {
-        __m128i leftVec = _mm_loadu_si128((const __m128i *)leftBuf);
-        __m128i rightVec = _mm_loadu_si128((const __m128i *)rightBuf);
-        int diff = _mm_movemask_epi8(_mm_cmpeq_epi8(leftVec, rightVec));
-
-        if (diff == 0) {
-            leftBuf += 16;
-            rightBuf += 16;
-        } else {
-            int bit = __builtin_clz(diff);
-            return leftBuf[bit] - rightBuf[bit];
-        }
-    }
-#endif
-
-    for (size_t i = 0; i < length; i++)
+    for (; i < length; i++)
         if (leftBuf[i] != rightBuf[i])
             return leftBuf[i] - rightBuf[i];
 
