@@ -72,6 +72,12 @@ pstr__match_set_avx(const char *buffer, const char *set, size_t length) {
 
     return result;
 }
+
+static int pstr__match_chr_avx(const char *buffer, int ch) {
+    __m256i vec = _mm256_set1_epi8((char)ch);
+    __m256i chars = _mm256_loadu_si256((const __m256i *)buffer);
+    return _mm256_movemask_epi8(_mm256_cmpeq_epi8(vec, chars));
+}
 #endif
 
 #ifdef PSTRING_SSE
@@ -96,21 +102,29 @@ pstr__match_set_sse(const char *buffer, const char *set, size_t length) {
 
     return result;
 }
+
+static int pstr__match_chr_sse(const char *buffer, int ch) {
+    __m128i vec = _mm_set1_epi8((char)ch);
+    __m128i chars = _mm_loadu_si128((const __m128i *)buffer);
+    return _mm_movemask_epi8(_mm_cmpeq_epi8(vec, chars));
+}
 #endif
 
 static struct {
     size_t size; /* vector size */
     int (*match_set)(const char *buffer, const char *set, size_t length);
+    int (*match_chr)(const char *buffer, int ch);
 } g_impl = {
 #if !defined(PSTRING_DETECT) && defined(PSTRING_AVX)
     .size = 32,
     .match_set = &pstr__match_set_avx,
+    .match_chr = &pstr__match_chr_avx,
 #elif !defined(PSTRING_DETECT) && defined(PSTRING_SSE)
     .size = 16,
     .match_set = &pstr__match_set_sse,
+    .match_chr = &pstr__match_chr_sse,
 #else
-    .size = 0,
-    .match_set = &NULL,
+    0
 #endif
 };
 
@@ -124,12 +138,14 @@ void pstrdetect(void) {
     if (PF_HAS_AVX) {
         g_impl.size = 32;
         g_impl.match_set = &pstr__match_set_avx;
+        g_impl.match_chr = &pstr__match_chr_avx;
     }
     #endif
     #ifdef PSTRING_SSE
     if (PF_HAS_SSE) {
         g_impl.size = 16;
         g_impl.match_set = &pstr__match_set_sse;
+        g_impl.match_chr = &pstr__match_chr_sse;
     }
     #endif
 #endif
@@ -429,38 +445,20 @@ char *pstrchr(const pstring_t *str, int ch) {
 
     size_t length = pstrlen(str);
     char *buffer = pstrbuf(str);
+    size_t i = 0;
 
-#ifdef PSTRING_AVX
-    __m256i vec = _mm256_set1_epi8((char)ch);
-    for (; length >= 32; length -= 32) {
-        __m256i chars = _mm256_loadu_si256((const __m256i *)buffer);
-        int diff = _mm256_movemask_epi8(_mm256_cmpeq_epi8(vec, chars));
+    if (g_impl.size > 0) {
+        for (; length - i >= g_impl.size; i += g_impl.size) {
+            int result = g_impl.match_chr(&buffer[i], ch);
 
-        if (diff != 0) {
-            int bit = __builtin_ctz(diff);
-            return &buffer[bit];
+            if (result) {
+                int bit = pstr__ctz(result);
+                return &buffer[i + bit];
+            }
         }
-
-        buffer += 32;
     }
-#endif
 
-#ifdef PSTRING_SSE
-    __m128i vec = _mm_set1_epi8((char)ch);
-    for (; length >= 16; length -= 16) {
-        __m128i chars = _mm_loadu_si128((const __m128i *)buffer);
-        int diff = _mm_movemask_epi8(_mm_cmpeq_epi8(vec, chars));
-
-        if (diff != 0) {
-            int bit = __builtin_ctz(diff);
-            return &buffer[bit];
-        }
-
-        buffer += 16;
-    }
-#endif
-
-    for (size_t i = 0; i < length; i++)
+    for (; i < length; i++)
         if (buffer[i] == (char)ch)
             return &buffer[i];
 
@@ -472,38 +470,22 @@ char *pstrrchr(const pstring_t *str, int ch) {
         return NULL;
 
     size_t length = pstrlen(str);
-    char *buffer = &pstrbuf(str)[length];
+    char *buffer = pstrbuf(str);
+    size_t i = 0;
 
-#ifdef PSTRING_AVX
-    __m256i vec = _mm256_set1_epi8((char)ch);
-    for (; length >= 32; length -= 32) {
-        __m256i chars = _mm256_loadu_si256((const __m256i *)&buffer[-32]);
-        int diff = _mm256_movemask_epi8(_mm256_cmpeq_epi8(vec, chars));
+    if (g_impl.size > 0) {
+        for (; length - i >= g_impl.size; i += g_impl.size) {
+            char *slot = &buffer[length - i - g_impl.size];
+            int result = g_impl.match_chr(slot, ch);
 
-        if (diff != 0) {
-            int bit = __builtin_clz(diff) - (sizeof(int) * 8 - 32);
-            return &buffer[31 - bit];
-        }
-
-        buffer -= 32;
-    }
-#endif
-
-#ifdef PSTRING_SSE
-    __m128i vec = _mm_set1_epi8((char)ch);
-    for (; length >= 16; length -= 16) {
-        buffer -= 16;
-
-        __m128i chars = _mm_loadu_si128((const __m128i *)buffer);
-        int diff = _mm_movemask_epi8(_mm_cmpeq_epi8(vec, chars));
-        if (diff != 0) {
-            int bit = __builtin_clz(diff) - (sizeof(int) * 8 - 16);
-            return &buffer[15 - bit];
+            if (result) {
+                int bit = pstr__clz2(result, g_impl.size);
+                return &slot[g_impl.size - bit - 1];
+            }
         }
     }
-#endif
 
-    for (size_t i = 0; i < length; i++)
+    for (; i < length; i++)
         if (buffer[length - i - 1] == (char)ch)
             return &buffer[length - i - 1];
 
