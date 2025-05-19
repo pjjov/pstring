@@ -642,32 +642,22 @@ char *pstrpbrk(const pstring_t *str, const char *set) {
         return 0;
 
     size_t length = pstrlen(str);
-    size_t setlen = strnlen(set, 256);
+    size_t setlen = pstr__nlen(set, 256);
     char *buffer = pstrbuf(str);
+    size_t i = 0;
 
-#ifdef PSTRING_AVX
-    for (; length >= 32; length -= 32, buffer += 32) {
-        int result = pstr__match_set_avx(buffer, set, setlen);
+    if (g_impl.size > 0) {
+        for (; length - i >= g_impl.size; i += g_impl.size) {
+            int result = g_impl.match_set(&buffer[i], set, setlen);
 
-        if (result) {
-            int bit = __builtin_ctz(result);
-            return &buffer[bit];
+            if (result) {
+                int bit = pstr__ctz(result);
+                return &buffer[bit];
+            }
         }
     }
-#endif
 
-#ifdef PSTRING_SSE
-    for (; length >= 16; length -= 16, buffer += 16) {
-        int result = pstr__match_set_sse(buffer, set, setlen);
-
-        if (result) {
-            int bit = __builtin_ctz(result);
-            return &buffer[bit];
-        }
-    }
-#endif
-
-    for (size_t i = 0; i < length; i++) {
+    for (; i < length; i++) {
         for (size_t j = 0; j < setlen; j++)
             if (buffer[i] == set[j])
                 return &buffer[i];
