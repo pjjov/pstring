@@ -323,6 +323,24 @@ int pstrslice(pstring_t *out, const pstring_t *str, size_t from, size_t to) {
     return pstrwrap(out, &pstrbuf(str)[from], to - from, to - from);
 }
 
+int pstrrange(
+    pstring_t *out, const pstring_t *str, const char *from, const char *to
+) {
+    if (!out || !str)
+        return PSTRING_EINVAL;
+
+    if (to > &pstrbuf(str)[pstrlen(str)])
+        to = &pstrbuf(str)[pstrlen(str)];
+    if (to < pstrbuf(str))
+        to = pstrbuf(str);
+    if (from > to)
+        from = to;
+    if (from < pstrbuf(str))
+        from = pstrbuf(str);
+
+    return pstrwrap(out, (char *)from, to - from, to - from);
+}
+
 void pstrfree(pstring_t *str) {
     if (str && pstrallocator(str)) {
         deallocate(pstrallocator(str), pstrbuf(str), pstrcap(str) + 1);

@@ -109,6 +109,14 @@ static int test_pstring_wrap_slice(int seed, int repetition) {
     pf_assert_false(pstrsso(&str));
     pf_assert_false(pstrowned(&str));
 
+    pf_assert_ok(pstrrange(&slice, &str, &buffer[7], &buffer[12]));
+    pf_assert(pstrlen(&slice) == 5);
+    pf_assert(pstrcap(&slice) == 5);
+    pf_assert_not_null(pstrbuf(&slice));
+    pf_assert_memcmp(pstrbuf(&slice), "world", 5);
+    pf_assert_false(pstrsso(&str));
+    pf_assert_false(pstrowned(&str));
+
     return 0;
 }
 

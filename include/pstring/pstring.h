@@ -138,6 +138,16 @@ int pstrwrap(pstring_t *out, char *buffer, size_t length, size_t capacity);
 **/
 int pstrslice(pstring_t *out, const pstring_t *str, size_t from, size_t to);
 
+/** Initializes `out` as a range of bytes from `str`, starting
+    at `from` (inclusive) and ending at `to` (exclusive).
+    If `from` is `NULL` or invalid, it's set to the start of the pstring.
+    If `to` is `NULL` or invalid, it's set to the end of the pstring.
+    Possible error codes: PSTRING_EINVAL.
+**/
+int pstrrange(
+    pstring_t *out, const pstring_t *str, const char *from, const char *to
+);
+
 /** Initializes a `pstring_t` as a slice of `str`, which is assumed
     to be a null-terminated statically allocated string/array.
 **/
