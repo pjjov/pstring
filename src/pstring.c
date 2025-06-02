@@ -326,18 +326,20 @@ int pstrslice(pstring_t *out, const pstring_t *str, size_t from, size_t to) {
 int pstrrange(
     pstring_t *out, const pstring_t *str, const char *from, const char *to
 ) {
-    if (!out || !str)
+    if (!out)
         return PSTRING_EINVAL;
 
-    if (to > &pstrbuf(str)[pstrlen(str)])
-        to = &pstrbuf(str)[pstrlen(str)];
-    if (to < pstrbuf(str))
-        to = pstrbuf(str);
+    if (str) {
+        if (to > &pstrbuf(str)[pstrlen(str)])
+            to = &pstrbuf(str)[pstrlen(str)];
+        if (to < pstrbuf(str))
+            to = pstrbuf(str);
+        if (from < pstrbuf(str))
+            from = pstrbuf(str);
+    }
+
     if (from > to)
         from = to;
-    if (from < pstrbuf(str))
-        from = pstrbuf(str);
-
     return pstrwrap(out, (char *)from, to - from, to - from);
 }
 
