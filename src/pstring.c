@@ -213,7 +213,7 @@ static inline int pstr__clz2(int x, int bits) {
     return pstr__clz(x & ((1 << bits) - 1)) - bits;
 }
 
-static inline int pstr__nlen(const char *str, size_t max) {
+size_t pstr__nlen(const char *str, size_t max) {
 #if __STDC_VERSION__ >= 201112L && __STDC_LIB_EXT1__
     return strnlen_s(str, max);
 #elif _POSIX_C_SOURCE >= 200809L

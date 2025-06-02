@@ -235,4 +235,6 @@ static inline void pstr__setlen(pstring_t *str, size_t length) {
         str->base.length = length;
 }
 
+size_t pstr__nlen(const char *str, size_t max);
+
 #endif
