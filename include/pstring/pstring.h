@@ -95,6 +95,13 @@ static inline int pstrowned(pstring_t *str) {
     return pstrsso(str) || pstrallocator(str) != NULL;
 }
 
+/** Returns the address pointing to the end of the character buffer,
+    which, if `str` is owned, points to a `\0` character.
+**/
+static inline char *pstrend(const pstring_t *str) {
+    return &pstrbuf(str)[pstrlen(str)];
+}
+
 /** Initializes `out` by copying the contents of `str`.
     If `len` is `0` and `str` is not empty, `strlen` is called.
     If `alloc` is `NULL`, the standard allocator is used.
