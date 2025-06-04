@@ -183,31 +183,31 @@ static int test_pstring_concat(int seed, int repetition) {
     pf_assert_ok(pstrcat(&a, &b));
     pf_assert(pstrlen(&a) == 5);
     pf_assert_memcmp(pstrbuf(&a), "Hello", 5);
-    pf_assert(pstrbuf(&a)[pstrlen(&a)] == '\0');
+    pf_assert(*pstrend(&a) == '\0');
 
     pf_assert_ok(pstrwrap(&b, ", ", 0, 0));
     pf_assert_ok(pstrcat(&a, &b));
     pf_assert(pstrlen(&a) == 7);
     pf_assert_memcmp(pstrbuf(&a), "Hello, ", 7);
-    pf_assert(pstrbuf(&a)[pstrlen(&a)] == '\0');
+    pf_assert(*pstrend(&a) == '\0');
 
     pf_assert_ok(pstrwrap(&b, "world", 0, 0));
     pf_assert_ok(pstrcat(&a, &b));
     pf_assert(pstrlen(&a) == 12);
     pf_assert_memcmp(pstrbuf(&a), "Hello, world", 12);
-    pf_assert(pstrbuf(&a)[pstrlen(&a)] == '\0');
+    pf_assert(*pstrend(&a) == '\0');
 
     pf_assert_ok(pstrwrap(&b, "!", 0, 0));
     pf_assert_ok(pstrcat(&a, &b));
     pf_assert(pstrlen(&a) == 13);
     pf_assert_memcmp(pstrbuf(&a), "Hello, world!", 13);
-    pf_assert(pstrbuf(&a)[pstrlen(&a)] == '\0');
+    pf_assert(*pstrend(&a) == '\0');
 
     pf_assert_ok(pstrwrap(&b, "", 0, 0));
     pf_assert_ok(pstrcat(&a, &b));
     pf_assert(pstrlen(&a) == 13);
     pf_assert_memcmp(pstrbuf(&a), "Hello, world!", 13);
-    pf_assert(pstrbuf(&a)[pstrlen(&a)] == '\0');
+    pf_assert(*pstrend(&a) == '\0');
 
     pstrfree(&a);
     return 0;
@@ -225,7 +225,7 @@ static int test_pstring_join(int seed, int repetition) {
     pf_assert_ok(pstrjoin(&out, src, 5));
     pf_assert(pstrlen(&out) == 13);
     pf_assert_memcmp(pstrbuf(&out), "Hello, world!", 13);
-    pf_assert(pstrbuf(&out)[pstrlen(&out)] == '\0');
+    pf_assert(*pstrend(&out) == '\0');
 
     pstrfree(&out);
     return 0;
@@ -238,7 +238,7 @@ static int test_pstring_copy(int seed, int repetition) {
     pf_assert_ok(pstrcpy(&dst, &src));
     pf_assert(pstrlen(&dst) == pstrlen(&src));
     pf_assert_memcmp(pstrbuf(&dst), "Hello, world!", 13);
-    pf_assert(pstrbuf(&dst)[pstrlen(&dst)] == '\0');
+    pf_assert(*pstrend(&dst) == '\0');
 
     pstrfree(&dst);
     return 0;

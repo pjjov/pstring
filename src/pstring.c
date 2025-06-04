@@ -330,8 +330,8 @@ int pstrrange(
         return PSTRING_EINVAL;
 
     if (str) {
-        if (to > &pstrbuf(str)[pstrlen(str)])
-            to = &pstrbuf(str)[pstrlen(str)];
+        if (to > pstrend(str))
+            to = pstrend(str);
         if (to < pstrbuf(str))
             to = pstrbuf(str);
         if (from < pstrbuf(str))
@@ -463,7 +463,7 @@ int pstrcat(pstring_t *dst, const pstring_t *src) {
         if (pstrreserve(dst, pstrlen(src)))
             return PSTRING_ENOMEM;
 
-        memcpy(&pstrbuf(dst)[pstrlen(dst)], pstrbuf(src), pstrlen(src));
+        memcpy(pstrend(dst), pstrbuf(src), pstrlen(src));
         pstr__setlen(dst, pstrlen(dst) + pstrlen(src));
     }
     return PSTRING_OK;
@@ -718,7 +718,7 @@ char *pstrstr(const pstring_t *str, const pstring_t *sub) {
 
     char ch = pstrbuf(sub)[0];
     char *search = pstrbuf(str);
-    char *end = &search[pstrlen(str)];
+    char *end = pstrend(str);
     while ((search = pstrchr(str, ch)) && search < end) {
         if (0 == memcmp(search, pstrbuf(sub), pstrlen(sub)))
             return search;
