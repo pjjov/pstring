@@ -102,6 +102,11 @@ static inline char *pstrend(const pstring_t *str) {
     return &pstrbuf(str)[pstrlen(str)];
 }
 
+/** Returns the character at index `i` or `'\0'` if out of bounds **/
+static inline char pstrget(const pstring_t *str, size_t i) {
+    return (i < pstrlen(str)) ? pstrbuf(str)[i] : '\0';
+}
+
 /** Initializes `out` by copying the contents of `str`.
     If `len` is `0` and `str` is not empty, `strlen` is called.
     If `alloc` is `NULL`, the standard allocator is used.
