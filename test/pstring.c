@@ -17,8 +17,8 @@
     limitations under the License.
 */
 
-#include "pf_assert.h"
-#include "pf_test.h"
+#include <pf_assert.h>
+#include <pf_test.h>
 
 #include <pstring/pstring.h>
 
@@ -325,7 +325,7 @@ int test_pstring_substring(int seed, int repetition) {
     return 0;
 }
 
-static const struct pf_test suite[] = {
+const struct pf_test suite_pstring[] = {
     { test_pstring_new, "/pstring/new", 1 },
     { test_pstring_alloc, "/pstring/alloc", 1 },
     { test_pstring_wrap_slice, "/pstring/wrap_slice", 1 },
@@ -340,5 +340,3 @@ static const struct pf_test suite[] = {
     { test_pstring_substring, "/pstring/substring", 1 },
     { 0 },
 };
-
-int main() { return pf_suite_run(suite, 0); }

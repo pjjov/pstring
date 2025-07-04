@@ -145,7 +145,7 @@ static struct {
 };
 
 #ifdef PSTRING_DETECT
-    #include "pf_cpuinfo.h"
+    #include <pf_cpuinfo.h>
 #endif
 
 void pstrdetect(void) {
