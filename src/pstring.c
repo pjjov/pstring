@@ -340,7 +340,12 @@ int pstrrange(
 
     if (from > to)
         from = to;
-    return pstrwrap(out, (char *)from, to - from, to - from);
+
+    out->buffer = (char *)from;
+    out->base.allocator = NULL;
+    out->base.capacity = to - from;
+    out->base.length = to - from;
+    return PSTRING_OK;
 }
 
 void pstrfree(pstring_t *str) {
