@@ -33,4 +33,30 @@ typedef struct pstring_t pstring_t;
 typedef struct pstrdict_t pstrdict_t;
 typedef size_t(pstrhash_fn)(const pstring_t *str);
 
+/** Allocates a new `pstrdict` using the `allocator` that will produce key hashes
+    using the provided `hash` function. For each of the parameters that are
+    `NULL`, the default ones will be used.
+**/
+pstrdict_t *pstrdict_new(pstrhash_fn *hash, allocator_t *allocator);
+
+/** Reserves space to fit at least `count` more key-value pairs inside `dict`.
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
+**/
+int pstrdict_reserve(pstrdict_t *dict, size_t count);
+
+/** Frees all memory resources used by `dict`. **/
+void pstrdict_free(pstrdict_t *dict);
+
+/** Returns the number of slots reserved in `dict` **/
+size_t pstrdict_capacity(const pstrdict_t *dict);
+
+/** Returns the number of key-value pairs in `dict` **/
+size_t pstrdict_count(const pstrdict_t *dict);
+
+/** Returns the allocator used by `dict` **/
+allocator_t *pstrdict_allocator(const pstrdict_t *dict);
+
+/** Removes all key-value pairs from `dict` **/
+void pstrdict_clear(pstrdict_t *dict);
+
 #endif

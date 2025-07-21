@@ -22,7 +22,10 @@
 
 #include <stdint.h>
 
+#include "allocator_std.h"
+
 #define PSTRDICT_BUCKET_SIZE 16
+#define PSTRDICT_THRESHOLD 0.7
 
 #if !defined(PSTRING_NO_SIMD) && defined(__SSE2__) && PSTRDICT_BUCKET_SIZE >= 16
     #define PSTRDICT_SSE2
@@ -50,6 +53,7 @@ struct pstrdict_t {
     struct bucket *buckets;
     size_t count;
     size_t capacity;
+    pstrhash_fn *hash;
     allocator_t *allocator;
 };
 
@@ -68,4 +72,107 @@ static inline uint64_t bucket_match(union metadata *meta, uint8_t part) {
     }
 #endif
     return out;
+}
+
+/* graphics.stanford.edu/~seander/bithacks.html#RoundUpPowerOf2 */
+static inline size_t round_pow2(size_t v) {
+    v--;
+    v |= v >> 1;
+    v |= v >> 2;
+    v |= v >> 4;
+    v |= v >> 8;
+    v |= v >> 16;
+#if SIZE_MAX > UINT32_MAX
+    v |= v >> 32;
+#endif
+    v++;
+
+    return v;
+}
+
+static size_t default_hash(const pstring_t *str) { return 0; }
+
+pstrdict_t *pstrdict_new(pstrhash_fn *hash, allocator_t *allocator) {
+    if (!allocator)
+        allocator = &standard_allocator;
+    if (!hash)
+        hash = &default_hash;
+
+    pstrdict_t *out = allocate(allocator, sizeof(pstrdict_t));
+
+    if (out) {
+        out->buckets = NULL;
+        out->count = 0;
+        out->capacity = 0;
+        out->hash = hash;
+        out->allocator = allocator;
+    }
+
+    return out;
+}
+
+void pstrdict_clear(pstrdict_t *dict) {
+    if (!dict)
+        return;
+
+    dict->count = 0;
+    for (size_t b = 0; b < dict->capacity / PSTRDICT_BUCKET_SIZE; b++) {
+        union metadata *meta = &dict->buckets[b].meta;
+        memset(meta, 0, sizeof(union metadata));
+    }
+}
+
+static int grow_empty(pstrdict_t *dict, size_t capacity) {
+    struct bucket *buckets = reallocate(
+        dict->allocator,
+        dict->buckets,
+        dict->capacity / PSTRDICT_BUCKET_SIZE * sizeof(struct bucket),
+        capacity / PSTRDICT_BUCKET_SIZE * sizeof(struct bucket)
+    );
+
+    if (!buckets)
+        return PSTRING_ENOMEM;
+
+    dict->buckets = buckets;
+    dict->capacity = capacity;
+    pstrdict_clear(dict);
+    return PSTRING_OK;
+}
+
+int pstrdict_reserve(pstrdict_t *dict, size_t count) {
+    if (!dict)
+        return PSTRING_EINVAL;
+
+    if (dict->count + count <= dict->capacity * PSTRDICT_THRESHOLD)
+        return PSTRING_OK;
+
+    size_t capacity = round_pow2(dict->capacity) * 2;
+    if (capacity < PSTRDICT_BUCKET_SIZE)
+        capacity = PSTRDICT_BUCKET_SIZE;
+
+    if (dict->count == 0)
+        return grow_empty(dict, capacity);
+    return PSTRING_ENOMEM;
+}
+
+void pstrdict_free(pstrdict_t *dict) {
+    if (dict) {
+        deallocate(
+            dict->allocator,
+            dict->buckets,
+            dict->capacity / PSTRDICT_BUCKET_SIZE * sizeof(struct bucket)
+        );
+
+        deallocate(dict->allocator, dict, sizeof(pstrdict_t));
+    }
+}
+
+size_t pstrdict_capacity(const pstrdict_t *dict) {
+    return dict ? dict->capacity : 0;
+}
+
+size_t pstrdict_count(const pstrdict_t *dict) { return dict ? dict->count : 0; }
+
+allocator_t *pstrdict_allocator(const pstrdict_t *dict) {
+    return dict ? dict->allocator : 0;
 }

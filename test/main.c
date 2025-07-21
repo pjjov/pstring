@@ -21,13 +21,15 @@
 #include <string.h>
 
 extern const pf_test suite_pstring[];
+extern const pf_test suite_dict[];
 
 static const pf_test *suites[] = {
     suite_pstring,
+    suite_dict,
     NULL,
 };
 
-static const char *names[] = { "pstring", NULL };
+static const char *names[] = { "pstring", "dict", NULL };
 
 int main(int argc, char *argv[]) {
     if (argc > 2) {

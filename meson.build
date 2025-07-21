@@ -6,6 +6,7 @@ project('pstring', 'c')
 
 src = [
     './src/pstring.c',
+    './src/pstrdict.c',
 ]
 
 inc = include_directories('./include/')
@@ -32,7 +33,9 @@ tests = executable(
     sources: [
         'test/main.c',
         'test/pstring.c',
+        'test/pstrdict.c',
     ]
 )
 
 test('pstring/pstring', tests, args: ['pstring'], protocol: 'tap')
+test('pstring/dict', tests, args: ['dict'], protocol: 'tap')
