@@ -80,4 +80,9 @@ int pstrdict_insert(pstrdict_t *dict, const pstring_t *key, const void *value);
 **/
 int pstrdict_remove(pstrdict_t *dict, const pstring_t *key);
 
+/** Forcefully inserts the key-value pair, without checking for it's presence.
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
+**/
+int pstrdict_finsert(pstrdict_t *dict, const pstring_t *key, const void *value);
+
 #endif

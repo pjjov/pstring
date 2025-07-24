@@ -169,6 +169,32 @@ static int grow_empty(pstrdict_t *dict, size_t capacity) {
     return PSTRING_OK;
 }
 
+static int grow_not_empty(pstrdict_t *dict, size_t capacity) {
+    pstrdict_t tmp = *dict;
+    tmp.buckets = NULL;
+    tmp.capacity = 0;
+    tmp.count = 0;
+
+    if (grow_empty(&tmp, capacity))
+        return PSTRING_ENOMEM;
+
+    for (size_t b = 0; b < dict->capacity / PSTRDICT_BUCKET_SIZE; b++) {
+        struct pair *pairs = dict->buckets[b].pairs;
+
+        for (size_t i = 0; i < PSTRDICT_BUCKET_SIZE; i++)
+            pstrdict_finsert(&tmp, pairs[i].key, pairs[i].value);
+    }
+
+    deallocate(
+        dict->allocator,
+        dict->buckets,
+        dict->capacity / PSTRDICT_BUCKET_SIZE * sizeof(struct bucket)
+    );
+
+    *dict = tmp;
+    return PSTRING_OK;
+}
+
 int pstrdict_reserve(pstrdict_t *dict, size_t count) {
     if (!dict)
         return PSTRING_EINVAL;
@@ -180,9 +206,8 @@ int pstrdict_reserve(pstrdict_t *dict, size_t count) {
     if (capacity < PSTRDICT_BUCKET_SIZE)
         capacity = PSTRDICT_BUCKET_SIZE;
 
-    if (dict->count == 0)
-        return grow_empty(dict, capacity);
-    return PSTRING_ENOMEM;
+    return dict->count == 0 ? grow_empty(dict, capacity)
+                           : grow_not_empty(dict, capacity);
 }
 
 void pstrdict_free(pstrdict_t *dict) {
@@ -369,4 +394,32 @@ int pstrdict_remove(pstrdict_t *dict, const pstring_t *key) {
     }
 
     return PSTRING_ENOENT;
+}
+
+int pstrdict_finsert(pstrdict_t *dict, const pstring_t *key, const void *value) {
+    if (!dict || !key || !value)
+        return PSTRING_EINVAL;
+
+    if (pstrdict_reserve(dict, 1))
+        return PSTRING_ENOMEM;
+
+    size_t hash = dict->hash(key);
+    uint8_t i, part = hash_part(hash);
+    struct bucket *b = iter_init(dict, hash);
+
+    while (1) {
+        uint64_t matches = bucket_match(&b->meta, PSTRDICT_EMPTY);
+
+        if (matches) {
+            i = bitset_next(&matches);
+
+            dict->count++;
+            b->meta.hashes[i] = part;
+            b->pairs[i].key = key;
+            b->pairs[i].value = value;
+            return PSTRING_OK;
+        }
+
+        b = iter_next(dict, b);
+    }
 }
