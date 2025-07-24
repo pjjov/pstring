@@ -72,9 +72,44 @@ int test_pstrdict_get_set(int seed, int rep) {
     return 0;
 }
 
+int test_pstrdict_insert_remove(int seed, int rep) {
+    pstring_t keys[] = {
+        PSTRWRAP("a"), PSTRWRAP("b"), PSTRWRAP("c"),
+        PSTRWRAP("d"), PSTRWRAP("e"),
+    };
+
+    int values[5] = { 1, 2, 3, 4, 5 };
+
+    pstrdict_t *dict = pstrdict_new(NULL, NULL);
+    pf_assert_not_null(dict);
+
+    for (size_t i = 0; i < 5; i++)
+        pf_assert_ok(pstrdict_insert(dict, &keys[i], &values[i]));
+
+    for (size_t i = 0; i < 5; i++) {
+        pf_assert(PSTRING_EEXIST == pstrdict_insert(dict, &keys[i], &values[i]));
+        pf_assert(pstrdict_get(dict, &keys[i]) == &values[i]);
+    }
+
+    for (size_t i = 0; i < 5; i++)
+        pf_assert_ok(pstrdict_remove(dict, &keys[i]));
+
+    for (size_t i = 0; i < 5; i++) {
+        pf_assert_null(pstrdict_get(dict, &keys[i]));
+        pf_assert(PSTRING_ENOENT == pstrdict_remove(dict, &keys[i]));
+    }
+
+    pf_assert(PSTRING_EINVAL == pstrdict_insert(dict, NULL, NULL));
+    pf_assert(PSTRING_EINVAL == pstrdict_remove(dict, NULL));
+
+    pstrdict_free(dict);
+    return 0;
+}
+
 const struct pf_test suite_dict[] = {
     { test_pstrdict_new, "/pstring/dict/new", 1 },
     { test_pstrdict_reserve, "/pstring/dict/reserve", 1 },
     { test_pstrdict_get_set, "/pstring/dict/get_set", 1 },
+    { test_pstrdict_insert_remove, "/pstring/dict/insert_remove", 1 },
     { 0 },
 };

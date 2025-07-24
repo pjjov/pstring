@@ -300,3 +300,73 @@ int pstrdict_set(pstrdict_t *dict, const pstring_t *key, const void *value) {
         b = iter_next(dict, b);
     }
 }
+
+int pstrdict_insert(pstrdict_t *dict, const pstring_t *key, const void *value) {
+    if (!dict || !key || !value)
+        return PSTRING_EINVAL;
+
+    if (pstrdict_reserve(dict, 1))
+        return PSTRING_ENOMEM;
+
+    size_t hash = dict->hash(key);
+    uint8_t i, part = hash_part(hash);
+    struct bucket *b = iter_init(dict, hash);
+
+    while (1) {
+        uint64_t matches = bucket_match(&b->meta, part);
+
+        while (matches) {
+            i = bitset_next(&matches);
+
+            if (pstrequal(key, b->pairs[i].key))
+                return PSTRING_EEXIST;
+        }
+
+        matches = bucket_match(&b->meta, PSTRDICT_EMPTY);
+
+        if (matches) {
+            i = bitset_next(&matches);
+
+            dict->count++;
+            b->meta.hashes[i] = part;
+            b->pairs[i].key = key;
+            b->pairs[i].value = value;
+            return PSTRING_OK;
+        }
+
+        b = iter_next(dict, b);
+    }
+}
+
+int pstrdict_remove(pstrdict_t *dict, const pstring_t *key) {
+    if (!dict || !key)
+        return PSTRING_EINVAL;
+
+    if (dict->count == 0)
+        return PSTRING_ENOENT;
+
+    size_t hash = dict->hash(key);
+    uint8_t part = hash_part(hash);
+    struct bucket *b = iter_init(dict, hash);
+
+    while (1) {
+        uint64_t matches = bucket_match(&b->meta, part);
+
+        while (matches) {
+            uint8_t i = bitset_next(&matches);
+
+            if (pstrequal(key, b->pairs[i].key)) {
+                b->meta.hashes[i] = PSTRDICT_TOMB;
+                dict->count--;
+                return PSTRING_OK;
+            }
+        }
+
+        if (bucket_match(&b->meta, PSTRDICT_EMPTY))
+            break;
+
+        b = iter_next(dict, b);
+    }
+
+    return PSTRING_ENOENT;
+}

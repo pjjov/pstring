@@ -70,4 +70,14 @@ void *pstrdict_get(pstrdict_t *dict, const pstring_t *key);
 **/
 int pstrdict_set(pstrdict_t *dict, const pstring_t *key, const void *value);
 
+/** Inserts the key-value pair if it's not already present in `dict`.
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM, PSTRING_EEXIST.
+**/
+int pstrdict_insert(pstrdict_t *dict, const pstring_t *key, const void *value);
+
+/** Removes the key-value pair from `dict`, if it's found.
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM, PSTRING_ENOENT.
+**/
+int pstrdict_remove(pstrdict_t *dict, const pstring_t *key);
+
 #endif
