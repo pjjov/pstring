@@ -59,4 +59,15 @@ allocator_t *pstrdict_allocator(const pstrdict_t *dict);
 /** Removes all key-value pairs from `dict` **/
 void pstrdict_clear(pstrdict_t *dict);
 
+/** Retrieves the value associated with `key` or `NULL` if not found. **/
+void *pstrdict_get(pstrdict_t *dict, const pstring_t *key);
+
+/** Sets the value associated with `key` to `value`, inserting them if `key` is
+    not already present in `dict`. Both pointers, the initial key and current
+    value, must remain valid until they are removed or `dict` is destroyed.
+
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
+**/
+int pstrdict_set(pstrdict_t *dict, const pstring_t *key, const void *value);
+
 #endif

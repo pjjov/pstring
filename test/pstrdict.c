@@ -48,8 +48,33 @@ int test_pstrdict_reserve(int seed, int rep) {
     return 0;
 }
 
+int test_pstrdict_get_set(int seed, int rep) {
+    pstring_t keys[] = {
+        PSTRWRAP("a"), PSTRWRAP("b"), PSTRWRAP("c"),
+        PSTRWRAP("d"), PSTRWRAP("e"),
+    };
+
+    int values[] = { 1, 2, 3, 4, 5 };
+
+    pstrdict_t *dict = pstrdict_new(NULL, NULL);
+    pf_assert_not_null(dict);
+
+    for (size_t i = 0; i < 5; i++)
+        pf_assert_ok(pstrdict_set(dict, &keys[i], &values[i]));
+
+    for (size_t i = 0; i < 5; i++)
+        pf_assert(pstrdict_get(dict, &keys[i]) == &values[i]);
+
+    pf_assert_null(pstrdict_get(dict, &PSTRWRAP("f")));
+    pf_assert(PSTRING_EINVAL == pstrdict_set(dict, NULL, NULL));
+
+    pstrdict_free(dict);
+    return 0;
+}
+
 const struct pf_test suite_dict[] = {
     { test_pstrdict_new, "/pstring/dict/new", 1 },
-    { test_pstrdict_reserve, "/pstring/dict/reserved", 1 },
+    { test_pstrdict_reserve, "/pstring/dict/reserve", 1 },
+    { test_pstrdict_get_set, "/pstring/dict/get_set", 1 },
     { 0 },
 };

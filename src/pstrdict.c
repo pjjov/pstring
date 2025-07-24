@@ -26,6 +26,8 @@
 
 #define PSTRDICT_BUCKET_SIZE 16
 #define PSTRDICT_THRESHOLD 0.7
+#define PSTRDICT_EMPTY 0
+#define PSTRDICT_TOMB 1
 
 #if !defined(PSTRING_NO_SIMD) && defined(__SSE2__) && PSTRDICT_BUCKET_SIZE >= 16
     #define PSTRDICT_SSE2
@@ -90,7 +92,35 @@ static inline size_t round_pow2(size_t v) {
     return v;
 }
 
-static size_t default_hash(const pstring_t *str) { return 0; }
+static inline uint8_t hash_part(size_t hash) {
+    uint8_t part = hash & 0xFF;
+    if (part == PSTRDICT_EMPTY)
+        part++;
+    if (part == PSTRDICT_TOMB)
+        part++;
+    return part;
+}
+
+#if SIZE_MAX == 0xFFFFFFFFFFFFFFFFull
+    #define HASH_FNV_PRIME 0x00000100000001b3ull
+    #define HASH_FNV_OFFSET 0xcbf29ce484222325ull
+#elif SIZE_MAX == 0xFFFFFFFFull
+    #define HASH_FNV_PRIME 0x01000193ull
+    #define HASH_FNV_OFFSET 0x811c9dc5ull
+#endif
+
+static size_t default_hash(const pstring_t *str) {
+    size_t hash = HASH_FNV_OFFSET;
+    size_t length = pstrlen(str);
+    const char *bytes = pstrbuf(str);
+
+    while (length--) {
+        hash ^= (size_t)(unsigned char)*bytes++;
+        hash *= HASH_FNV_PRIME;
+    }
+
+    return hash;
+}
 
 pstrdict_t *pstrdict_new(pstrhash_fn *hash, allocator_t *allocator) {
     if (!allocator)
@@ -175,4 +205,98 @@ size_t pstrdict_count(const pstrdict_t *dict) { return dict ? dict->count : 0; }
 
 allocator_t *pstrdict_allocator(const pstrdict_t *dict) {
     return dict ? dict->allocator : 0;
+}
+
+uint8_t bitset_next(uint64_t *set) {
+    if (!set)
+        return 0;
+
+    for (uint8_t i = 0;; i++) {
+        if (*set & (1 << i)) {
+            *set &= ~((uint64_t)1 << i);
+            return i;
+        }
+    }
+}
+
+struct pstrdict_iter {
+    struct bucket *buckets;
+    struct bucket *current;
+    size_t mask;
+    size_t b;
+};
+
+static inline struct bucket *iter_init(pstrdict_t *dict, size_t hash) {
+    return &dict->buckets[(hash & (dict->capacity - 1)) / PSTRDICT_BUCKET_SIZE];
+}
+
+static inline struct bucket *iter_next(pstrdict_t *dict, struct bucket *prev) {
+    size_t end = dict->capacity / PSTRDICT_BUCKET_SIZE;
+    return ++prev >= &dict->buckets[end] ? dict->buckets : prev;
+}
+
+void *pstrdict_get(pstrdict_t *dict, const pstring_t *key) {
+    if (!dict || !key || dict->count == 0)
+        return NULL;
+
+    size_t hash = dict->hash(key);
+    uint8_t part = hash_part(hash);
+    struct bucket *b = iter_init(dict, hash);
+
+    while (1) {
+        uint64_t matches = bucket_match(&b->meta, part);
+
+        while (matches) {
+            uint8_t i = bitset_next(&matches);
+
+            if (pstrequal(key, b->pairs[i].key))
+                return (void *)b->pairs[i].value;
+        }
+
+        if (bucket_match(&b->meta, PSTRDICT_EMPTY))
+            break;
+
+        b = iter_next(dict, b);
+    }
+
+    return NULL;
+}
+
+int pstrdict_set(pstrdict_t *dict, const pstring_t *key, const void *value) {
+    if (!dict || !key || !value)
+        return PSTRING_EINVAL;
+
+    if (pstrdict_reserve(dict, 1))
+        return PSTRING_ENOMEM;
+
+    size_t hash = dict->hash(key);
+    uint8_t i, part = hash_part(hash);
+    struct bucket *b = iter_init(dict, hash);
+
+    while (1) {
+        uint64_t matches = bucket_match(&b->meta, part);
+
+        while (matches) {
+            i = bitset_next(&matches);
+
+            if (pstrequal(key, b->pairs[i].key)) {
+                b->pairs[i].value = value;
+                return PSTRING_OK;
+            }
+        }
+
+        matches = bucket_match(&b->meta, PSTRDICT_EMPTY);
+
+        if (matches) {
+            i = bitset_next(&matches);
+
+            dict->count++;
+            b->meta.hashes[i] = part;
+            b->pairs[i].key = key;
+            b->pairs[i].value = value;
+            return PSTRING_OK;
+        }
+
+        b = iter_next(dict, b);
+    }
 }
