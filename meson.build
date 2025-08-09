@@ -5,6 +5,7 @@
 project('pstring', 'c')
 
 src = [
+    './src/encoding.c',
     './src/io.c',
     './src/pstring.c',
     './src/pstrdict.c',
@@ -32,6 +33,7 @@ tests = executable(
     'pstring-test',
     dependencies: [pstring_dep, cpolyfill_dep],
     sources: [
+        'test/encoding.c',
         'test/main.c',
         'test/pstring.c',
         'test/pstrdict.c',
@@ -40,3 +42,4 @@ tests = executable(
 
 test('pstring/pstring', tests, args: ['pstring'], protocol: 'tap')
 test('pstring/dict', tests, args: ['dict'], protocol: 'tap')
+test('pstring/encoding', tests, args: ['encoding'], protocol: 'tap')

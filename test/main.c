@@ -22,14 +22,21 @@
 
 extern const pf_test suite_pstring[];
 extern const pf_test suite_dict[];
+extern const pf_test suite_encoding[];
 
 static const pf_test *suites[] = {
     suite_pstring,
     suite_dict,
+    suite_encoding,
     NULL,
 };
 
-static const char *names[] = { "pstring", "dict", NULL };
+static const char *names[] = {
+    "pstring",
+    "dict",
+    "encoding",
+    NULL,
+};
 
 int main(int argc, char *argv[]) {
     if (argc > 2) {
