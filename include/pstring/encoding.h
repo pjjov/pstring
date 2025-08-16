@@ -35,4 +35,14 @@ int pstrenc_hex(pstring_t *dst, const pstring_t *src);
 **/
 int pstrdec_hex(pstring_t *dst, const pstring_t *src);
 
+/** Encodes `src` into a URL compatible string.
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
+**/
+int pstrenc_url(pstring_t *dst, const pstring_t *src);
+
+/** Decodes a URL-encoded string from `src`.
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
+**/
+int pstrdec_url(pstring_t *dst, const pstring_t *src);
+
 #endif
