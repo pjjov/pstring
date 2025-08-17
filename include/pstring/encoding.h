@@ -45,4 +45,40 @@ int pstrenc_url(pstring_t *dst, const pstring_t *src);
 **/
 int pstrdec_url(pstring_t *dst, const pstring_t *src);
 
+/** Encodes `src` into a Base64-encoded string.
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
+**/
+int pstrenc_base64(pstring_t *dst, const pstring_t *src);
+
+/** Encodes `src` into a URL-safe Base64-encoded string.
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
+**/
+int pstrenc_base64url(pstring_t *dst, const pstring_t *src);
+
+/** Encodes `src` into a Base64-encoded string using the provided
+    translation table. `table` must be exactly 64 characters long.
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
+**/
+int pstrenc_base64table(
+    pstring_t *dst, const pstring_t *src, const pstring_t *table
+);
+
+/** Decodes a Base64-encoded string from `src`.
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
+**/
+int pstrdec_base64(pstring_t *dst, const pstring_t *src);
+
+/** Decodes a URL-safe Base64-encoded string from `src`.
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
+**/
+int pstrdec_base64url(pstring_t *dst, const pstring_t *src);
+
+/** Decodes a Base64-encoded string from `src` using the provided
+    translation table. `table` must be exactly 64 characters long.
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
+**/
+int pstrdec_base64table(
+    pstring_t *dst, const pstring_t *src, const pstring_t *table
+);
+
 #endif

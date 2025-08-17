@@ -66,8 +66,42 @@ int test_encoding_url(int seed, int rep) {
     return 0;
 }
 
+int test_encoding_base64(int seed, int rep) {
+    pstring_t dst = { 0 };
+
+    TEST_ENCODING(pstrenc_base64, "abcd $-hello_'", "YWJjZCAkLWhlbGxvXyc=");
+    TEST_ENCODING(pstrdec_base64, "YWJjZCAkLWhlbGxvXyc=", "abcd $-hello_'");
+    TEST_ENCODING(pstrenc_base64, "~~~", "fn5+");
+    TEST_ENCODING(pstrdec_base64, "fn5+", "~~~");
+    TEST_ENCODING(pstrenc_base64, "", "");
+    TEST_ENCODING(pstrdec_base64, "", "");
+
+    TEST_ENCODING(pstrenc_base64url, "abcd $-hello_'", "YWJjZCAkLWhlbGxvXyc=");
+    TEST_ENCODING(pstrdec_base64url, "YWJjZCAkLWhlbGxvXyc=", "abcd $-hello_'");
+    TEST_ENCODING(pstrenc_base64url, "~~~", "fn5-");
+    TEST_ENCODING(pstrdec_base64url, "fn5-", "~~~");
+    TEST_ENCODING(pstrenc_base64url, "", "");
+    TEST_ENCODING(pstrdec_base64url, "", "");
+
+    pf_assert(PSTRING_EINVAL == pstrenc_base64(NULL, NULL));
+    pf_assert(PSTRING_EINVAL == pstrdec_base64(NULL, NULL));
+    pf_assert(PSTRING_EINVAL == pstrenc_base64url(NULL, NULL));
+    pf_assert(PSTRING_EINVAL == pstrdec_base64url(NULL, NULL));
+    pf_assert(PSTRING_EINVAL == pstrenc_base64table(NULL, NULL, NULL));
+    pf_assert(PSTRING_EINVAL == pstrdec_base64table(NULL, NULL, NULL));
+
+    pf_assert(
+        PSTRING_EINVAL
+        == pstrenc_base64table(&PSTRWRAP(""), &PSTRWRAP(""), &PSTRWRAP(""))
+    );
+
+    pstrfree(&dst);
+    return 0;
+}
+
 const struct pf_test suite_encoding[] = {
     { test_encoding_hex, "/pstring/encoding/hex", 1 },
     { test_encoding_url, "/pstring/encoding/url", 1 },
+    { test_encoding_base64, "/pstring/encoding/base64", 1 },
     { 0 },
 };
