@@ -714,6 +714,39 @@ char *pstrpbrk(const pstring_t *str, const char *set) {
     return NULL;
 }
 
+char *pstrcpbrk(const pstring_t *str, const char *set) {
+    if (!str || !set)
+        return 0;
+
+    size_t length = pstrlen(str);
+    size_t setlen = pstr__nlen(set, 256);
+    char *buffer = pstrbuf(str);
+    size_t i = 0, j;
+
+    if (g_impl.size > 0) {
+        for (; length - i >= g_impl.size; i += g_impl.size) {
+            int result = g_impl.match_set(&buffer[i], set, setlen);
+            result = ~result & ((1 << g_impl.size) - 1);
+
+            if (result) {
+                int bit = pstr__ctz(result);
+                return &buffer[bit];
+            }
+        }
+    }
+
+    for (; i < length; i++) {
+        for (j = 0; j < setlen; j++)
+            if (buffer[i] != set[j])
+                break;
+
+        if (j == setlen)
+            return &buffer[i];
+    }
+
+    return NULL;
+}
+
 char *pstrstr(const pstring_t *str, const pstring_t *sub) {
     if (!str || !sub || pstrlen(sub) > pstrlen(str))
         return NULL;

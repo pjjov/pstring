@@ -304,9 +304,16 @@ int test_pstring_breakset(int seed, int repetition) {
     pf_assert(&pstrbuf(&str)[7] == pstrpbrk(&str, "%$"));
     pf_assert(&pstrbuf(&str)[10] == pstrpbrk(&str, "12345"));
     pf_assert(&pstrbuf(&str)[7] == pstrpbrk(&str, "%$"));
-    pf_assert(NULL == pstrpbrk(&str, " "));
-    pf_assert(NULL == pstrpbrk(&str, "\0"));
-    pf_assert(NULL == pstrpbrk(NULL, NULL));
+    pf_assert_null(pstrpbrk(&str, " "));
+    pf_assert_null(pstrpbrk(&str, "\0"));
+    pf_assert_null(pstrpbrk(NULL, NULL));
+
+    pf_assert(&pstrbuf(&str)[5] == pstrcpbrk(&str, "AbcD"));
+    pf_assert(&pstrbuf(&str)[9] == pstrcpbrk(&str, "AbcDef%$"));
+    pf_assert(&pstrbuf(&str)[0] == pstrcpbrk(&str, "%$"));
+    pf_assert_null(pstrcpbrk(&str, "AbccDef%$a3145bcb"));
+    pf_assert_not_null(pstrcpbrk(&str, "\0"));
+    pf_assert_null(pstrcpbrk(NULL, NULL));
 
     return 0;
 }
