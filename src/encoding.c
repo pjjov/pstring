@@ -287,3 +287,195 @@ int pstrdec_base64(pstring_t *dst, const pstring_t *src) {
 int pstrdec_base64url(pstring_t *dst, const pstring_t *src) {
     return pstrdec_base64table(dst, src, &base64url_table);
 }
+
+int pstrenc_cstring(pstring_t *dst, const pstring_t *src) {
+    if (!dst || !src)
+        return PSTRING_EINVAL;
+
+    const char *prev = pstrbuf(src);
+    const char *end = pstrend(src);
+    const char *match = prev;
+    pstring_t search;
+
+    size_t dstlen = pstrlen(dst);
+    size_t index = dstlen;
+
+    while (match) {
+        pstrrange(&search, NULL, prev, end);
+
+        match = pstrcpbrk(
+            &search,
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+            "!#%&()*+,-./0123456789:;<=>[]^_{|}~"
+        );
+
+        size_t length = match ? match - prev : end - prev;
+
+        if (pstrreserve(dst, length + 4)) {
+            pstr__setlen(dst, dstlen);
+            return PSTRING_ENOMEM;
+        }
+
+        char *out = pstrbuf(dst);
+        memcpy(&out[index], prev, length);
+        index += length;
+
+        if (match) {
+            out[index++] = '\\';
+
+            switch (*match) {
+                /* clang-format off */
+            case '\?': out[index++] = '?'; break;
+            case '\'': out[index++] = '\''; break;
+            case '\"': out[index++] = '\"'; break;
+            case '\\': out[index++] = '\\'; break;
+            case '\a': out[index++] = 'a'; break;
+            case '\b': out[index++] = 'b'; break;
+            case '\f': out[index++] = 'f'; break;
+            case '\n': out[index++] = 'n'; break;
+            case '\r': out[index++] = 'r'; break;
+            case '\t': out[index++] = 't'; break;
+            case '\v': out[index++] = 'v'; break;
+                /* clang-format on */
+
+            default:
+                out[index++] = (*match >> 6) + '0';
+                out[index++] = ((*match >> 3) & 7) + '0';
+                out[index++] = (*match & 7) + '0';
+                break;
+            }
+
+            prev = match + 1;
+        }
+
+        pstr__setlen(dst, index);
+    }
+
+    return PSTRING_OK;
+}
+
+int pstrdec_cstring(pstring_t *dst, const pstring_t *src) {
+    if (!dst || !src)
+        return PSTRING_EINVAL;
+
+    const char *prev = pstrbuf(src);
+    const char *end = pstrend(src);
+    const char *match = prev;
+    char *out = pstrend(dst);
+    pstring_t search;
+
+    if (pstrreserve(dst, pstrlen(src)))
+        return PSTRING_ENOMEM;
+
+    while (match) {
+        pstrrange(&search, NULL, prev, end - 1);
+        match = pstrchr(&search, '\\');
+        size_t length = match ? match - prev : end - prev;
+
+        memcpy(out, prev, length);
+        prev = match + 2;
+        out += length;
+
+        if (match) {
+            switch (match[1]) {
+                /* clang-format off */
+            case '?':  *out++ = '\?'; break;
+            case '\'': *out++ = '\''; break;
+            case '\"': *out++ = '\"'; break;
+            case '\\': *out++ = '\\'; break;
+            case 'a':  *out++ = '\a'; break;
+            case 'b':  *out++ = '\b'; break;
+            case 'f':  *out++ = '\f'; break;
+            case 'n':  *out++ = '\n'; break;
+            case 'r':  *out++ = '\r'; break;
+            case 't':  *out++ = '\t'; break;
+            case 'v':  *out++ = '\v'; break;
+
+            case '0': case '1': case '2': case '3':
+            case '4': case '5': case '6': case '7': {
+                /* clang-format on */
+                unsigned long code = 0;
+                size_t i = 1;
+
+                for (; i < 4 && &match[i] < end; i++) {
+                    if (match[i] < '0' && match[i] > '7')
+                        break;
+                    code = (code << 3) + match[i] - '0';
+                }
+
+                if (code >= 256)
+                    return PSTRING_EINVAL;
+
+                *out++ = code;
+                prev += i - 2;
+                break;
+            }
+
+            case 'x': {
+                char hi = &match[2] < end ? hex2num(match[2]) : 17;
+                char lo = &match[3] < end ? hex2num(match[3]) : 17;
+                char bounds = &match[4] < end ? hex2num(match[4]) : 17;
+
+                if (hi > 16 || (lo < 16 && bounds < 16))
+                    return PSTRING_EINVAL;
+
+                if (lo < 16) {
+                    *out++ = hi * 16 + lo;
+                    prev += 2;
+                } else {
+                    *out++ = hi;
+                    prev++;
+                }
+
+                break;
+            }
+
+            case 'u':
+            case 'U': {
+                unsigned long c = 0;
+                int length = match[1] == 'U' ? 8 : 4;
+                prev += length;
+
+                if (&match[length + 1] >= end)
+                    return PSTRING_EINVAL;
+
+                for (int i = 0; i < length; i += 2) {
+                    char hi = hex2num(match[i + 2]);
+                    char lo = hex2num(match[i + 3]);
+                    if (lo > 16 || hi > 16)
+                        return PSTRING_EINVAL;
+                    c = (c << 8) | (hi * 16 + lo);
+                }
+
+                if ((c < 0xA0 && c != 0x24 && c != 0x40 && c != 0x60)
+                    || (c >= 0xD800 && c <= 0xDFFF) || c > 0x10FFFF) {
+                    return PSTRING_EINVAL;
+                }
+
+                if (c <= 0x7F) {
+                    *out++ = (char)c;
+                } else if (c <= 0x7FF) {
+                    *out++ = (char)(((c >> 6) & 0x1F) | 0xC0);
+                    *out++ = (char)(((c >> 0) & 0x3F) | 0x80);
+                } else if (c <= 0xFFFF) {
+                    *out++ = (char)(((c >> 12) & 0x0F) | 0xE0);
+                    *out++ = (char)(((c >> 6) & 0x3F) | 0x80);
+                    *out++ = (char)(((c >> 0) & 0x3F) | 0x80);
+                } else if (c <= 0x10FFFF) {
+                    *out++ = (char)(((c >> 18) & 0x07) | 0xF0);
+                    *out++ = (char)(((c >> 12) & 0x3F) | 0x80);
+                    *out++ = (char)(((c >> 6) & 0x3F) | 0x80);
+                    *out++ = (char)(((c >> 0) & 0x3F) | 0x80);
+                }
+
+                break;
+            }
+            default:
+                return PSTRING_EINVAL;
+            }
+        }
+    }
+
+    pstr__setlen(dst, out - pstrbuf(dst));
+    return PSTRING_OK;
+}

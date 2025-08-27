@@ -81,4 +81,15 @@ int pstrdec_base64table(
     pstring_t *dst, const pstring_t *src, const pstring_t *table
 );
 
+/** Stores an escaped version of `src` into `dst`, which, if surrounded
+    by quotes, is safe to use as a string literal in C source code.
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
+**/
+int pstrenc_cstring(pstring_t *dst, const pstring_t *src);
+
+/** Expands C escape sequences found in `src`.
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
+**/
+int pstrdec_cstring(pstring_t *dst, const pstring_t *src);
+
 #endif

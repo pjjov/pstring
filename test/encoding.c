@@ -99,9 +99,49 @@ int test_encoding_base64(int seed, int rep) {
     return 0;
 }
 
+int test_encoding_cstring(int seed, int rep) {
+    pstring_t dst = { 0 };
+
+    TEST_ENCODING(pstrenc_cstring, "abcd\tefg\0h\nj", "abcd\\tefg\\000h\\nj");
+    TEST_ENCODING(pstrenc_cstring, "", "");
+
+    TEST_ENCODING(pstrdec_cstring, "abcd\\tefg\\000h\\nj", "abcd\tefg\0h\nj");
+    TEST_ENCODING(pstrdec_cstring, "\\xabz", "\xabz");
+    TEST_ENCODING(pstrdec_cstring, "\\xab", "\xab");
+    TEST_ENCODING(pstrdec_cstring, "\\xaz", "\xaz");
+    TEST_ENCODING(pstrdec_cstring, "\\xa", "\xa");
+    TEST_ENCODING(pstrdec_cstring, "\\u0024", "$");
+    TEST_ENCODING(pstrdec_cstring, "\\u0040", "@");
+    TEST_ENCODING(pstrdec_cstring, "\\u0060", "`");
+    TEST_ENCODING(pstrdec_cstring, "\\u1234", "\u1234");
+    TEST_ENCODING(pstrdec_cstring, "\\u12341234", "\u12341234");
+    TEST_ENCODING(pstrdec_cstring, "\\U00101234", "\U00101234");
+    TEST_ENCODING(pstrdec_cstring, "", "");
+
+    pf_assert(PSTRING_EINVAL == pstrenc_cstring(NULL, NULL));
+    pf_assert(PSTRING_EINVAL == pstrdec_cstring(NULL, NULL));
+    pf_assert(PSTRING_EINVAL == pstrdec_cstring(&dst, &PSTRWRAP("\\xaaa")));
+    pf_assert(PSTRING_EINVAL == pstrdec_cstring(&dst, &PSTRWRAP("\\xz")));
+    pf_assert(PSTRING_EINVAL == pstrdec_cstring(&dst, &PSTRWRAP("\\x")));
+    pf_assert(PSTRING_EINVAL == pstrdec_cstring(&dst, &PSTRWRAP("\\u")));
+    pf_assert(PSTRING_EINVAL == pstrdec_cstring(&dst, &PSTRWRAP("\\U")));
+    pf_assert(PSTRING_EINVAL == pstrdec_cstring(&dst, &PSTRWRAP("\\u123z")));
+    pf_assert(PSTRING_EINVAL == pstrdec_cstring(&dst, &PSTRWRAP("\\U1234567")));
+    pf_assert(PSTRING_EINVAL == pstrdec_cstring(&dst, &PSTRWRAP("\\uD800")));
+    pf_assert(PSTRING_EINVAL == pstrdec_cstring(&dst, &PSTRWRAP("\\uDFFF")));
+    pf_assert(
+        PSTRING_EINVAL == pstrdec_cstring(&dst, &PSTRWRAP("\\U00110000"))
+    );
+    pf_assert(PSTRING_EINVAL == pstrdec_cstring(&dst, &PSTRWRAP("\\u09F")));
+
+    pstrfree(&dst);
+    return 0;
+}
+
 const struct pf_test suite_encoding[] = {
     { test_encoding_hex, "/pstring/encoding/hex", 1 },
     { test_encoding_url, "/pstring/encoding/url", 1 },
     { test_encoding_base64, "/pstring/encoding/base64", 1 },
+    { test_encoding_cstring, "/pstring/encoding/cstring", 1 },
     { 0 },
 };
