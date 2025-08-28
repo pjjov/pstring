@@ -20,6 +20,7 @@
 #include <pstring/encoding.h>
 #include <pstring/pstring.h>
 
+#include <stdint.h>
 #include <string.h>
 
 static const char *hexdigits = "0123456789ABCDEF";
@@ -354,6 +355,30 @@ int pstrenc_cstring(pstring_t *dst, const pstring_t *src) {
     return PSTRING_OK;
 }
 
+static int writeutf8(char *out, uint32_t c) {
+    if (c <= 0x7F) {
+        *out++ = (char)c;
+        return 1;
+    } else if (c <= 0x7FF) {
+        *out++ = (char)(((c >> 6) & 0x1F) | 0xC0);
+        *out++ = (char)(((c >> 0) & 0x3F) | 0x80);
+        return 2;
+    } else if (c <= 0xFFFF) {
+        *out++ = (char)(((c >> 12) & 0x0F) | 0xE0);
+        *out++ = (char)(((c >> 6) & 0x3F) | 0x80);
+        *out++ = (char)(((c >> 0) & 0x3F) | 0x80);
+        return 3;
+    } else if (c <= 0x10FFFF) {
+        *out++ = (char)(((c >> 18) & 0x07) | 0xF0);
+        *out++ = (char)(((c >> 12) & 0x3F) | 0x80);
+        *out++ = (char)(((c >> 6) & 0x3F) | 0x80);
+        *out++ = (char)(((c >> 0) & 0x3F) | 0x80);
+        return 4;
+    }
+
+    return 0;
+}
+
 int pstrdec_cstring(pstring_t *dst, const pstring_t *src) {
     if (!dst || !src)
         return PSTRING_EINVAL;
@@ -432,7 +457,7 @@ int pstrdec_cstring(pstring_t *dst, const pstring_t *src) {
 
             case 'u':
             case 'U': {
-                unsigned long c = 0;
+                uint32_t c = 0;
                 int length = match[1] == 'U' ? 8 : 4;
                 prev += length;
 
@@ -452,22 +477,7 @@ int pstrdec_cstring(pstring_t *dst, const pstring_t *src) {
                     return PSTRING_EINVAL;
                 }
 
-                if (c <= 0x7F) {
-                    *out++ = (char)c;
-                } else if (c <= 0x7FF) {
-                    *out++ = (char)(((c >> 6) & 0x1F) | 0xC0);
-                    *out++ = (char)(((c >> 0) & 0x3F) | 0x80);
-                } else if (c <= 0xFFFF) {
-                    *out++ = (char)(((c >> 12) & 0x0F) | 0xE0);
-                    *out++ = (char)(((c >> 6) & 0x3F) | 0x80);
-                    *out++ = (char)(((c >> 0) & 0x3F) | 0x80);
-                } else if (c <= 0x10FFFF) {
-                    *out++ = (char)(((c >> 18) & 0x07) | 0xF0);
-                    *out++ = (char)(((c >> 12) & 0x3F) | 0x80);
-                    *out++ = (char)(((c >> 6) & 0x3F) | 0x80);
-                    *out++ = (char)(((c >> 0) & 0x3F) | 0x80);
-                }
-
+                out += writeutf8(out, c);
                 break;
             }
             default:
