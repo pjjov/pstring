@@ -716,7 +716,7 @@ char *pstrpbrk(const pstring_t *str, const char *set) {
 
 char *pstrcpbrk(const pstring_t *str, const char *set) {
     if (!str || !set)
-        return 0;
+        return NULL;
 
     size_t length = pstrlen(str);
     size_t setlen = pstr__nlen(set, 256);
@@ -737,7 +737,7 @@ char *pstrcpbrk(const pstring_t *str, const char *set) {
 
     for (; i < length; i++) {
         for (j = 0; j < setlen; j++)
-            if (buffer[i] != set[j])
+            if (buffer[i] == set[j])
                 break;
 
         if (j == setlen)
