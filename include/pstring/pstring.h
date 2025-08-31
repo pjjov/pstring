@@ -184,6 +184,9 @@ int pstrgrow(pstring_t *str, size_t count);
 **/
 int pstrshrink(pstring_t *str);
 
+/** Removes all characters from `str`, setting it's length to 0. **/
+#define pstrclear(str) pstr__setlen((str), 0)
+
 /** Checks if `left` and `right` pstring are equal. **/
 int pstrequal(const pstring_t *left, const pstring_t *right);
 
