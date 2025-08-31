@@ -21,6 +21,8 @@
 #ifndef PSTRING_ENCODING
 #define PSTRING_ENCODING
 
+#include <stddef.h>
+#include <stdint.h>
 typedef struct pstring_t pstring_t;
 
 /** Encodes the bytes from `src` as a string of hexadecimal numbers.
@@ -91,5 +93,17 @@ int pstrenc_cstring(pstring_t *dst, const pstring_t *src);
     Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
 **/
 int pstrdec_cstring(pstring_t *dst, const pstring_t *src);
+
+/** Encodes codepoints from `src` as UTF8 characters.
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
+**/
+int pstrenc_utf8(pstring_t *dst, const uint32_t *src, size_t length);
+
+/** Decodes UTF-8 characters from `src` as Unicode codepoints.
+    Parameter `length` should point to the maximum length of the buffer `dst`,
+    which will be changed by the function to the number of codepoints decoded.
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
+**/
+int pstrdec_utf8(uint32_t *dst, size_t *length, const pstring_t *src);
 
 #endif

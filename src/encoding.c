@@ -355,28 +355,24 @@ int pstrenc_cstring(pstring_t *dst, const pstring_t *src) {
     return PSTRING_OK;
 }
 
-static int writeutf8(char *out, uint32_t c) {
+static char *writeutf8(char *out, uint32_t c) {
     if (c <= 0x7F) {
         *out++ = (char)c;
-        return 1;
     } else if (c <= 0x7FF) {
         *out++ = (char)(((c >> 6) & 0x1F) | 0xC0);
         *out++ = (char)(((c >> 0) & 0x3F) | 0x80);
-        return 2;
     } else if (c <= 0xFFFF) {
         *out++ = (char)(((c >> 12) & 0x0F) | 0xE0);
         *out++ = (char)(((c >> 6) & 0x3F) | 0x80);
         *out++ = (char)(((c >> 0) & 0x3F) | 0x80);
-        return 3;
     } else if (c <= 0x10FFFF) {
         *out++ = (char)(((c >> 18) & 0x07) | 0xF0);
         *out++ = (char)(((c >> 12) & 0x3F) | 0x80);
         *out++ = (char)(((c >> 6) & 0x3F) | 0x80);
         *out++ = (char)(((c >> 0) & 0x3F) | 0x80);
-        return 4;
     }
 
-    return 0;
+    return out;
 }
 
 int pstrdec_cstring(pstring_t *dst, const pstring_t *src) {
@@ -477,7 +473,7 @@ int pstrdec_cstring(pstring_t *dst, const pstring_t *src) {
                     return PSTRING_EINVAL;
                 }
 
-                out += writeutf8(out, c);
+                out = writeutf8(out, c);
                 break;
             }
             default:
@@ -487,5 +483,89 @@ int pstrdec_cstring(pstring_t *dst, const pstring_t *src) {
     }
 
     pstr__setlen(dst, out - pstrbuf(dst));
+    return PSTRING_OK;
+}
+
+int pstrenc_utf8(pstring_t *dst, const uint32_t *src, size_t length) {
+    if (!dst || !src)
+        return PSTRING_EINVAL;
+
+    if (pstrreserve(dst, length * 4))
+        return PSTRING_ENOMEM;
+
+    char *out = pstrend(dst);
+    for (size_t i = 0; i < length; i++)
+        out = writeutf8(out, src[i]);
+
+    pstr__setlen(dst, out - pstrbuf(dst));
+    return PSTRING_OK;
+}
+
+int pstrdec_utf8(uint32_t *dst, size_t *length, const pstring_t *src) {
+    if (!dst || !src)
+        return PSTRING_EINVAL;
+
+    const char *chr = pstrbuf(src);
+    const char *end = pstrend(src);
+    size_t count = 0, max = *length;
+
+    static uint32_t overlong[4] = { 0, 0x80, 0x800, 0x10000 };
+
+    int left = 0;
+    char mask, shift;
+    uint32_t code, min;
+    for (; chr < end && count < max; chr++) {
+        char c = *chr;
+
+        if (left == 0) {
+            if (!(c & 0x80)) {
+                /* ASCII character */
+                dst[count++] = c;
+                continue;
+            }
+
+            if ((c & 0xF8) == 0xF0)
+                left = 4; /* 4-byte character, mask = 0x07, shift = 18 */
+            else if ((c & 0xF0) == 0xE0)
+                left = 3; /* 3-byte character, mask = 0x0F, shift = 12 */
+            else if ((c & 0xE0) == 0xC0)
+                left = 2; /* 2-byte character, mask = 0x1F, shift = 6  */
+            else
+                goto failure;
+
+            code = 0;
+            mask = (1 << (7 - left)) - 1;
+            shift = (left - 1) * 6;
+            min = overlong[left - 1];
+        } else if ((c & 0xC0) != 0x80) {
+            /* expected continuation byte */
+            goto failure;
+        }
+
+        code |= (c & mask) << shift;
+        mask = 0x3F;
+        shift -= 6;
+
+        if (--left == 0) {
+#ifndef PSTRING_ALLOW_OVERLONG
+            if (code < min)
+                goto failure;
+#else
+            (void)min;
+#endif
+            dst[count++] = code;
+        }
+
+        continue;
+    failure:
+        /* use a replacement character */
+        dst[count++] = 0xFFFD;
+        left = 0;
+    }
+
+    *length = count;
+    if (chr < end)
+        return PSTRING_ENOMEM;
+
     return PSTRING_OK;
 }

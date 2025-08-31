@@ -138,10 +138,57 @@ int test_encoding_cstring(int seed, int rep) {
     return 0;
 }
 
+int test_encoding_utf8(int seed, int rep) {
+    pstring_t dst = { 0 };
+    uint32_t src[5] = {
+        0x24, 0x40, 0x60, 0x1234, 0x0010FFFF,
+    };
+
+    const char result[] = "\u0024\u0040\u0060\u1234\U0010FFFF";
+    pf_assert_ok(pstrenc_utf8(&dst, src, 5));
+    pf_assert(pstrlen(&dst) == sizeof(result) - 1);
+    pf_assert_memcmp(pstrbuf(&dst), result, sizeof(result) - 1);
+
+#define TEST_ENC_UTF8(value, str)                          \
+    code = (value);                                        \
+    pstr__setlen(&dst, 0);                                 \
+    pf_assert_ok(pstrenc_utf8(&dst, &code, 1));            \
+    pf_assert(pstrlen(&dst) == sizeof(str) - 1);           \
+    pf_assert_memcmp(pstrbuf(&dst), str, sizeof(str) - 1);
+
+#define TEST_DEC_UTF8(str, value)                               \
+    pf_assert_ok(pstrdec_utf8(&code, &length, &PSTRWRAP(str))); \
+    pf_assert(length == 1);                                     \
+    pf_assert(code == (value))
+
+    size_t length = 1;
+    uint32_t code;
+    TEST_ENC_UTF8(0x0024, "\u0024");
+    TEST_ENC_UTF8(0x0040, "\u0040");
+    TEST_ENC_UTF8(0x0060, "\u0060");
+    TEST_ENC_UTF8(0x1234, "\u1234");
+    TEST_ENC_UTF8(0x0392, "\u0392");
+    TEST_ENC_UTF8(0xC704, "\uC704");
+    TEST_ENC_UTF8(0x0010FFFF, "\U0010FFFF");
+    TEST_ENC_UTF8(0x00010345, "\U00010345");
+    TEST_DEC_UTF8("\u0024", 0x0024);
+    TEST_DEC_UTF8("\u0040", 0x0040);
+    TEST_DEC_UTF8("\u0060", 0x0060);
+    TEST_DEC_UTF8("\u1234", 0x1234);
+    TEST_DEC_UTF8("\u0392", 0x0392);
+    TEST_DEC_UTF8("\uC704", 0xC704);
+    TEST_DEC_UTF8("\U0010FFFF", 0x0010FFFF);
+    TEST_DEC_UTF8("\U00010345", 0x00010345);
+
+    pstrfree(&dst);
+    return 0;
+}
+
 const struct pf_test suite_encoding[] = {
     { test_encoding_hex, "/pstring/encoding/hex", 1 },
     { test_encoding_url, "/pstring/encoding/url", 1 },
     { test_encoding_base64, "/pstring/encoding/base64", 1 },
     { test_encoding_cstring, "/pstring/encoding/cstring", 1 },
+    { test_encoding_utf8, "/pstring/encoding/utf8", 1 },
     { 0 },
 };
