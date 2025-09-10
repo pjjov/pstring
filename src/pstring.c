@@ -764,3 +764,46 @@ char *pstrstr(const pstring_t *str, const pstring_t *sub) {
 
     return NULL;
 }
+
+int pstrrepl(
+    pstring_t *str, const pstring_t *src, const pstring_t *dst, size_t max
+) {
+    if (!str || !src || !dst)
+        return PSTRING_EINVAL;
+
+    if (max == 0)
+        max = SIZE_MAX;
+
+    size_t slen = pstrlen(src);
+    size_t dlen = pstrlen(dst);
+
+    pstring_t search;
+    pstrslice(&search, str, 0, pstrlen(str));
+    size_t length = pstrlen(str);
+    char *match;
+
+    while (max-- > 0) {
+        if (!(match = pstrstr(&search, src)))
+            break;
+
+        if (dlen > slen && pstrreserve(str, dlen - slen))
+            return PSTRING_ENOMEM;
+
+        if (dlen > 0) {
+            memcpy(&match[dlen], match, pstrend(str) - match);
+            memcpy(match, pstrbuf(dst), dlen);
+        } else {
+            memcpy(match, &match[slen], pstrend(str) - match - slen);
+        }
+
+        if (dlen > slen)
+            length += dlen - slen;
+        else
+            length -= slen - dlen;
+
+        pstr__setlen(str, length);
+        pstrrange(&search, NULL, &match[dlen], pstrend(str));
+    }
+
+    return PSTRING_OK;
+}

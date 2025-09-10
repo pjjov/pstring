@@ -257,6 +257,14 @@ int pstrcpy(pstring_t *dst, const pstring_t *src);
 **/
 int pstrjoin(pstring_t *dst, const pstring_t *srcs, size_t count);
 
+/** Replaces at most `max` instances of substring `src` with `dst`.
+    If `max` is zero, all instances of `src` will be replaced.
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
+**/
+int pstrrepl(
+    pstring_t *str, const pstring_t *src, const pstring_t *dst, size_t max
+);
+
 /** Naively sets the length of `str` to `length` **/
 static inline void pstr__setlen(pstring_t *str, size_t length) {
     if (pstrsso(str))

@@ -332,6 +332,28 @@ int test_pstring_substring(int seed, int repetition) {
     return 0;
 }
 
+int test_pstring_replace(int seed, int rep) {
+
+#define TEST_REPL(m_str, m_old, m_new, m_max, m_res)                       \
+    pf_assert_ok(                                                          \
+        pstrrepl((m_str), &PSTRWRAP((m_old)), &PSTRWRAP((m_new)), (m_max)) \
+    );                                                                     \
+    pf_assert_true(pstrequal((m_str), &PSTRWRAP(m_res)))
+
+    pstring_t str;
+    pf_assert_ok(pstrnew(&str, "ABcABcABc", 0, NULL));
+    TEST_REPL(&str, "ABc", "ABC", 0, "ABCABCABC");
+    TEST_REPL(&str, "ABC", "abc", 1, "abcABCABC");
+    TEST_REPL(&str, "ABC", "abc", 2, "abcabcabc");
+    TEST_REPL(&str, "abc", "ABC", 4, "ABCABCABC");
+    TEST_REPL(&str, "ABC", "a", 3, "aaa");
+    TEST_REPL(&str, "aa", "AAAA", 0, "AAAAa");
+    TEST_REPL(&str, "A", "", 0, "a");
+
+    pstrfree(&str);
+    return 0;
+}
+
 const struct pf_test suite_pstring[] = {
     { test_pstring_new, "/pstring/new", 1 },
     { test_pstring_alloc, "/pstring/alloc", 1 },
@@ -345,5 +367,6 @@ const struct pf_test suite_pstring[] = {
     { test_pstring_span, "/pstring/span", 1 },
     { test_pstring_breakset, "/pstring/breakset", 1 },
     { test_pstring_substring, "/pstring/substring", 1 },
+    { test_pstring_replace, "/pstring/replace", 1 },
     { 0 },
 };
