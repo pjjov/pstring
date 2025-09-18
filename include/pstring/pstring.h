@@ -56,6 +56,7 @@ enum pstring_error {
     PSTRING_OK = 0,
     PSTRING_ENOENT = -2,
     PSTRING_EINTR = -4,
+    PSTRING_EIO = -5,
     PSTRING_ENOMEM = -12,
     PSTRING_EEXIST = -17,
     PSTRING_EINVAL = -22,
@@ -264,6 +265,16 @@ int pstrjoin(pstring_t *dst, const pstring_t *srcs, size_t count);
 int pstrrepl(
     pstring_t *str, const pstring_t *src, const pstring_t *dst, size_t max
 );
+
+/** Concatenates the contents of the file onto the end of `out`.
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM, PSTRING_EIO.
+**/
+int pstrread(pstring_t *out, const char *path);
+
+/** Writes the entire string `out` to the file at `path`.
+    Possible error codes: PSTRING_EINVAL, PSTRING_EIO.
+**/
+int pstrwrite(const pstring_t *str, const char *path);
 
 /** Naively sets the length of `str` to `length` **/
 static inline void pstr__setlen(pstring_t *str, size_t length) {

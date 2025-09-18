@@ -5,6 +5,7 @@
 project('pstring', 'c')
 
 src = [
+    './src/io.c',
     './src/pstring.c',
     './src/pstrdict.c',
 ]
