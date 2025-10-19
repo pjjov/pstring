@@ -17,7 +17,9 @@
     limitations under the License.
 */
 
+#include <pstring/io.h>
 #include <pstring/pstring.h>
+#include <stdarg.h>
 #include <stdio.h>
 
 int pstrread(pstring_t *out, const char *path) {
@@ -62,4 +64,39 @@ int pstrwrite(const pstring_t *str, const char *path) {
         return PSTRING_EIO;
 
     return PSTRING_OK;
+}
+
+int pstrio_vprintf(pstring_t *dst, const char *fmt, va_list args) {
+    if (!dst || !fmt)
+        return PSTRING_EINVAL;
+
+    size_t fmtlen = pstr__nlen(fmt, 4096);
+    size_t len = fmtlen * 2;
+    size_t req;
+
+    do {
+        req = len + 1;
+
+        if (pstrreserve(dst, req))
+            return PSTRING_ENOMEM;
+
+        int result = vsnprintf(pstrend(dst), req, fmt, args);
+
+        if (result < 0)
+            return PSTRING_EIO;
+
+        len = (size_t)result;
+    } while (len >= req);
+
+    pstr__setlen(dst, pstrlen(dst) + len);
+    return PSTRING_OK;
+}
+
+int pstrio_printf(pstring_t *dst, const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    int result = pstrio_vprintf(dst, fmt, args);
+    va_end(args);
+
+    return result;
 }
