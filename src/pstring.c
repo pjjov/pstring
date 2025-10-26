@@ -756,7 +756,7 @@ char *pstrstr(const pstring_t *str, const pstring_t *sub) {
 
     char ch = pstrbuf(sub)[0];
     char *search = pstrbuf(str);
-    char *end = pstrend(str);
+    char *end = pstrend(str) - pstrlen(sub) + 1;
     while ((search = pstrchr(str, ch)) && search < end) {
         if (0 == memcmp(search, pstrbuf(sub), pstrlen(sub)))
             return search;
