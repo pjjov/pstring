@@ -755,11 +755,16 @@ char *pstrstr(const pstring_t *str, const pstring_t *sub) {
         return pstrbuf(str);
 
     char ch = pstrbuf(sub)[0];
-    char *search = pstrbuf(str);
     char *end = pstrend(str) - pstrlen(sub) + 1;
-    while ((search = pstrchr(str, ch)) && search < end) {
-        if (0 == memcmp(search, pstrbuf(sub), pstrlen(sub)))
-            return search;
+
+    char *match;
+    pstring_t search;
+    pstrrange(&search, NULL, pstrbuf(str), end);
+
+    while ((match = pstrchr(&search, ch))) {
+        if (0 == memcmp(match, pstrbuf(sub), pstrlen(sub)))
+            return match;
+        pstrrange(&search, NULL, match + 1, end);
     }
 
     return NULL;

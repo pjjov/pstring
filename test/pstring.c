@@ -325,6 +325,7 @@ int test_pstring_substring(int seed, int repetition) {
     pf_assert(pstrbuf(&str) == pstrstr(&str, &PSTRWRAP("Hello")));
     pf_assert(&pstrbuf(&str)[7] == pstrstr(&str, &PSTRWRAP("world")));
     pf_assert(&pstrbuf(&str)[12] == pstrstr(&str, &PSTRWRAP("!")));
+    pf_assert(&pstrbuf(&str)[8] == pstrstr(&str, &PSTRWRAP("orld")));
     pf_assert_null(pstrstr(&str, &PSTRWRAP("\0")));
     pf_assert_null(pstrstr(&str, &PSTRWRAP("hello")));
     pf_assert_null(pstrstr(&str, &PSTRWRAP("!oveflow")));
