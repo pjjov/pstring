@@ -73,6 +73,7 @@ int pstrio_vprintf(pstring_t *dst, const char *fmt, va_list args) {
     size_t fmtlen = pstr__nlen(fmt, 4096);
     size_t len = fmtlen * 2;
     size_t req;
+    va_list copy;
 
     do {
         req = len + 1;
@@ -80,7 +81,9 @@ int pstrio_vprintf(pstring_t *dst, const char *fmt, va_list args) {
         if (pstrreserve(dst, req))
             return PSTRING_ENOMEM;
 
-        int result = vsnprintf(pstrend(dst), req, fmt, args);
+        va_copy(copy, args);
+        int result = vsnprintf(pstrend(dst), req, fmt, copy);
+        va_end(copy);
 
         if (result < 0)
             return PSTRING_EIO;
