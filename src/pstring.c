@@ -304,7 +304,7 @@ int pstrwrap(pstring_t *out, char *buffer, size_t length, size_t capacity) {
     return PSTRING_OK;
 }
 
-int pstrdup(pstring_t *out, pstring_t *str, allocator_t *allocator) {
+int pstrdup(pstring_t *out, const pstring_t *str, allocator_t *allocator) {
     if (!out || !str)
         return PSTRING_EINVAL;
 
@@ -374,8 +374,8 @@ int pstrgrow(pstring_t *str, size_t count) {
         if (pstralloc(&tmp, PSTRING_SSO_SIZE + count, NULL))
             return PSTRING_ENOMEM;
 
-        memcpy(tmp.buffer, str->buffer, pstrlen(str));
-        tmp.base.length = pstrlen(str);
+        memcpy(pstrbuf(&tmp), str->sso.buffer, str->sso.length);
+        tmp.base.length = str->sso.length;
         *str = tmp;
         return PSTRING_OK;
     }
@@ -700,7 +700,7 @@ char *pstrpbrk(const pstring_t *str, const char *set) {
 
             if (result) {
                 int bit = pstr__ctz(result);
-                return &buffer[bit];
+                return &buffer[i + bit];
             }
         }
     }
@@ -730,7 +730,7 @@ char *pstrcpbrk(const pstring_t *str, const char *set) {
 
             if (result) {
                 int bit = pstr__ctz(result);
-                return &buffer[bit];
+                return &buffer[i + bit];
             }
         }
     }

@@ -307,7 +307,7 @@ int pstrenc_cstring(pstring_t *dst, const pstring_t *src) {
         match = pstrcpbrk(
             &search,
             "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
-            "!#%&()*+,-./0123456789:;<=>[]^_{|}~"
+            " !#%&()*+,-./0123456789:;<=>[]^_{|}~"
         );
 
         size_t length = match ? match - prev : end - prev;

@@ -119,7 +119,7 @@ int pstrnew(pstring_t *out, const char *str, size_t len, allocator_t *alloc);
     You can use this function to turn slices into owned pstrings.
     Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
 **/
-int pstrdup(pstring_t *out, pstring_t *str, allocator_t *allocator);
+int pstrdup(pstring_t *out, const pstring_t *str, allocator_t *allocator);
 
 /** Initializes `out` and reserves `capacity` bytes.
     Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
