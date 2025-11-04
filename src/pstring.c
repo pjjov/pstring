@@ -785,27 +785,24 @@ int pstrrepl(
     pstring_t search;
     pstrslice(&search, str, 0, pstrlen(str));
     size_t length = pstrlen(str);
+    long diff = dlen - slen;
     char *match;
 
     while (max-- > 0) {
         if (!(match = pstrstr(&search, src)))
             break;
 
-        if (dlen > slen && pstrreserve(str, dlen - slen))
+        if (diff > 0 && pstrreserve(str, length + diff))
             return PSTRING_ENOMEM;
 
         if (dlen > 0) {
-            memcpy(&match[dlen], match, pstrend(str) - match);
+            memcpy(&match[dlen], match + slen, pstrend(str) - match - slen);
             memcpy(match, pstrbuf(dst), dlen);
         } else {
             memcpy(match, &match[slen], pstrend(str) - match - slen);
         }
 
-        if (dlen > slen)
-            length += dlen - slen;
-        else
-            length -= slen - dlen;
-
+        length += diff;
         pstr__setlen(str, length);
         pstrrange(&search, NULL, &match[dlen], pstrend(str));
     }
