@@ -185,6 +185,11 @@ int pstrrange(
                    .base.capacity = sizeof((str)) - 1, \
                    .base.allocator = 0 })
 
+/** Returns a reference to `pstring_t` that is initialized as a slice of `str`,
+    which is assumed to be a null-terminated statically allocated string/array.
+**/
+#define PSTR(str) (&PSTRWRAP((str)))
+
 /** Reserves space to fit additional `count` items in `str`
     Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
 **/
