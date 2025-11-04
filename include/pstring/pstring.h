@@ -68,17 +68,32 @@ enum pstring_error {
     this function, the returned pointer should be considered invalid.
 **/
 static inline char *pstrbuf(const pstring_t *str) {
+#ifndef PSTRING_SKIP_NULL_CHECKS
+    if (!str)
+        return NULL;
+#endif
+
     return str->buffer ? str->buffer : (char *)str->sso.buffer;
 }
 
 /** Returns the length, number of bytes, of `str`. **/
 static inline size_t pstrlen(const pstring_t *str) {
+#ifndef PSTRING_SKIP_NULL_CHECKS
+    if (!str)
+        return 0;
+#endif
+
     size_t mask = (str->buffer == NULL) - 1;
     return PSTRING_BLEND(str->sso.length, str->base.length, mask);
 }
 
 /** Returns the number of bytes allocated by `str`. **/
 static inline size_t pstrcap(const pstring_t *str) {
+#ifndef PSTRING_SKIP_NULL_CHECKS
+    if (!str)
+        return 0;
+#endif
+
     size_t mask = (str->buffer == NULL) - 1;
     return PSTRING_BLEND(PSTRING_SSO_SIZE, str->base.capacity, mask);
 }
@@ -89,7 +104,7 @@ static inline allocator_t *pstrallocator(const pstring_t *str) {
 }
 
 /** Checks if `str` is stored on the stack. **/
-static inline int pstrsso(pstring_t *str) { return str->buffer == NULL; }
+static inline int pstrsso(pstring_t *str) { return str && str->buffer == NULL; }
 
 /** Checks if `str` can be resized (not a slice). **/
 static inline int pstrowned(pstring_t *str) {
