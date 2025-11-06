@@ -103,3 +103,19 @@ int pstrio_printf(pstring_t *dst, const char *fmt, ...) {
 
     return result;
 }
+
+int pstream_init(pstream_t *out, const struct pstream_vt *vtable) {
+    if (!out || !vtable)
+        return PSTRING_EINVAL;
+
+    int fail = PSTRING_FALSE;
+    fail |= !vtable->read;
+    fail |= !vtable->write;
+    fail |= !vtable->tell;
+    fail |= !vtable->seek;
+    fail |= !vtable->flush;
+    fail |= !vtable->close;
+
+    out->vtable = vtable;
+    return fail ? PSTRING_EINVAL : PSTRING_OK;
+}
