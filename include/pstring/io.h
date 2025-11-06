@@ -64,6 +64,16 @@ struct pstream_t {
     } state;
 };
 
+/** Opens the file located at `path` as a stream.
+    Possible error codes: PSTRING_EINVAL, PSTRING_EIO.
+**/
+int pstream_open(pstream_t *out, const char *path, const char *mode);
+
+/** Wraps provided `file` handle into a stream.
+    Possible error codes: PSTRING_EINVAL, PSTRING_EIO.
+**/
+int pstream_file(pstream_t *out, FILE *file);
+
 /** Initializes `out` as a custom stream.
     `vtable` and it's members cannot be `NULL`.
 

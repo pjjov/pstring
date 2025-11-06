@@ -119,3 +119,61 @@ int pstream_init(pstream_t *out, const struct pstream_vt *vtable) {
     out->vtable = vtable;
     return fail ? PSTRING_EINVAL : PSTRING_OK;
 }
+
+int pstream_open(pstream_t *out, const char *path, const char *mode) {
+    if (!out || !path || !mode)
+        return PSTRING_EINVAL;
+
+    FILE *file = fopen(path, mode);
+    if (pstream_file(out, file))
+        return PSTRING_EIO;
+
+    return PSTRING_OK;
+}
+
+static size_t file_read(pstream_t *stream, void *buffer, size_t size) {
+    FILE *file = stream->state.ptr[0];
+    return fread(buffer, size, 1, file);
+}
+
+static size_t file_write(pstream_t *stream, void *buffer, size_t size) {
+    FILE *file = stream->state.ptr[0];
+    return fwrite(buffer, size, 1, file);
+}
+
+static int file_seek(pstream_t *stream, size_t offset, int origin) {
+    FILE *file = stream->state.ptr[0];
+    return fseek(file, offset, origin);
+}
+
+static size_t file_tell(pstream_t *stream) {
+    FILE *file = stream->state.ptr[0];
+    return ftell(file);
+}
+
+static void file_flush(pstream_t *stream) {
+    FILE *file = stream->state.ptr[0];
+    fflush(file);
+}
+
+static void file_close(pstream_t *stream) {
+    FILE *file = stream->state.ptr[0];
+    fclose(file);
+}
+
+int pstream_file(pstream_t *out, FILE *file) {
+    if (!out || !file)
+        return PSTRING_EINVAL;
+
+    static const struct pstream_vt vtable = {
+        .read = file_read,
+        .write = file_write,
+        .tell = file_tell,
+        .seek = file_seek,
+        .flush = file_flush,
+        .close = file_close,
+    };
+
+    out->vtable = &vtable;
+    return PSTRING_OK;
+}
