@@ -11,6 +11,8 @@ ColumnLimit: 80
 IndentPPDirectives: BeforeHash
 Language: Cpp
 LineEnding: LF
+PenaltyBreakAssignment: 999
+PenaltyReturnTypeOnItsOwnLine: 999
 PointerAlignment: Right
 ReflowComments: false
 # SkipMacroDefinitionBody: true

@@ -21,6 +21,14 @@
 #ifndef PSTRING_DICT_H
 #define PSTRING_DICT_H
 
+#ifndef PSTR_INLINE
+    #define PSTR_INLINE static inline
+#endif
+
+#ifndef PSTR_API
+    #define PSTR_API
+#endif
+
 #include <stddef.h>
 
 typedef struct allocator_t allocator_t;
@@ -37,30 +45,30 @@ typedef size_t(pstrhash_fn)(const pstring_t *str);
     using the provided `hash` function. For each of the parameters that are
     `NULL`, the default ones will be used.
 **/
-pstrdict_t *pstrdict_new(pstrhash_fn *hash, allocator_t *allocator);
+PSTR_API pstrdict_t *pstrdict_new(pstrhash_fn *hash, allocator_t *allocator);
 
 /** Reserves space to fit at least `count` more key-value pairs inside `dict`.
     Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
 **/
-int pstrdict_reserve(pstrdict_t *dict, size_t count);
+PSTR_API int pstrdict_reserve(pstrdict_t *dict, size_t count);
 
 /** Frees all memory resources used by `dict`. **/
-void pstrdict_free(pstrdict_t *dict);
+PSTR_API void pstrdict_free(pstrdict_t *dict);
 
 /** Returns the number of slots reserved in `dict` **/
-size_t pstrdict_capacity(const pstrdict_t *dict);
+PSTR_API size_t pstrdict_capacity(const pstrdict_t *dict);
 
 /** Returns the number of key-value pairs in `dict` **/
-size_t pstrdict_count(const pstrdict_t *dict);
+PSTR_API size_t pstrdict_count(const pstrdict_t *dict);
 
 /** Returns the allocator used by `dict` **/
-allocator_t *pstrdict_allocator(const pstrdict_t *dict);
+PSTR_API allocator_t *pstrdict_allocator(const pstrdict_t *dict);
 
 /** Removes all key-value pairs from `dict` **/
-void pstrdict_clear(pstrdict_t *dict);
+PSTR_API void pstrdict_clear(pstrdict_t *dict);
 
 /** Retrieves the value associated with `key` or `NULL` if not found. **/
-void *pstrdict_get(pstrdict_t *dict, const pstring_t *key);
+PSTR_API void *pstrdict_get(pstrdict_t *dict, const pstring_t *key);
 
 /** Sets the value associated with `key` to `value`, inserting them if `key` is
     not already present in `dict`. Both pointers, the initial key and current
@@ -68,21 +76,27 @@ void *pstrdict_get(pstrdict_t *dict, const pstring_t *key);
 
     Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
 **/
-int pstrdict_set(pstrdict_t *dict, const pstring_t *key, const void *value);
+PSTR_API int pstrdict_set(
+    pstrdict_t *dict, const pstring_t *key, const void *value
+);
 
 /** Inserts the key-value pair if it's not already present in `dict`.
     Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM, PSTRING_EEXIST.
 **/
-int pstrdict_insert(pstrdict_t *dict, const pstring_t *key, const void *value);
+PSTR_API int pstrdict_insert(
+    pstrdict_t *dict, const pstring_t *key, const void *value
+);
 
 /** Removes the key-value pair from `dict`, if it's found.
     Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM, PSTRING_ENOENT.
 **/
-int pstrdict_remove(pstrdict_t *dict, const pstring_t *key);
+PSTR_API int pstrdict_remove(pstrdict_t *dict, const pstring_t *key);
 
 /** Forcefully inserts the key-value pair, without checking for it's presence.
     Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
 **/
-int pstrdict_finsert(pstrdict_t *dict, const pstring_t *key, const void *value);
+PSTR_API int pstrdict_finsert(
+    pstrdict_t *dict, const pstring_t *key, const void *value
+);
 
 #endif

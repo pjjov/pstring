@@ -21,6 +21,14 @@
 #ifndef PSTRING_IO_H
 #define PSTRING_IO_H
 
+#ifndef PSTR_INLINE
+    #define PSTR_INLINE static inline
+#endif
+
+#ifndef PSTR_API
+    #define PSTR_API
+#endif
+
 #include <pf_typeid.h>
 #include <stdarg.h>
 #include <stddef.h>
@@ -46,13 +54,13 @@ enum pstring_typeid {
 /** Concatenates string formated by standard library functions to `dst`.
     Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM, PSTRING_EIO.
 **/
-int pstrio_printf(pstring_t *dst, const char *fmt, ...);
+PSTR_API int pstrio_printf(pstring_t *dst, const char *fmt, ...);
 
 /** Concatenates string formated by standard library functions to `dst`.
     Arguments are passed as a variable arguments list from `<stdarg.h>`.
     Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM, PSTRING_EIO.
 **/
-int pstrio_vprintf(pstring_t *dst, const char *fmt, va_list args);
+PSTR_API int pstrio_vprintf(pstring_t *dst, const char *fmt, va_list args);
 
 struct pstream_vt {
     size_t (*read)(pstream_t *stream, void *buffer, size_t size);
@@ -77,12 +85,12 @@ struct pstream_t {
 /** Opens the file located at `path` as a stream.
     Possible error codes: PSTRING_EINVAL, PSTRING_EIO.
 **/
-int pstream_open(pstream_t *out, const char *path, const char *mode);
+PSTR_API int pstream_open(pstream_t *out, const char *path, const char *mode);
 
 /** Wraps provided `file` handle into a stream.
     Possible error codes: PSTRING_EINVAL, PSTRING_EIO.
 **/
-int pstream_file(pstream_t *out, FILE *file);
+PSTR_API int pstream_file(pstream_t *out, FILE *file);
 
 /** Initializes a stream that will read and write to the buffer
     of `str`, expanding it if needed. `str` will NOT be freed by
@@ -91,14 +99,14 @@ int pstream_file(pstream_t *out, FILE *file);
     Stream cursor will be at the end of the string.
     Possible error codes: PSTRING_EINVAL, PSTRING_EIO.
 **/
-int pstream_string(pstream_t *out, pstring_t *str);
+PSTR_API int pstream_string(pstream_t *out, pstring_t *str);
 
 /** Initializes `out` as a custom stream.
     `vtable` and it's members cannot be `NULL`.
 
     Possible error codes: PSTRING_EINVAL.
 **/
-int pstream_init(pstream_t *out, const struct pstream_vt *vtable);
+PSTR_API int pstream_init(pstream_t *out, const struct pstream_vt *vtable);
 
 /*
     Since `pstream_init` does `NULL` checking for vtable members before
@@ -119,13 +127,13 @@ int pstream_init(pstream_t *out, const struct pstream_vt *vtable);
 /** Sets the position of the stream to an offset of the specified origin.
     Possible error codes: PSTRING_EINVAL, PSTRING_EIO.
 **/
-static inline int pstream_seek(pstream_t *stream, long offset, int origin) {
+PSTR_INLINE int pstream_seek(pstream_t *stream, long offset, int origin) {
     PSTREAM_ASSERT(seek, 0);
     return stream->vtable->seek(stream, offset, origin);
 }
 
 /** Returns the current position of the stream. **/
-static inline size_t pstream_tell(pstream_t *stream) {
+PSTR_INLINE size_t pstream_tell(pstream_t *stream) {
     PSTREAM_ASSERT(tell, 0);
     return stream->vtable->tell(stream);
 }
@@ -133,8 +141,7 @@ static inline size_t pstream_tell(pstream_t *stream) {
 /** Reads up to `size` bytes from `stream` and returns number of bytes read.
     Possible error codes: PSTRING_EINVAL, PSTRING_EIO.
 **/
-static inline size_t
-pstream_read(pstream_t *stream, void *buffer, size_t size) {
+PSTR_INLINE size_t pstream_read(pstream_t *stream, void *buffer, size_t size) {
     PSTREAM_ASSERT(tell, 0);
     return stream->vtable->read(stream, buffer, size);
 }
@@ -143,31 +150,31 @@ pstream_read(pstream_t *stream, void *buffer, size_t size) {
     The number of bytes actually written is returned.
     Possible error codes: PSTRING_EINVAL, PSTRING_EIO.
 **/
-static inline size_t
-pstream_write(pstream_t *stream, void *buffer, size_t size) {
+PSTR_INLINE size_t pstream_write(pstream_t *stream, void *buffer, size_t size) {
     PSTREAM_ASSERT(tell, 0);
     return stream->vtable->tell(stream);
 }
 
 /** Flushes internal buffers of a stream. **/
-static inline void pstream_flush(pstream_t *stream) {
+PSTR_INLINE void pstream_flush(pstream_t *stream) {
     PSTREAM_ASSERT(flush, (void)0);
     stream->vtable->flush(stream);
 }
 
 /** Closes the stream and frees it's resources. **/
-static inline void pstream_close(pstream_t *stream) {
+PSTR_INLINE void pstream_close(pstream_t *stream) {
     PSTREAM_ASSERT(close, (void)0);
     return stream->vtable->close(stream);
 }
 
-static inline int
-pstream_serialize(pstream_t *stream, int type, const void *item) {
+PSTR_INLINE int pstream_serialize(
+    pstream_t *stream, int type, const void *item
+) {
     PSTREAM_ASSERT(serialize, -22);
     return stream->vtable->serialize(stream, type, item);
 }
 
-static inline int pstream_deserialize(pstream_t *stream, int type, void *item) {
+PSTR_INLINE int pstream_deserialize(pstream_t *stream, int type, void *item) {
     PSTREAM_ASSERT(deserialize, -22);
     return stream->vtable->deserialize(stream, type, item);
 }
