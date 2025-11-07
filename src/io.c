@@ -20,7 +20,9 @@
 #include <pstring/io.h>
 #include <pstring/pstring.h>
 #include <stdarg.h>
+#include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
 int pstrread(pstring_t *out, const char *path) {
     if (!out || !path)
@@ -182,8 +184,112 @@ int pstream_file(pstream_t *out, FILE *file) {
         .seek = file_seek,
         .flush = file_flush,
         .close = file_close,
+        .serialize = file_serialize,
+        .deserialize = file_deserialize,
     };
 
     out->vtable = &vtable;
+    return PSTRING_OK;
+}
+
+static size_t str_read(pstream_t *stream, void *buffer, size_t size) {
+    pstring_t *str = stream->state.ptr[0];
+    size_t index = (uintptr_t)stream->state.ptr[1];
+
+    if (size > pstrlen(str) - index)
+        size = pstrlen(str) - index;
+
+    if (size > 0) {
+        memcpy(buffer, &pstrbuf(str)[index], size);
+        stream->state.ptr[1] = (void *)(uintptr_t)(index + size);
+    }
+
+    return size;
+}
+
+static size_t str_write(pstream_t *stream, void *buffer, size_t size) {
+    pstring_t *str = stream->state.ptr[0];
+    size_t index = (uintptr_t)stream->state.ptr[1];
+    size_t left = pstrcap(str) - index;
+
+    if (size > left && pstrreserve(str, size))
+        size = left;
+
+    if (size > 0) {
+        memcpy(&pstrbuf(str)[index], buffer, size);
+        stream->state.ptr[1] = (void *)(uintptr_t)(index + size);
+
+        if (index + size > pstrlen(str))
+            pstr__setlen(str, index + size);
+    }
+
+    return size;
+}
+
+static int str_seek(pstream_t *stream, long offset, int origin) {
+    pstring_t *str = stream->state.ptr[0];
+    size_t index = (uintptr_t)stream->state.ptr[1];
+    size_t result;
+
+    switch (origin) {
+    case PSTRING_SEEK_SET:
+        result = offset;
+        break;
+    case PSTRING_SEEK_CUR:
+        if (offset < 0 && index < -offset)
+            return PSTRING_EINVAL;
+        result = index + offset;
+        break;
+    case PSTRING_SEEK_END:
+        if (offset < 0 && pstrlen(str) < -offset)
+            return PSTRING_EINVAL;
+        result = pstrlen(str) + offset;
+        break;
+    default:
+        return PSTRING_EINVAL;
+    }
+
+    if (result > pstrlen(str) && pstrreserve(str, result - pstrlen(str)))
+        return PSTRING_ENOMEM;
+
+    stream->state.ptr[1] = (void *)(uintptr_t)result;
+    return PSTRING_OK;
+}
+
+static size_t str_tell(pstream_t *stream) {
+    return (uintptr_t)stream->state.ptr[1];
+}
+
+static void str_flush(pstream_t *stream) {
+    /* nothing to flush or close */
+    return;
+}
+
+static int str_serialize(pstream_t *stream, int type, const void *item) {
+    return PSTRING_ENOSYS;
+}
+
+static int str_deserialize(pstream_t *stream, int type, void *item) {
+    return PSTRING_ENOSYS;
+}
+
+int pstream_string(pstream_t *out, pstring_t *str) {
+    if (!out || !str)
+        return PSTRING_EINVAL;
+
+    static const struct pstream_vt vtable = {
+        .read = str_read,
+        .write = str_write,
+        .tell = str_tell,
+        .seek = str_seek,
+        .flush = str_flush,
+        .close = str_flush,
+        .serialize = str_serialize,
+        .deserialize = str_deserialize,
+    };
+
+    out->vtable = &vtable;
+    out->state.ptr[0] = str;
+    out->state.ptr[1] = (void *)(uintptr_t)pstrlen(str);
     return PSTRING_OK;
 }

@@ -84,6 +84,15 @@ int pstream_open(pstream_t *out, const char *path, const char *mode);
 **/
 int pstream_file(pstream_t *out, FILE *file);
 
+/** Initializes a stream that will read and write to the buffer
+    of `str`, expanding it if needed. `str` will NOT be freed by
+    the stream when closing.
+
+    Stream cursor will be at the end of the string.
+    Possible error codes: PSTRING_EINVAL, PSTRING_EIO.
+**/
+int pstream_string(pstream_t *out, pstring_t *str);
+
 /** Initializes `out` as a custom stream.
     `vtable` and it's members cannot be `NULL`.
 
