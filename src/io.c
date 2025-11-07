@@ -115,6 +115,8 @@ int pstream_init(pstream_t *out, const struct pstream_vt *vtable) {
     fail |= !vtable->seek;
     fail |= !vtable->flush;
     fail |= !vtable->close;
+    fail |= !vtable->serialize;
+    fail |= !vtable->deserialize;
 
     out->vtable = vtable;
     return fail ? PSTRING_EINVAL : PSTRING_OK;
@@ -141,7 +143,7 @@ static size_t file_write(pstream_t *stream, void *buffer, size_t size) {
     return fwrite(buffer, size, 1, file);
 }
 
-static int file_seek(pstream_t *stream, size_t offset, int origin) {
+static int file_seek(pstream_t *stream, long offset, int origin) {
     FILE *file = stream->state.ptr[0];
     return fseek(file, offset, origin);
 }
@@ -159,6 +161,14 @@ static void file_flush(pstream_t *stream) {
 static void file_close(pstream_t *stream) {
     FILE *file = stream->state.ptr[0];
     fclose(file);
+}
+
+static int file_serialize(pstream_t *stream, int type, const void *item) {
+    return PSTRING_ENOSYS;
+}
+
+static int file_deserialize(pstream_t *stream, int type, void *item) {
+    return PSTRING_ENOSYS;
 }
 
 int pstream_file(pstream_t *out, FILE *file) {

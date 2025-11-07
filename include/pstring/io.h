@@ -21,6 +21,7 @@
 #ifndef PSTRING_IO_H
 #define PSTRING_IO_H
 
+#include <pf_typeid.h>
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -33,6 +34,13 @@ enum pstream_origin {
     PSTRING_SEEK_SET,
     PSTRING_SEEK_CUR,
     PSTRING_SEEK_END,
+};
+
+enum pstring_typeid {
+    PSTRTYPE__NAMESPACE = 'P' << 8,
+    PSTRTYPE_ARRAY,
+    PSTRTYPE_MAP,
+    PSTRTYPE__MAX,
 };
 
 /** Concatenates string formated by standard library functions to `dst`.
@@ -50,9 +58,11 @@ struct pstream_vt {
     size_t (*read)(pstream_t *stream, void *buffer, size_t size);
     size_t (*write)(pstream_t *stream, void *buffer, size_t size);
     size_t (*tell)(pstream_t *stream);
-    int (*seek)(pstream_t *stream, size_t offset, int origin);
+    int (*seek)(pstream_t *stream, long offset, int origin);
     void (*flush)(pstream_t *stream);
     void (*close)(pstream_t *stream);
+    int (*serialize)(pstream_t *stream, int type, const void *item);
+    int (*deserialize)(pstream_t *stream, int type, void *item);
 };
 
 struct pstream_t {
@@ -100,7 +110,7 @@ int pstream_init(pstream_t *out, const struct pstream_vt *vtable);
 /** Sets the position of the stream to an offset of the specified origin.
     Possible error codes: PSTRING_EINVAL, PSTRING_EIO.
 **/
-static inline int pstream_seek(pstream_t *stream, size_t offset, int origin) {
+static inline int pstream_seek(pstream_t *stream, long offset, int origin) {
     PSTREAM_ASSERT(seek, 0);
     return stream->vtable->seek(stream, offset, origin);
 }
@@ -140,6 +150,17 @@ static inline void pstream_flush(pstream_t *stream) {
 static inline void pstream_close(pstream_t *stream) {
     PSTREAM_ASSERT(close, (void)0);
     return stream->vtable->close(stream);
+}
+
+static inline int
+pstream_serialize(pstream_t *stream, int type, const void *item) {
+    PSTREAM_ASSERT(serialize, -22);
+    return stream->vtable->serialize(stream, type, item);
+}
+
+static inline int pstream_deserialize(pstream_t *stream, int type, void *item) {
+    PSTREAM_ASSERT(deserialize, -22);
+    return stream->vtable->deserialize(stream, type, item);
 }
 
 #endif
