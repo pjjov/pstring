@@ -64,7 +64,7 @@ PSTR_API int pstrio_vprintf(pstring_t *dst, const char *fmt, va_list args);
 
 struct pstream_vt {
     size_t (*read)(pstream_t *stream, void *buffer, size_t size);
-    size_t (*write)(pstream_t *stream, void *buffer, size_t size);
+    size_t (*write)(pstream_t *stream, const void *buffer, size_t size);
     size_t (*tell)(pstream_t *stream);
     int (*seek)(pstream_t *stream, long offset, int origin);
     void (*flush)(pstream_t *stream);
@@ -150,7 +150,8 @@ PSTR_INLINE size_t pstream_read(pstream_t *stream, void *buffer, size_t size) {
     The number of bytes actually written is returned.
     Possible error codes: PSTRING_EINVAL, PSTRING_EIO.
 **/
-PSTR_INLINE size_t pstream_write(pstream_t *stream, void *buffer, size_t size) {
+PSTR_INLINE size_t
+pstream_write(pstream_t *stream, const void *buffer, size_t size) {
     PSTREAM_ASSERT(tell, 0);
     return stream->vtable->tell(stream);
 }

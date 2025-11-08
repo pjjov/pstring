@@ -140,7 +140,7 @@ static size_t file_read(pstream_t *stream, void *buffer, size_t size) {
     return fread(buffer, size, 1, file);
 }
 
-static size_t file_write(pstream_t *stream, void *buffer, size_t size) {
+static size_t file_write(pstream_t *stream, const void *buffer, size_t size) {
     FILE *file = stream->state.ptr[0];
     return fwrite(buffer, size, 1, file);
 }
@@ -207,7 +207,7 @@ static size_t str_read(pstream_t *stream, void *buffer, size_t size) {
     return size;
 }
 
-static size_t str_write(pstream_t *stream, void *buffer, size_t size) {
+static size_t str_write(pstream_t *stream, const void *buffer, size_t size) {
     pstring_t *str = stream->state.ptr[0];
     size_t index = (uintptr_t)stream->state.ptr[1];
     size_t left = pstrcap(str) - index;
