@@ -17,6 +17,7 @@
     limitations under the License.
 */
 
+#define PF_TYPE_HELPERS
 #include <pstring/io.h>
 #include <pstring/pstring.h>
 #include <stdarg.h>
@@ -128,6 +129,70 @@ PSTR_API int pstream_vprintf(pstream_t *stream, const char *fmt, va_list args) {
     return res < 0 ? PSTRING_EIO : PSTRING_OK;
 }
 
+static int srlz_text_int(pstream_t *stream, int type, const void *item) {
+    char buffer[256];
+    uintmax_t value;
+    int res;
+
+    if (pf_type_int_load(type, item, &value))
+        return PSTRING_EINVAL;
+
+    if (pf_type_is_unsigned(type))
+        res = snprintf(buffer, 256, "%llu", (unsigned long long)value);
+    else
+        res = snprintf(buffer, 256, "%lld", (long long)value);
+
+    if (res <= 0 || res >= 256)
+        return PSTRING_EINVAL;
+
+    if (res != pstream_write(stream, buffer, res))
+        return PSTRING_EIO;
+
+    return PSTRING_OK;
+}
+
+static int srlz_text_float(pstream_t *stream, int type, const void *item) {
+    char buffer[256];
+    double value;
+    int res;
+
+    switch (type) {
+        /* clang-format off */
+    case PF_TYPE_FLOAT:   value = *(float *)item; break;
+    case PF_TYPE_DOUBLE:  value = *(double *)item; break;
+    case PF_TYPE_LDOUBLE: value = *(long double *)item; break;
+    default: return PSTRING_EINVAL;
+        /* clang-format on */
+    }
+
+    res = snprintf(buffer, 256, "%f", value);
+    if (res <= 0 || res >= 256)
+        return PSTRING_EINVAL;
+
+    if (res != pstream_write(stream, buffer, res))
+        return PSTRING_EIO;
+
+    return PSTRING_OK;
+}
+
+static int srlz_text(pstream_t *stream, int type, const void *item) {
+    if (pf_type_is_integer(type))
+        return srlz_text_int(stream, type, item);
+    if (pf_type_is_float(type))
+        return srlz_text_float(stream, type, item);
+    if (type == PF_TYPE_CHAR)
+        return 1 != pstream_write(stream, item, 1);
+    if (type == PF_TYPE_PTR)
+        return pstream_printf(stream, "%p", *(void **)item);
+
+    if (type == PF_TYPE_CSTRING) {
+        size_t length = strlen(item);
+        return length != pstream_write(stream, item, length);
+    }
+
+    return PSTRING_EINVAL;
+}
+
 int pstream_init(pstream_t *out, const struct pstream_vt *vtable) {
     if (!out || !vtable)
         return PSTRING_EINVAL;
@@ -188,7 +253,8 @@ static void file_close(pstream_t *stream) {
 }
 
 static int file_serialize(pstream_t *stream, int type, const void *item) {
-    return PSTRING_ENOSYS;
+    /* todo: binary mode serialization */
+    return srlz_text(stream, type, item);
 }
 
 static int file_deserialize(pstream_t *stream, int type, void *item) {
@@ -287,10 +353,6 @@ static void str_flush(pstream_t *stream) {
     return;
 }
 
-static int str_serialize(pstream_t *stream, int type, const void *item) {
-    return PSTRING_ENOSYS;
-}
-
 static int str_deserialize(pstream_t *stream, int type, void *item) {
     return PSTRING_ENOSYS;
 }
@@ -306,7 +368,7 @@ int pstream_string(pstream_t *out, pstring_t *str) {
         .seek = str_seek,
         .flush = str_flush,
         .close = str_flush,
-        .serialize = str_serialize,
+        .serialize = srlz_text,
         .deserialize = str_deserialize,
     };
 
