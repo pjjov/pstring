@@ -254,15 +254,15 @@ static int str_seek(pstream_t *stream, long offset, int origin) {
     size_t result;
 
     switch (origin) {
-    case PSTRING_SEEK_SET:
+    case PSTR_SEEK_SET:
         result = offset;
         break;
-    case PSTRING_SEEK_CUR:
+    case PSTR_SEEK_CUR:
         if (offset < 0 && index < -offset)
             return PSTRING_EINVAL;
         result = index + offset;
         break;
-    case PSTRING_SEEK_END:
+    case PSTR_SEEK_END:
         if (offset < 0 && pstrlen(str) < -offset)
             return PSTRING_EINVAL;
         result = pstrlen(str) + offset;

@@ -39,9 +39,9 @@ typedef struct pstream_t pstream_t;
 #define PSTREAM_STATE_SIZE 24
 
 enum pstream_origin {
-    PSTRING_SEEK_SET,
-    PSTRING_SEEK_CUR,
-    PSTRING_SEEK_END,
+    PSTR_SEEK_SET,
+    PSTR_SEEK_CUR,
+    PSTR_SEEK_END,
 };
 
 enum pstring_typeid {
@@ -152,8 +152,8 @@ PSTR_INLINE size_t pstream_read(pstream_t *stream, void *buffer, size_t size) {
 **/
 PSTR_INLINE size_t
 pstream_write(pstream_t *stream, const void *buffer, size_t size) {
-    PSTREAM_ASSERT(tell, 0);
-    return stream->vtable->tell(stream);
+    PSTREAM_ASSERT(write, 0);
+    return stream->vtable->write(stream, buffer, size);
 }
 
 /** Flushes internal buffers of a stream. **/
