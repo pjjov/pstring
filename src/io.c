@@ -24,6 +24,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#define PRINTF_BUFFER_SIZE 1024
+
 int pstrread(pstring_t *out, const char *path) {
     if (!out || !path)
         return PSTRING_EINVAL;
@@ -104,6 +106,26 @@ int pstrio_printf(pstring_t *dst, const char *fmt, ...) {
     va_end(args);
 
     return result;
+}
+
+PSTR_API int pstream_printf(pstream_t *stream, const char *fmt, ...) {
+    va_list args;
+
+    va_start(args, fmt);
+    int res = pstream_vprintf(stream, fmt, args);
+    va_end(args);
+
+    return res;
+}
+
+PSTR_API int pstream_vprintf(pstream_t *stream, const char *fmt, va_list args) {
+    char buffer[PRINTF_BUFFER_SIZE];
+
+    int res = vsnprintf(buffer, PRINTF_BUFFER_SIZE, fmt, args);
+    if (res >= PRINTF_BUFFER_SIZE)
+        return PSTRING_ENOMEM;
+
+    return res < 0 ? PSTRING_EIO : PSTRING_OK;
 }
 
 int pstream_init(pstream_t *out, const struct pstream_vt *vtable) {

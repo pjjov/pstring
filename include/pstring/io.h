@@ -168,6 +168,16 @@ PSTR_INLINE void pstream_close(pstream_t *stream) {
     return stream->vtable->close(stream);
 }
 
+/** Writes to stream a string formatted as `fmt` using variable arguments.
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
+**/
+PSTR_API int pstream_printf(pstream_t *stream, const char *fmt, ...);
+
+/** Writes to stream a string formatted as `fmt` using variable arguments.
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
+**/
+PSTR_API int pstream_vprintf(pstream_t *stream, const char *fmt, va_list args);
+
 PSTR_INLINE int pstream_serialize(
     pstream_t *stream, int type, const void *item
 ) {
