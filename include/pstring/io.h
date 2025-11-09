@@ -168,6 +168,13 @@ PSTR_INLINE void pstream_close(pstream_t *stream) {
     return stream->vtable->close(stream);
 }
 
+/** Writes a single character to `stream`.
+    Possible error codes: PSTRING_EINVAL, PSTRING_EIO.
+**/
+PSTR_API int pstream_putc(pstream_t *stream, char chr) {
+    return 1 != pstream_write(stream, &chr, 1);
+}
+
 /** Writes to stream a string formatted as `fmt` using variable arguments.
     Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
 **/
