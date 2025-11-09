@@ -23,19 +23,14 @@
 extern const pf_test suite_pstring[];
 extern const pf_test suite_dict[];
 extern const pf_test suite_encoding[];
+extern const pf_test suite_io[];
 
 static const pf_test *suites[] = {
-    suite_pstring,
-    suite_dict,
-    suite_encoding,
-    NULL,
+    suite_pstring, suite_dict, suite_encoding, suite_io, NULL,
 };
 
 static const char *names[] = {
-    "pstring",
-    "dict",
-    "encoding",
-    NULL,
+    "pstring", "dict", "encoding", "io", NULL,
 };
 
 int main(int argc, char *argv[]) {

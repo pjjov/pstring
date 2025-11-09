@@ -34,6 +34,7 @@ tests = executable(
     dependencies: [pstring_dep, cpolyfill_dep],
     sources: [
         'test/encoding.c',
+        'test/io.c',
         'test/main.c',
         'test/pstring.c',
         'test/pstrdict.c',
@@ -43,3 +44,4 @@ tests = executable(
 test('pstring/pstring', tests, args: ['pstring'], protocol: 'tap')
 test('pstring/dict', tests, args: ['dict'], protocol: 'tap')
 test('pstring/encoding', tests, args: ['encoding'], protocol: 'tap')
+test('pstring/io', tests, args: ['io'], protocol: 'tap')
