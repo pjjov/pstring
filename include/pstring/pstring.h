@@ -131,6 +131,11 @@ PSTR_INLINE char pstrget(const pstring_t *str, size_t i) {
     return (i < pstrlen(str)) ? pstrbuf(str)[i] : '\0';
 }
 
+/** Returns the pointer to the slot `i` or `NULL` if out of bounds **/
+PSTR_INLINE char *pstrslot(const pstring_t *str, size_t i) {
+    return (i < pstrcap(str)) ? &pstrbuf(str)[i] : NULL;
+}
+
 /** Initializes `out` by copying the contents of `str`.
     If `len` is `0` and `str` is not empty, `strlen` is called.
     If `alloc` is `NULL`, the standard allocator is used.
