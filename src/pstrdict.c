@@ -17,8 +17,8 @@
     limitations under the License.
 */
 
-#include <pstring/pstring.h>
 #include <pstring/pstrdict.h>
+#include <pstring/pstring.h>
 
 #include <stdint.h>
 
@@ -186,7 +186,7 @@ int pstrdict_reserve(pstrdict_t *dict, size_t count) {
         capacity = PSTRDICT_BUCKET_SIZE;
 
     return dict->count == 0 ? grow_empty(dict, capacity)
-                           : grow_not_empty(dict, capacity);
+                            : grow_not_empty(dict, capacity);
 }
 
 void pstrdict_free(pstrdict_t *dict) {
@@ -375,7 +375,9 @@ int pstrdict_remove(pstrdict_t *dict, const pstring_t *key) {
     return PSTRING_ENOENT;
 }
 
-int pstrdict_finsert(pstrdict_t *dict, const pstring_t *key, const void *value) {
+int pstrdict_finsert(
+    pstrdict_t *dict, const pstring_t *key, const void *value
+) {
     if (!dict || !key || !value)
         return PSTRING_EINVAL;
 

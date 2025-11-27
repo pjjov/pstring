@@ -51,8 +51,9 @@
 #define PSTRING_MAX_SET 256
 
 #ifdef PSTRING_AVX
-static int
-pstr__match_set_avx(const char *buffer, const char *set, size_t length) {
+static int pstr__match_set_avx(
+    const char *buffer, const char *set, size_t length
+) {
     __m256i vec = _mm256_loadu_si256((const __m256i *)buffer);
     int result = 0;
 
@@ -87,8 +88,9 @@ static int pstr__compare_avx(const char *left, const char *right) {
 #endif
 
 #ifdef PSTRING_SSE
-static int
-pstr__match_set_sse(const char *buffer, const char *set, size_t length) {
+static int pstr__match_set_sse(
+    const char *buffer, const char *set, size_t length
+) {
     __m128i vec = _mm_loadu_si128((const __m128i *)buffer);
     int result = 0;
 
@@ -178,9 +180,10 @@ static inline int pstr__ctz(int x) {
     return __builtin_ctz(x);
 #else
     /* graphics.stanford.edu/~seander/bithacks.html#ZerosOnRightLinear */
-    static const int MultiplyDeBruijnBitPos[32]
-        = { 0,  1,  28, 2,  29, 14, 24, 3, 30, 22, 20, 15, 25, 17, 4,  8,
-            31, 27, 13, 23, 21, 19, 16, 7, 26, 12, 18, 6,  11, 5,  10, 9 };
+    static const int MultiplyDeBruijnBitPos[32] = {
+        0,  1,  28, 2,  29, 14, 24, 3, 30, 22, 20, 15, 25, 17, 4,  8,
+        31, 27, 13, 23, 21, 19, 16, 7, 26, 12, 18, 6,  11, 5,  10, 9
+    };
 
     unsigned int v = x;
     return MultiplyDeBruijnBitPos[((uint32_t)((v & -v) * 0x077CB531U)) >> 27];
