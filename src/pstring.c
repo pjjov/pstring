@@ -471,6 +471,37 @@ int pstrcat(pstring_t *dst, const pstring_t *src) {
         memcpy(pstrend(dst), pstrbuf(src), pstrlen(src));
         pstr__setlen(dst, pstrlen(dst) + pstrlen(src));
     }
+
+    return PSTRING_OK;
+}
+
+int pstrcats(pstring_t *dst, const char *src, size_t length) {
+    if (!dst || !src)
+        return PSTRING_EINVAL;
+
+    if (length == 0)
+        length = strlen(src);
+
+    if (length > 0) {
+        if (pstrreserve(dst, length))
+            return PSTRING_ENOMEM;
+
+        memcpy(pstrend(dst), src, length);
+        pstr__setlen(dst, pstrlen(dst) + length);
+    }
+
+    return PSTRING_OK;
+}
+
+int pstrcatc(pstring_t *dst, char chr) {
+    if (!dst)
+        return PSTRING_EINVAL;
+
+    if (pstrreserve(dst, 1))
+        return PSTRING_ENOMEM;
+
+    *pstrend(dst) = chr;
+    pstr__setlen(dst, pstrlen(dst) + 1);
     return PSTRING_OK;
 }
 

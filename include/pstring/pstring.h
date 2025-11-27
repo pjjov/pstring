@@ -289,6 +289,17 @@ PSTR_API size_t pstrrcspn(const pstring_t *str, const char *set);
 **/
 PSTR_API int pstrcat(pstring_t *dst, const pstring_t *src);
 
+/** Concatenates `src` onto the end of `dst`.
+    If `length` is zero, `src` is treated as a null-terminated string.
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
+**/
+PSTR_API int pstrcats(pstring_t *dst, const char *src, size_t length);
+
+/** Concatenates character `chr` onto the end of `dst`.
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
+**/
+PSTR_API int pstrcatc(pstring_t *dst, char chr);
+
 /** Copies the contents of `src` into `dst`
     Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
 **/
