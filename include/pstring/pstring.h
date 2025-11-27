@@ -318,6 +318,11 @@ PSTR_API int pstrrepl(
     pstring_t *str, const pstring_t *src, const pstring_t *dst, size_t max
 );
 
+/** Returns a non-unique integer value representing the contents of `str`.
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
+**/
+PSTR_API size_t pstrhash(const pstring_t *str);
+
 /** Concatenates the contents of the file onto the end of `out`.
     Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM, PSTRING_EIO.
 **/

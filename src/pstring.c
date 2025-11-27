@@ -840,3 +840,24 @@ int pstrrepl(
 
     return PSTRING_OK;
 }
+
+size_t pstrhash(const pstring_t *str) {
+#if SIZE_MAX == 0xFFFFFFFFFFFFFFFFull
+    #define HASH_FNV_PRIME 0x00000100000001b3ull
+    #define HASH_FNV_OFFSET 0xcbf29ce484222325ull
+#elif SIZE_MAX == 0xFFFFFFFFull
+    #define HASH_FNV_PRIME 0x01000193ull
+    #define HASH_FNV_OFFSET 0x811c9dc5ull
+#endif
+
+    size_t hash = HASH_FNV_OFFSET;
+    size_t length = pstrlen(str);
+    const char *bytes = pstrbuf(str);
+
+    while (length--) {
+        hash ^= (size_t)(unsigned char)*bytes++;
+        hash *= HASH_FNV_PRIME;
+    }
+
+    return hash;
+}

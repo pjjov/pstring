@@ -101,32 +101,11 @@ static inline uint8_t hash_part(size_t hash) {
     return part;
 }
 
-#if SIZE_MAX == 0xFFFFFFFFFFFFFFFFull
-    #define HASH_FNV_PRIME 0x00000100000001b3ull
-    #define HASH_FNV_OFFSET 0xcbf29ce484222325ull
-#elif SIZE_MAX == 0xFFFFFFFFull
-    #define HASH_FNV_PRIME 0x01000193ull
-    #define HASH_FNV_OFFSET 0x811c9dc5ull
-#endif
-
-static size_t default_hash(const pstring_t *str) {
-    size_t hash = HASH_FNV_OFFSET;
-    size_t length = pstrlen(str);
-    const char *bytes = pstrbuf(str);
-
-    while (length--) {
-        hash ^= (size_t)(unsigned char)*bytes++;
-        hash *= HASH_FNV_PRIME;
-    }
-
-    return hash;
-}
-
 pstrdict_t *pstrdict_new(pstrhash_fn *hash, allocator_t *allocator) {
     if (!allocator)
         allocator = &standard_allocator;
     if (!hash)
-        hash = &default_hash;
+        hash = &pstrhash;
 
     pstrdict_t *out = allocate(allocator, sizeof(pstrdict_t));
 
