@@ -19,6 +19,7 @@
 
 #include <pf_assert.h>
 #include <pf_test.h>
+#include <pf_typeid.h>
 
 #include <pstring/io.h>
 #include <pstring/pstring.h>

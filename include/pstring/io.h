@@ -29,7 +29,6 @@
     #define PSTR_API
 #endif
 
-#include <pf_typeid.h>
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -45,10 +44,7 @@ enum pstream_origin {
 };
 
 enum pstring_typeid {
-    PSTRTYPE__NAMESPACE = 'P' << 8,
-    PSTRTYPE_ARRAY,
-    PSTRTYPE_MAP,
-    PSTRTYPE__MAX,
+    PSTRING_TYPE = 3 | ('P' << 8),
 };
 
 /** Concatenates string formated by standard library functions to `dst`.
@@ -171,7 +167,7 @@ PSTR_INLINE void pstream_close(pstream_t *stream) {
 /** Writes a single character to `stream`.
     Possible error codes: PSTRING_EINVAL, PSTRING_EIO.
 **/
-PSTR_API int pstream_putc(pstream_t *stream, char chr) {
+PSTR_INLINE int pstream_putc(pstream_t *stream, char chr) {
     return 1 != pstream_write(stream, &chr, 1);
 }
 

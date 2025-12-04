@@ -18,6 +18,7 @@
 */
 
 #define PF_TYPE_HELPERS
+#include <pf_typeid.h>
 #include <pstring/io.h>
 #include <pstring/pstring.h>
 #include <stdarg.h>
