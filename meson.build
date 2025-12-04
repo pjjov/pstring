@@ -11,13 +11,20 @@ src = [
     './src/pstrdict.c',
 ]
 
+args = []
 inc = include_directories('./include/')
 
 cpolyfill_dep = dependency('cpolyfill', required: true)
+xxhash_dep = dependency('xxhash', 'libxxhash', required: false)
+
+if xxhash_dep.found()
+    args += '-DPSTRING_USE_XXHASH'
+endif
 
 lib = library(
     'pstring',
-    dependencies: cpolyfill_dep,
+    c_args: args,
+    dependencies: [cpolyfill_dep, xxhash_dep],
     sources: src,
     include_directories: inc
 )

@@ -844,14 +844,24 @@ int pstrrepl(
     return PSTRING_OK;
 }
 
+#ifdef PSTRING_USE_XXHASH
+
+    #include <xxhash.h>
+
 size_t pstrhash(const pstring_t *str) {
-#if SIZE_MAX == 0xFFFFFFFFFFFFFFFFull
-    #define HASH_FNV_PRIME 0x00000100000001b3ull
-    #define HASH_FNV_OFFSET 0xcbf29ce484222325ull
-#elif SIZE_MAX == 0xFFFFFFFFull
-    #define HASH_FNV_PRIME 0x01000193ull
-    #define HASH_FNV_OFFSET 0x811c9dc5ull
-#endif
+    return XXH3_64bits(pstrbuf(str), pstrlen(str));
+}
+
+#else
+
+size_t pstrhash(const pstring_t *str) {
+    #if SIZE_MAX == 0xFFFFFFFFFFFFFFFFull
+        #define HASH_FNV_PRIME 0x00000100000001b3ull
+        #define HASH_FNV_OFFSET 0xcbf29ce484222325ull
+    #elif SIZE_MAX == 0xFFFFFFFFull
+        #define HASH_FNV_PRIME 0x01000193ull
+        #define HASH_FNV_OFFSET 0x811c9dc5ull
+    #endif
 
     size_t hash = HASH_FNV_OFFSET;
     size_t length = pstrlen(str);
@@ -864,3 +874,5 @@ size_t pstrhash(const pstring_t *str) {
 
     return hash;
 }
+
+#endif
