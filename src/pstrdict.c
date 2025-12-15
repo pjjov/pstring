@@ -234,9 +234,13 @@ static inline struct bucket *iter_init(pstrdict_t *dict, size_t hash) {
     return &dict->buckets[(hash & (dict->capacity - 1)) / PSTRDICT_BUCKET_SIZE];
 }
 
-static inline struct bucket *iter_next(pstrdict_t *dict, struct bucket *prev) {
+static inline struct bucket *iter_end(pstrdict_t *dict) {
     size_t end = dict->capacity / PSTRDICT_BUCKET_SIZE;
-    return ++prev >= &dict->buckets[end] ? dict->buckets : prev;
+    return &dict->buckets[end];
+}
+
+static inline struct bucket *iter_next(pstrdict_t *dict, struct bucket *prev) {
+    return ++prev >= iter_end(dict) ? dict->buckets : prev;
 }
 
 void *pstrdict_get(pstrdict_t *dict, const pstring_t *key) {
@@ -403,4 +407,58 @@ int pstrdict_finsert(
 
         b = iter_next(dict, b);
     }
+}
+
+int pstrdict_each(pstrdict_t *dict, pstrdict_fn *fn, void *user) {
+    if (!dict || !fn)
+        return PSTRING_EINVAL;
+
+    struct bucket *b = dict->buckets;
+
+    for (; b < iter_end(dict); b++) {
+        uint64_t matches = bucket_match(&b->meta, PSTRDICT_EMPTY)
+                         | bucket_match(&b->meta, PSTRDICT_TOMB);
+
+        matches = (~matches) & ((1 << PSTRDICT_BUCKET_SIZE) - 1);
+
+        while (matches) {
+            uint8_t i = bitset_next(&matches);
+
+            pstring_t *key = (pstring_t *)b->pairs[i].key;
+            void *value = (void *)b->pairs[i].value;
+
+            if (fn(user, key, value))
+                return PSTRING_EINTR;
+        }
+    }
+
+    return PSTRING_OK;
+}
+
+PSTR_API int pstrdict_filter(pstrdict_t *dict, pstrdict_fn *fn, void *user) {
+    if (!dict || !fn)
+        return PSTRING_EINVAL;
+
+    struct bucket *b = dict->buckets;
+
+    for (; b < iter_end(dict); b++) {
+        uint64_t matches = bucket_match(&b->meta, PSTRDICT_EMPTY)
+                         | bucket_match(&b->meta, PSTRDICT_TOMB);
+
+        matches = (~matches) & ((1 << PSTRDICT_BUCKET_SIZE) - 1);
+
+        while (matches) {
+            uint8_t i = bitset_next(&matches);
+
+            pstring_t *key = (pstring_t *)b->pairs[i].key;
+            void *value = (void *)b->pairs[i].value;
+
+            if (!fn(user, key, value)) {
+                b->meta.hashes[i] = PSTRDICT_TOMB;
+                dict->count--;
+            }
+        }
+    }
+
+    return PSTRING_OK;
 }

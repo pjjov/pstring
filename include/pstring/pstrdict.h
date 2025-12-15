@@ -99,4 +99,21 @@ PSTR_API int pstrdict_finsert(
     pstrdict_t *dict, const pstring_t *key, const void *value
 );
 
+/** Callback that traverses the key-value pairs of a dictionary. **/
+typedef int (pstrdict_fn)(void *user, pstring_t *key, void *value);
+
+/** Calls `fn` for each key-value pair inside `dict`.
+    If a non-zero value is returned by `fn`, the iteration is interrupted.
+
+    Possible error codes: PSTRING_EINVAL, PSTRING_EINTR.
+**/
+PSTR_API int pstrdict_each(pstrdict_t *dict, pstrdict_fn *fn, void *user);
+
+/** Calls `fn` for each key-value pair inside `dict`,
+    removing them if `PSTRING_FALSE` is returned.
+
+    Possible error codes: PSTRING_EINVAL, PSTRING_EINTR.
+**/
+PSTR_API int pstrdict_filter(pstrdict_t *dict, pstrdict_fn *fn, void *user);
+
 #endif

@@ -106,10 +106,50 @@ int test_pstrdict_insert_remove(int seed, int rep) {
     return 0;
 }
 
+int sum_each(void *user, pstring_t *key, void *value) {
+    *(int *)user += *(int *)value;
+    return 0;
+}
+
+int remove_larger(void *user, pstring_t *key, void *value) {
+    return *(int *)value <= *(int *)user;
+}
+
+int test_pstrdict_each(int seed, int rep) {
+    pstring_t keys[] = {
+        PSTRWRAP("a"), PSTRWRAP("b"), PSTRWRAP("c"),
+        PSTRWRAP("d"), PSTRWRAP("e"),
+    };
+
+    int values[5] = { 1, 2, 3, 4, 5 };
+
+    pstrdict_t *dict = pstrdict_new(NULL, NULL);
+    pf_assert_not_null(dict);
+
+    for (size_t i = 0; i < 5; i++)
+        pf_assert_ok(pstrdict_insert(dict, &keys[i], &values[i]));
+
+    int sum = 0;
+    pf_assert_ok(pstrdict_each(dict, sum_each, &sum));
+    pf_assert(sum == 15);
+
+    int limit = 3;
+    pf_assert_ok(pstrdict_filter(dict, remove_larger, &limit));
+    pf_assert_not_null(pstrdict_get(dict, PSTR("a")));
+    pf_assert_not_null(pstrdict_get(dict, PSTR("b")));
+    pf_assert_not_null(pstrdict_get(dict, PSTR("c")));
+    pf_assert_null(pstrdict_get(dict, PSTR("d")));
+    pf_assert_null(pstrdict_get(dict, PSTR("e")));
+
+    pstrdict_free(dict);
+    return 0;
+}
+
 const struct pf_test suite_dict[] = {
     { test_pstrdict_new, "/pstring/dict/new", 1 },
     { test_pstrdict_reserve, "/pstring/dict/reserve", 1 },
     { test_pstrdict_get_set, "/pstring/dict/get_set", 1 },
     { test_pstrdict_insert_remove, "/pstring/dict/insert_remove", 1 },
+    { test_pstrdict_each, "/pstring/dict/each", 1 },
     { 0 },
 };
