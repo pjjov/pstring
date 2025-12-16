@@ -339,6 +339,9 @@ PSTR_INLINE void pstr__setlen(pstring_t *str, size_t length) {
         str->sso.length = length;
     else
         str->base.length = length;
+
+    if (pstrowned(str))
+        *pstrend(str) = '\0';
 }
 
 PSTR_API size_t pstr__nlen(const char *str, size_t max);
