@@ -68,7 +68,12 @@ PSTR_API allocator_t *pstrdict_allocator(const pstrdict_t *dict);
 PSTR_API void pstrdict_clear(pstrdict_t *dict);
 
 /** Retrieves the value associated with `key` or `NULL` if not found. **/
-PSTR_API void *pstrdict_get(pstrdict_t *dict, const pstring_t *key);
+PSTR_API void *pstrdict_get(const pstrdict_t *dict, const pstring_t *key);
+
+/** Retrieves the value associated with `key` or `NULL` if not found. **/
+PSTR_API void *pstrdict_gets(
+    const pstrdict_t *dict, const char *key, size_t length
+);
 
 /** Sets the value associated with `key` to `value`, inserting them if `key` is
     not already present in `dict`. Both pointers, the initial key and current

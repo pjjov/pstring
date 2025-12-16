@@ -230,20 +230,20 @@ struct pstrdict_iter {
     size_t b;
 };
 
-static inline struct bucket *iter_init(pstrdict_t *dict, size_t hash) {
+static inline struct bucket *iter_init(const pstrdict_t *dict, size_t hash) {
     return &dict->buckets[(hash & (dict->capacity - 1)) / PSTRDICT_BUCKET_SIZE];
 }
 
-static inline struct bucket *iter_end(pstrdict_t *dict) {
+static inline struct bucket *iter_end(const pstrdict_t *dict) {
     size_t end = dict->capacity / PSTRDICT_BUCKET_SIZE;
     return &dict->buckets[end];
 }
 
-static inline struct bucket *iter_next(pstrdict_t *dict, struct bucket *prev) {
+static inline struct bucket *iter_next(const pstrdict_t *dict, struct bucket *prev) {
     return ++prev >= iter_end(dict) ? dict->buckets : prev;
 }
 
-void *pstrdict_get(pstrdict_t *dict, const pstring_t *key) {
+void *pstrdict_get(const pstrdict_t *dict, const pstring_t *key) {
     if (!dict || !key || dict->count == 0)
         return NULL;
 
@@ -268,6 +268,17 @@ void *pstrdict_get(pstrdict_t *dict, const pstring_t *key) {
     }
 
     return NULL;
+}
+
+void *pstrdict_gets(
+    const pstrdict_t *dict, const char *key, size_t length
+) {
+    if (!dict || (!key && length > 0))
+        return NULL;
+
+    pstring_t buffer;
+    pstrwrap(&buffer, (char *)key, length, 0);
+    return pstrdict_get(dict, &buffer);
 }
 
 int pstrdict_set(pstrdict_t *dict, const pstring_t *key, const void *value) {
