@@ -377,7 +377,7 @@ int pstrgrow(pstring_t *str, size_t count) {
         if (pstralloc(&tmp, PSTRING_SSO_SIZE + count, NULL))
             return PSTRING_ENOMEM;
 
-        memcpy(pstrbuf(&tmp), str->sso.buffer, str->sso.length);
+        memcpy(pstrbuf(&tmp), str->sso.buffer, PSTRING_SSO_SIZE);
         tmp.base.length = str->sso.length;
         *str = tmp;
         return PSTRING_OK;
