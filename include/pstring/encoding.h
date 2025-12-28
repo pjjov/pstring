@@ -114,4 +114,14 @@ PSTR_API int pstrenc_utf8(pstring_t *dst, const uint32_t *src, size_t length);
 **/
 PSTR_API int pstrdec_utf8(uint32_t *dst, size_t *length, const pstring_t *src);
 
+/** Encodes `src` as a JSON string into `dst`.
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
+**/
+PSTR_API int pstrenc_json(pstring_t *dst, const pstring_t *src);
+
+/** Decodes a JSON string from `src` into `dst`.
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
+**/
+PSTR_API int pstrdec_json(pstring_t *dst, const pstring_t *src);
+
 #endif
