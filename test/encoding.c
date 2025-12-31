@@ -192,14 +192,51 @@ int test_encoding_json(int seed, int rep) {
     TEST_ENCODING(pstrenc_json, "\\\\", "\\\\\\\\");
     TEST_ENCODING(pstrenc_json, "/\b\f\n\r\t", "\\/\\b\\f\\n\\r\\t");
     TEST_ENCODING(pstrenc_json, "\"caf\351\"", "\\\"caf\\u00E9\\\"");
-    TEST_ENCODING(pstrenc_json, "{\"key\":\"value\"}", "{\\\"key\\\":\\\"value\\\"}");
+    TEST_ENCODING(
+        pstrenc_json, "{\"key\":\"value\"}", "{\\\"key\\\":\\\"value\\\"}"
+    );
 
     TEST_ENCODING(pstrdec_json, "\\\"hello\\\"", "\"hello\"");
     TEST_ENCODING(pstrdec_json, "\\\"\\\"", "\"\"");
     TEST_ENCODING(pstrdec_json, "\\\\\\\\", "\\\\");
     TEST_ENCODING(pstrdec_json, "\\/\\b\\f\\n\\r\\t", "/\b\f\n\r\t");
     TEST_ENCODING(pstrdec_json, "\\\"caf\\u0010\\\"", "\"caf\020\"");
-    TEST_ENCODING(pstrdec_json, "{\\\"key\\\":\\\"value\\\"}", "{\"key\":\"value\"}");
+    TEST_ENCODING(
+        pstrdec_json, "{\\\"key\\\":\\\"value\\\"}", "{\"key\":\"value\"}"
+    );
+
+    pstrfree(&dst);
+    return 0;
+}
+
+int test_encoding_xml(int seed, int rep) {
+    pstring_t dst = { 0 };
+
+    TEST_ENCODING(pstrenc_xml, "Hello, world!", "Hello, world!");
+    TEST_ENCODING(pstrenc_xml, "5 > 3", "5 &gt; 3");
+    TEST_ENCODING(pstrenc_xml, "&lt;script&gt;", "&amp;lt;script&amp;gt;");
+    TEST_ENCODING(
+        pstrenc_xml, "Hello <b>World</b>", "Hello &lt;b&gt;World&lt;/b&gt;"
+    );
+
+    TEST_ENCODING(pstrdec_xml, "Hello, world!", "Hello, world!");
+    TEST_ENCODING(pstrdec_xml, "5 &gt; 3", "5 > 3");
+    TEST_ENCODING(pstrdec_xml, "&amp;lt;script&amp;gt;", "&lt;script&gt;");
+    TEST_ENCODING(
+        pstrdec_xml, "Hello &lt;b&gt;World&lt;/b&gt;", "Hello <b>World</b>"
+    );
+
+    TEST_ENCODING(
+        pstrenc_xml,
+        "<div class=\"box\">Text</div>",
+        "&lt;div class=&quot;box&quot;&gt;Text&lt;/div&gt;"
+    );
+
+    TEST_ENCODING(
+        pstrdec_xml,
+        "&lt;div class=&quot;box&quot;&gt;Text&lt;/div&gt;",
+        "<div class=\"box\">Text</div>"
+    );
 
     pstrfree(&dst);
     return 0;
@@ -212,5 +249,6 @@ const struct pf_test suite_encoding[] = {
     { test_encoding_cstring, "/pstring/encoding/cstring", 1 },
     { test_encoding_utf8, "/pstring/encoding/utf8", 1 },
     { test_encoding_json, "/pstring/encoding/json", 1 },
+    { test_encoding_xml, "/pstring/encoding/xml", 1 },
     { 0 },
 };

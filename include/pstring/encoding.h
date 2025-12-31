@@ -124,4 +124,28 @@ PSTR_API int pstrenc_json(pstring_t *dst, const pstring_t *src);
 **/
 PSTR_API int pstrdec_json(pstring_t *dst, const pstring_t *src);
 
+/** Encodes `src` as a XML string into `dst`.
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
+**/
+PSTR_API int pstrenc_xml(pstring_t *dst, const pstring_t *src);
+
+/** Decodes a XML string from `src` into `dst`.
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
+**/
+PSTR_API int pstrdec_xml(pstring_t *dst, const pstring_t *src);
+
+/** Encodes `src` as a HTML string into `dst`.
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
+**/
+PSTR_INLINE int pstrenc_html(pstring_t *dst, const pstring_t *src) {
+    return pstrenc_xml(dst, src);
+}
+
+/** Decodes a HTML string from `src` into `dst`.
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
+**/
+PSTR_INLINE int pstrdec_html(pstring_t *dst, const pstring_t *src) {
+    return pstrdec_xml(dst, src);
+}
+
 #endif
