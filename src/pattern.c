@@ -19,10 +19,12 @@
 
 #include <pstring/pstring.h>
 #include <stdint.h>
+#include <string.h>
 
 enum {
     VAL_BYTE,
     VAL_CODE,
+    VAL_CLASS,
 };
 
 struct value {
@@ -125,11 +127,55 @@ static void regex_postfix(struct parser *p, size_t value) {
     emit_index(p, value);
 }
 
-static void regex_char(struct parser *p) { }
+static void regex_char(struct parser *p) {
+    emit_value(p, &VAL(BYTE, .as.byte = peek(p, 0)));
+    regex_postfix(p, p->vcount);
+}
+
+static void regex_any(struct parser *p) { regex_postfix(p, p->vcount); }
+
+static inline int is_escape(char chr) {
+    return NULL != strchr("{}[]()^$.|*+?\\", chr);
+}
+
+static inline int is_metaescape(char chr) {
+    return NULL != strchr("dswDSW", chr);
+}
+
+static void regex_esc_wb(struct parser *p) { p->errno = PSTRING_ENOSYS; }
+
+static void regex_esc_meta(struct parser *p) {
+    emit_value(p, &VAL(CLASS, .as.byte = peek(p, 0)));
+}
+
+static void regex_esc(struct parser *p) {
+    char chr = peek(p, 1);
+    p->chr++;
+
+    switch (chr) {
+        /* clang-format off */
+    case 't': chr = '\t'; break;
+    case 'n': chr = '\n'; break;
+    case 'r': chr = '\r'; break;
+    /* todo */
+        /* clang-format on */
+    case 'b':
+    case 'B':
+        regex_esc_wb(p);
+        break;
+
+    default:
+        if (is_escape(chr))
+            regex_char(p);
+        else if (is_metaescape(chr))
+            regex_esc_meta(p);
+        else
+            p->errno = PSTRING_ENOENT;
+    }
+}
+
 static void regex_set(struct parser *p) { }
-static void regex_esc(struct parser *p) { }
 static void regex_alt(struct parser *p) { }
-static void regex_any(struct parser *p) { }
 static void regex_group_open(struct parser *p) { }
 static void regex_group_close(struct parser *p) { }
 
