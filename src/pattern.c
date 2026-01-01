@@ -18,6 +18,7 @@
 */
 
 #include <pstring/pstring.h>
+#include <stdalign.h>
 #include <stdint.h>
 #include <string.h>
 
@@ -80,7 +81,7 @@ static inline void emit_value(struct parser *p, struct value *value) {
     p->values = (struct value *)pstrbuf(p->vbuffer);
     p->vcount = pstrlen(p->vbuffer) * sizeof(*value);
 
-    if (((uintptr_t)p->values) & (sizeof(*value) - 1))
+    if (((uintptr_t)p->values) & (alignof(*value) - 1))
         p->errno = PSTRING_ENOMEM;
 }
 
