@@ -101,3 +101,64 @@ static inline void emit_match(struct parser *p, size_t min, size_t max) {
 static inline char peek(struct parser *p, size_t i) {
     return &p->chr[i] < p->end ? p->chr[i] : '\0';
 };
+
+static void regex_quantifier(struct parser *p) {
+    /* todo: */
+    size_t min = 0;
+    size_t max = 0;
+    emit_match(p, min, max);
+}
+
+static void regex_postfix(struct parser *p, size_t value) {
+    char chr = peek(p, 0);
+
+    switch (chr) {
+        /* clang-format off */
+    case '{': regex_quantifier(p);        break;
+    case '?': emit_match(p, 0, 1);        break;
+    case '*': emit_match(p, 0, SIZE_MAX); break;
+    case '+': emit_match(p, 1, SIZE_MAX); break;
+    default:  emit_match(p, 1, 1);        break;
+        /* clang-format on */
+    };
+
+    emit_index(p, value);
+}
+
+static void regex_char(struct parser *p) { }
+static void regex_set(struct parser *p) { }
+static void regex_esc(struct parser *p) { }
+static void regex_alt(struct parser *p) { }
+static void regex_any(struct parser *p) { }
+static void regex_group_open(struct parser *p) { }
+static void regex_group_close(struct parser *p) { }
+
+static void regex_next(struct parser *p) {
+    char chr = peek(p, 0);
+    p->chr++;
+
+    if (chr & 0x80) {
+        /* UTF-8 */
+        p->errno = PSTRING_ENOSYS;
+        return;
+    }
+
+    switch (chr) {
+    case '*':
+    case '?':
+    case '+':
+    case ']':
+        p->errno = PSTRING_EINVAL;
+        break;
+
+        /* clang-format off */
+    case '(':  regex_group_open(p);  break;
+    case ')':  regex_group_close(p); break;
+    case '\\': regex_esc(p);         break;
+    case '[':  regex_set(p);         break;
+    case '|':  regex_alt(p);         break;
+    case '.':  regex_any(p);         break;
+    default:   regex_char(p);         break;
+        /* clang-format on */
+    }
+}
