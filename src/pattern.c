@@ -17,10 +17,14 @@
     limitations under the License.
 */
 
+#include <pstring/pattern.h>
 #include <pstring/pstring.h>
+
 #include <stdalign.h>
 #include <stdint.h>
 #include <string.h>
+
+#include "allocator_std.h"
 
 #define BRANCH_SIZE (sizeof(size_t) + 1)
 #define BRANCH_DEPTH 32
@@ -44,6 +48,8 @@ struct value {
     (struct value) { VAL_##type, __VA_ARGS__ }
 
 typedef struct pstrexpr_t {
+    allocator_t *allocator;
+    pstring_t source;
     pstring_t bytecode;
     pstring_t values;
 } pstrexpr_t;
@@ -236,7 +242,6 @@ static void regex_esc(struct parser *p) {
 
 static void regex_set(struct parser *p) { }
 
-/* (()|ab|cs|(ab|CS))bb */
 static void regex_alt(struct parser *p) {
     patch_branch(p); /* previous */
 
@@ -287,4 +292,63 @@ static void regex_next(struct parser *p) {
     default:   regex_char(p);        break;
         /* clang-format on */
     }
+}
+
+static void init_parser(pstrexpr_t *out, struct parser *p) {
+    p->chr = pstrbuf(&out->source);
+    p->end = pstrend(&out->source);
+
+    p->errno = PSTRING_OK;
+    p->numCaptures = 0;
+    p->numValues = 0;
+    p->top = 0;
+
+    p->source = &out->source;
+    p->vbuffer = &out->values;
+    p->bytecode = &out->bytecode;
+}
+
+static int parse_regex(pstrexpr_t *out) {
+    struct parser p;
+    init_parser(out, &p);
+
+    while (p.chr < p.end)
+        regex_next(&p);
+
+    return p.errno <= 0 ? p.errno : PSTRING_OK;
+}
+
+static int parse_pattern(pstrexpr_t *out) { return parse_regex(out); }
+
+pstrexpr_t *pstrexpr_new(const char *pattern, allocator_t *allocator) {
+    if (!allocator)
+        allocator = &standard_allocator;
+
+    pstrexpr_t *expr;
+
+    if (!(expr = zallocate(allocator, sizeof(*expr))))
+        return NULL;
+
+    expr->allocator = allocator;
+    int res = pstrnew(&expr->source, pattern, 0, allocator)
+        || pstralloc(&expr->values, pstrcap(&expr->source), allocator)
+        || pstralloc(&expr->bytecode, pstrcap(&expr->source), allocator)
+        || parse_pattern(expr);
+
+    if (res) {
+        pstrexpr_free(expr);
+        return NULL;
+    }
+
+    return expr;
+}
+
+void pstrexpr_free(pstrexpr_t *expr) {
+    if (!expr)
+        return;
+
+    pstrfree(&expr->source);
+    pstrfree(&expr->bytecode);
+    pstrfree(&expr->values);
+    deallocate(expr->allocator, expr, sizeof(*expr));
 }
