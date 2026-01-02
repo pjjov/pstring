@@ -22,6 +22,10 @@
 #include <stdint.h>
 #include <string.h>
 
+#define BRANCH_SIZE (sizeof(size_t) + 1)
+#define BRANCH_DEPTH 32
+#define PARSER_DEPTH 64
+
 enum {
     VAL_BYTE,
     VAL_CODE,
@@ -47,6 +51,7 @@ typedef struct pstrexpr_t {
 enum {
     OP_NOP = 0,
     OP_MATCH,
+    OP_BRANCH,
     OP_CAPTURE_START,
     OP_CAPTURE_END,
 };
@@ -60,8 +65,15 @@ struct parser {
     pstring_t *bytecode;
     pstring_t *vbuffer;
 
-    size_t vcount;
+    size_t numCaptures;
+    size_t numValues;
     struct value *values;
+    size_t top;
+
+    struct {
+        int op;
+        size_t index;
+    } stack[PARSER_DEPTH];
 };
 
 static inline void emit_op(struct parser *p, char op) {
@@ -79,7 +91,7 @@ static inline void emit_value(struct parser *p, struct value *value) {
         p->errno = PSTRING_ENOMEM;
 
     p->values = (struct value *)pstrbuf(p->vbuffer);
-    p->vcount = pstrlen(p->vbuffer) * sizeof(*value);
+    p->numValues = pstrlen(p->vbuffer) * sizeof(*value);
 
     if (((uintptr_t)p->values) & (alignof(*value) - 1))
         p->errno = PSTRING_ENOMEM;
@@ -96,9 +108,55 @@ static inline void emit_index(struct parser *p, size_t index) {
 
 static inline void emit_match(struct parser *p, size_t min, size_t max) {
     emit_op(p, OP_MATCH);
-    emit_index(p, p->vcount - 1);
+    emit_index(p, p->numValues - 1);
     emit_index(p, min);
     emit_index(p, max);
+}
+
+static inline void push_stack(struct parser *p, int op) {
+    if (p->top < PARSER_DEPTH) {
+        p->stack[p->top].op = op;
+        p->stack[p->top].index = pstrlen(p->bytecode);
+        p->top++;
+    } else {
+        p->errno = PSTRING_ENOMEM;
+    }
+}
+
+static inline int pop_stack(struct parser *p, size_t *index) {
+    if (p->top == 0)
+        return 0;
+    p->top--;
+
+    if (index)
+        *index = p->stack[p->top].index;
+    return p->stack[p->top].op;
+}
+
+static inline int peek_stack(struct parser *p) {
+    return p->top > 0 ? p->stack[p->top - 1].op : OP_NOP;
+}
+
+static inline void patch_branch(struct parser *p) {
+    if (pstrreserve(p->bytecode, BRANCH_SIZE)) {
+        p->errno = PSTRING_ENOMEM;
+        return;
+    }
+
+    size_t branch;
+    pop_stack(p, &branch);
+
+    size_t jump = pstrlen(p->bytecode) - branch;
+    char *buf = pstrslot(p->bytecode, branch);
+
+    if (jump < UINT8_MAX - 1) {
+        *buf = (uint8_t)jump;
+        return;
+    }
+
+    *buf = UINT8_MAX;
+    memcpy(buf + 1, buf + BRANCH_SIZE, pstrlen(p->bytecode) - branch - 1);
+    memcpy(buf + 1, &jump, sizeof(jump));
 }
 
 static inline char peek(struct parser *p, size_t i) {
@@ -130,10 +188,10 @@ static void regex_postfix(struct parser *p, size_t value) {
 
 static void regex_char(struct parser *p) {
     emit_value(p, &VAL(BYTE, .as.byte = peek(p, 0)));
-    regex_postfix(p, p->vcount);
+    regex_postfix(p, p->numValues);
 }
 
-static void regex_any(struct parser *p) { regex_postfix(p, p->vcount); }
+static void regex_any(struct parser *p) { regex_postfix(p, p->numValues); }
 
 static inline int is_escape(char chr) {
     return NULL != strchr("{}[]()^$.|*+?\\", chr);
@@ -160,6 +218,7 @@ static void regex_esc(struct parser *p) {
     case 'r': chr = '\r'; break;
     /* todo */
         /* clang-format on */
+
     case 'b':
     case 'B':
         regex_esc_wb(p);
@@ -176,9 +235,29 @@ static void regex_esc(struct parser *p) {
 }
 
 static void regex_set(struct parser *p) { }
-static void regex_alt(struct parser *p) { }
-static void regex_group_open(struct parser *p) { }
-static void regex_group_close(struct parser *p) { }
+
+/* (()|ab|cs|(ab|CS))bb */
+static void regex_alt(struct parser *p) {
+    patch_branch(p); /* previous */
+
+    emit_op(p, OP_BRANCH);
+    push_stack(p, OP_BRANCH);
+    emit_index(p, 0);
+}
+
+static void regex_group_open(struct parser *p) {
+    p->numCaptures++;
+    emit_op(p, OP_CAPTURE_START);
+    emit_op(p, OP_BRANCH); /* first alternation */
+    push_stack(p, OP_CAPTURE_START);
+    emit_index(p, 0);
+}
+
+static void regex_group_close(struct parser *p) {
+    if (peek_stack(p) == OP_BRANCH)
+        patch_branch(p);
+    emit_op(p, OP_CAPTURE_END);
+}
 
 static void regex_next(struct parser *p) {
     char chr = peek(p, 0);
@@ -205,7 +284,7 @@ static void regex_next(struct parser *p) {
     case '[':  regex_set(p);         break;
     case '|':  regex_alt(p);         break;
     case '.':  regex_any(p);         break;
-    default:   regex_char(p);         break;
+    default:   regex_char(p);        break;
         /* clang-format on */
     }
 }
