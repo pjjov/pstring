@@ -27,20 +27,24 @@
 #include "allocator_std.h"
 
 #define BRANCH_SIZE (sizeof(size_t) + 1)
-#define BRANCH_DEPTH 32
 #define PARSER_DEPTH 64
 
 enum {
     VAL_BYTE,
     VAL_CODE,
     VAL_CLASS,
+    VAL_SET,
+    VAL_NSET,
 };
 
 struct value {
     int type;
+    unsigned int length;
+
     union {
         char byte;
         uint32_t code;
+        unsigned int offset;
     } as;
 };
 
@@ -240,7 +244,32 @@ static void regex_esc(struct parser *p) {
     }
 }
 
-static void regex_set(struct parser *p) { }
+static void regex_set(struct parser *p) {
+    struct value value;
+
+    if (peek(p, 1) == '^') {
+        p->chr++;
+        value.type = VAL_NSET;
+    } else {
+        value.type = VAL_SET;
+    }
+
+    const char *start = p->chr;
+    for (; p->chr < p->end; p->chr++) {
+        if (*p->chr == '\\')
+            p->chr++;
+        else if (*p->chr == ']')
+            break;
+    }
+
+    if (p->chr < p->end) {
+        value.as.offset = start - pstrbuf(p->source);
+        value.length = p->chr - start;
+        emit_value(p, &value);
+    } else {
+        p->errno = PSTRING_EINVAL;
+    }
+}
 
 static void regex_alt(struct parser *p) {
     patch_branch(p); /* previous */
