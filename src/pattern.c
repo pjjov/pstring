@@ -17,6 +17,7 @@
     limitations under the License.
 */
 
+#include <pstring/encoding.h>
 #include <pstring/pattern.h>
 #include <pstring/pstring.h>
 
@@ -31,7 +32,7 @@
 
 enum {
     VAL_BYTE,
-    VAL_CODE,
+    VAL_UTF8,
     VAL_CLASS,
     VAL_SET,
     VAL_NSET,
@@ -293,15 +294,20 @@ static void regex_group_close(struct parser *p) {
     emit_op(p, OP_CAPTURE_END);
 }
 
+static void regex_utf8(struct parser *p) {
+    const char *start = --p->chr;
+    p->chr = pstr_read_utf8(p->chr, p->end, NULL);
+
+    struct value value;
+    value.type = VAL_UTF8;
+    value.as.offset = start - pstrbuf(p->source);
+    value.length = p->chr - start;
+    emit_value(p, &value);
+}
+
 static void regex_next(struct parser *p) {
     char chr = peek(p, 0);
     p->chr++;
-
-    if (chr & 0x80) {
-        /* UTF-8 */
-        p->errno = PSTRING_ENOSYS;
-        return;
-    }
 
     switch (chr) {
     case '*':
@@ -318,8 +324,13 @@ static void regex_next(struct parser *p) {
     case '[':  regex_set(p);         break;
     case '|':  regex_alt(p);         break;
     case '.':  regex_any(p);         break;
-    default:   regex_char(p);        break;
         /* clang-format on */
+    default:
+        if (chr & 0x80)
+            regex_utf8(p);
+        else
+            regex_char(p);
+        break;
     }
 }
 
