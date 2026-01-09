@@ -361,7 +361,10 @@ int pstrenc_cstring(pstring_t *dst, const pstring_t *src) {
     return PSTRING_OK;
 }
 
-static char *writeutf8(char *out, uint32_t c) {
+char *pstr_write_utf8(char *out, uint32_t c) {
+    if (!out || c > 0x10FFFF)
+        return NULL;
+
     if (c <= 0x7F) {
         *out++ = (char)c;
     } else if (c <= 0x7FF) {
@@ -425,7 +428,7 @@ int pstrdec_cstring(pstring_t *dst, const pstring_t *src) {
                 size_t i = 1;
 
                 for (; i < 4 && &match[i] < end; i++) {
-                    if (match[i] < '0' && match[i] > '7')
+                    if (match[i] < '0' || match[i] > '7')
                         break;
                     code = (code << 3) + match[i] - '0';
                 }
@@ -479,7 +482,7 @@ int pstrdec_cstring(pstring_t *dst, const pstring_t *src) {
                     return PSTRING_EINVAL;
                 }
 
-                out = writeutf8(out, c);
+                out = pstr_write_utf8(out, c);
                 break;
             }
             default:
@@ -501,7 +504,7 @@ int pstrenc_utf8(pstring_t *dst, const uint32_t *src, size_t length) {
 
     char *out = pstrend(dst);
     for (size_t i = 0; i < length; i++)
-        out = writeutf8(out, src[i]);
+        out = pstr_write_utf8(out, src[i]);
 
     pstr__setlen(dst, out - pstrbuf(dst));
     return PSTRING_OK;
@@ -678,7 +681,7 @@ int pstrdec_json(pstring_t *dst, const pstring_t *src) {
                 code = (code << 4) | hex;
             }
 
-            out = writeutf8(out, code);
+            out = pstr_write_utf8(out, code);
             prev = match + 6;
             break;
         }
@@ -749,7 +752,7 @@ static inline int decode_xml_hex(char *out, pstring_t *entity) {
         code = (code << 4) | hex;
     }
 
-    return writeutf8(out, code) - out;
+    return pstr_write_utf8(out, code) - out;
 }
 
 static inline int decode_xml_dec(char *out, pstring_t *entity) {
@@ -763,7 +766,7 @@ static inline int decode_xml_dec(char *out, pstring_t *entity) {
         code = (code * 10) + dec;
     }
 
-    return writeutf8(out, code) - out;
+    return pstr_write_utf8(out, code) - out;
 }
 
 static inline int decode_xml(char *out, pstring_t *entity) {
@@ -776,9 +779,9 @@ static inline int decode_xml(char *out, pstring_t *entity) {
 
     char *result = NULL;
 
-#define DECODE_XML(code, num)          \
-    if (pstrequal(entity, PSTR(code))) \
-        result = writeutf8(out, num);
+#define DECODE_XML(code, num)               \
+    if (pstrequal(entity, PSTR(code)))      \
+        result = pstr_write_utf8(out, num);
 
     DECODE_XML("amp", '&');
     DECODE_XML("lt", '<');

@@ -155,4 +155,10 @@ PSTR_API const char *pstr_read_utf8(
     const char *chr, const char *end, uint32_t *out
 );
 
+/** Writes a UTF-8 character and stores it in `out`, returning the
+    end of the written byte sequence. The output buffer should
+    be big enough to store at least 4 bytes.
+**/
+PSTR_API char *pstr_write_utf8(char *out, uint32_t c);
+
 #endif
