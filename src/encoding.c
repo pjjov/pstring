@@ -507,6 +507,61 @@ int pstrenc_utf8(pstring_t *dst, const uint32_t *src, size_t length) {
     return PSTRING_OK;
 }
 
+static int utf8_length(char c) {
+    if ((c & 0xF8) == 0xF0)
+        return 4; /* 4-byte character, mask = 0x07, shift = 18 */
+    else if ((c & 0xF0) == 0xE0)
+        return 3; /* 3-byte character, mask = 0x0F, shift = 12 */
+    else if ((c & 0xE0) == 0xC0)
+        return 2; /* 2-byte character, mask = 0x1F, shift = 6  */
+    else if (!(c & 0x80))
+        return 1;
+    else
+        return 0;
+}
+
+const char *pstr_read_utf8(const char *chr, const char *end, uint32_t *out) {
+    if (!chr || !end || !out || (chr >= end))
+        return NULL;
+
+    int left = utf8_length(*chr);
+
+    if (left < 2) {
+        /* ASCII character or invalid first byte */
+        if (out)
+            *out = left == 1 ? *chr : 0xFFFD;
+        return chr + 1;
+    }
+
+    static uint32_t overlong[4] = { 0, 0x80, 0x800, 0x10000 };
+
+    uint32_t code = 0;
+    uint32_t min = overlong[left - 1];
+    char mask = (1 << (7 - left)) - 1;
+    char shift = (left - 1) * 6;
+
+    for (; chr < end && left > 0; chr++) {
+        if (mask == 0x3f && (*chr & 0xC0) != 0x80) {
+            /* expected continuation byte */
+            code = 0xFFFD;
+            break;
+        }
+
+        code |= (*chr & mask) << shift;
+        mask = 0x3F;
+        shift -= 6;
+        left--;
+    }
+
+    /* overlong encoding */
+    if (code < min || left > 0)
+        code = 0xFFFD;
+
+    if (out)
+        *out = code;
+    return chr;
+}
+
 int pstrdec_utf8(uint32_t *dst, size_t *length, const pstring_t *src) {
     if (!dst || !src)
         return PSTRING_EINVAL;
@@ -515,59 +570,8 @@ int pstrdec_utf8(uint32_t *dst, size_t *length, const pstring_t *src) {
     const char *end = pstrend(src);
     size_t count = 0, max = *length;
 
-    static uint32_t overlong[4] = { 0, 0x80, 0x800, 0x10000 };
-
-    int left = 0;
-    char mask, shift;
-    uint32_t code, min;
-    for (; chr < end && count < max; chr++) {
-        char c = *chr;
-
-        if (left == 0) {
-            if (!(c & 0x80)) {
-                /* ASCII character */
-                dst[count++] = c;
-                continue;
-            }
-
-            if ((c & 0xF8) == 0xF0)
-                left = 4; /* 4-byte character, mask = 0x07, shift = 18 */
-            else if ((c & 0xF0) == 0xE0)
-                left = 3; /* 3-byte character, mask = 0x0F, shift = 12 */
-            else if ((c & 0xE0) == 0xC0)
-                left = 2; /* 2-byte character, mask = 0x1F, shift = 6  */
-            else
-                goto failure;
-
-            code = 0;
-            mask = (1 << (7 - left)) - 1;
-            shift = (left - 1) * 6;
-            min = overlong[left - 1];
-        } else if ((c & 0xC0) != 0x80) {
-            /* expected continuation byte */
-            goto failure;
-        }
-
-        code |= (c & mask) << shift;
-        mask = 0x3F;
-        shift -= 6;
-
-        if (--left == 0) {
-#ifndef PSTRING_ALLOW_OVERLONG
-            if (code < min)
-                goto failure;
-#else
-            (void)min;
-#endif
-            dst[count++] = code;
-        }
-
-        continue;
-    failure:
-        /* use a replacement character */
-        dst[count++] = 0xFFFD;
-        left = 0;
-    }
+    for (; chr < end && count < max; count++)
+        chr = pstr_read_utf8(chr, end, &dst[count]);
 
     *length = count;
     if (chr < end)
