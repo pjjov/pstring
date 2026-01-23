@@ -67,7 +67,7 @@ enum {
 };
 
 struct parser {
-    int errno;
+    int error;
     const char *chr;
     const char *end;
 
@@ -88,12 +88,12 @@ struct parser {
 
 static inline void emit_op(struct parser *p, char op) {
     if (pstrcatc(p->bytecode, op))
-        p->errno = PSTRING_ENOMEM;
+        p->error = PSTRING_ENOMEM;
 }
 
 static inline void emit_buffer(struct parser *p, void *buffer, size_t length) {
     if (pstrcats(p->bytecode, (char *)buffer, length))
-        p->errno = PSTRING_ENOMEM;
+        p->error = PSTRING_ENOMEM;
 }
 
 static inline void emit_number(struct parser *p, size_t num) {
@@ -102,13 +102,13 @@ static inline void emit_number(struct parser *p, size_t num) {
 
 static inline void push_value(struct parser *p, struct value *value) {
     if (pstrcats(&p->vbuffer, (char *)value, sizeof(*value)))
-        p->errno = PSTRING_ENOMEM;
+        p->error = PSTRING_ENOMEM;
 
     p->values = (struct value *)pstrbuf(&p->vbuffer);
     p->numValues = pstrlen(&p->vbuffer) * sizeof(*value);
 
     if (((uintptr_t)p->values) & (alignof(*value) - 1))
-        p->errno = PSTRING_ENOMEM;
+        p->error = PSTRING_ENOMEM;
 }
 
 static inline void emit_index(struct parser *p, size_t index) {
@@ -146,7 +146,7 @@ static inline void push_stack(struct parser *p, int op) {
         p->stack[p->top].index = pstrlen(p->bytecode);
         p->top++;
     } else {
-        p->errno = PSTRING_ENOMEM;
+        p->error = PSTRING_ENOMEM;
     }
 }
 
@@ -166,7 +166,7 @@ static inline int peek_stack(struct parser *p) {
 
 static inline void patch_branch(struct parser *p) {
     if (pstrreserve(p->bytecode, BRANCH_SIZE)) {
-        p->errno = PSTRING_ENOMEM;
+        p->error = PSTRING_ENOMEM;
         return;
     }
 
@@ -226,7 +226,7 @@ static inline int is_metaescape(char chr) {
     return NULL != strchr("dswDSW", chr);
 }
 
-static void regex_esc_wb(struct parser *p) { p->errno = PSTRING_ENOSYS; }
+static void regex_esc_wb(struct parser *p) { p->error = PSTRING_ENOSYS; }
 
 static void regex_esc_meta(struct parser *p) {
     push_value(p, &VAL(CLASS, .as.byte = peek(p, 0)));
@@ -255,7 +255,7 @@ static void regex_esc(struct parser *p) {
         else if (is_metaescape(chr))
             regex_esc_meta(p);
         else
-            p->errno = PSTRING_ENOENT;
+            p->error = PSTRING_ENOENT;
     }
 }
 
@@ -282,7 +282,7 @@ static void regex_set(struct parser *p) {
         value.length = p->chr - start;
         push_value(p, &value);
     } else {
-        p->errno = PSTRING_EINVAL;
+        p->error = PSTRING_EINVAL;
     }
 }
 
@@ -328,7 +328,7 @@ static void regex_next(struct parser *p) {
     case '?':
     case '+':
     case ']':
-        p->errno = PSTRING_EINVAL;
+        p->error = PSTRING_EINVAL;
         break;
 
         /* clang-format off */
@@ -354,7 +354,7 @@ static void init_parser(
     p->chr = pstrbuf(source);
     p->end = pstrend(source);
 
-    p->errno = PSTRING_OK;
+    p->error = PSTRING_OK;
     p->numCaptures = 0;
     p->numValues = 0;
     p->top = 0;
@@ -363,18 +363,18 @@ static void init_parser(
     p->bytecode = &out->bytecode;
 
     if (pstralloc(&p->vbuffer, VALUE_BUFFER_SIZE, out->allocator))
-        p->errno = PSTRING_ENOMEM;
+        p->error = PSTRING_ENOMEM;
 }
 
 static int parse_regex(const pstring_t *source, pstrexpr_t *out) {
     struct parser p = { 0 };
     init_parser(out, source, &p);
 
-    while (!p.errno && p.chr < p.end)
+    while (!p.error && p.chr < p.end)
         regex_next(&p);
 
     pstrfree(&p.vbuffer);
-    return p.errno <= 0 ? p.errno : PSTRING_OK;
+    return p.error <= 0 ? p.error : PSTRING_OK;
 }
 
 static int parse_pattern(const pstring_t *source, pstrexpr_t *out) {
