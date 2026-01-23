@@ -436,6 +436,12 @@ static size_t read_number(struct matcher *m) {
     return out;
 }
 
+static int read_value(struct matcher *m, size_t *length) {
+    int type = *m->xcurr++;
+    *length = type >= VAL__MULTIBYTE ? read_number(m) : 1;
+    return type;
+}
+
 static int match_class_s(char c) {
     return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
         || (c >= '0' && c <= '9') || c == '_';
@@ -514,13 +520,10 @@ static int match_value(struct matcher *m, int type, size_t length) {
 static int op_match(struct matcher *m) {
     size_t min = read_number(m);
     size_t max = read_number(m);
-    int type = *m->xcurr++;
 
-    size_t length = 1;
-    if (type >= VAL__MULTIBYTE)
-        length = read_number(m);
+    size_t i, length;
+    int type = read_value(m, &length);
 
-    size_t i;
     for (i = 0; i < max && m->curr < m->end; i++)
         if (!match_value(m, type, length))
             break;
@@ -557,11 +560,64 @@ static int op_next(struct matcher *m) {
     return result;
 }
 
+static int op_rewind_match(struct matcher *m, struct range *r) {
+    m->curr = r->start;
+    m->xcurr = r->opcode + 1;
+
+    size_t min = read_number(m);
+    size_t max = read_number(m);
+    (void)max;
+
+    size_t length;
+    int type = read_value(m, &length);
+    m->xcurr += length;
+
+    size_t stride = type == VAL_UTF8 ? length : 1;
+    const char *newCurr = r->end - stride;
+
+    if (newCurr < &r->start[stride * min])
+        return PSTRING_FALSE;
+
+    m->end = newCurr;
+    m->curr = newCurr;
+    return PSTRING_TRUE;
+}
+
+static int op_rewind(struct matcher *m) {
+    while (m->top > 0) {
+        struct range *r = &m->stack[m->top - 1];
+
+        switch (*r->start) {
+        case OP_NOP:
+        case OP_MATCH:
+            if (op_rewind_match(m, r))
+                return PSTRING_TRUE;
+        }
+
+        m->top--;
+    }
+}
+
+static int match(struct matcher *m) {
+    while (m->xcurr < m->end) {
+        if (!op_match(m) && !op_rewind(m))
+            return PSTRING_FALSE;
+    }
+
+    return PSTRING_TRUE;
+}
+
 int pstrexpr_match(
     const pstrexpr_t *expr, const pstring_t *string, pstring_t *capture
 ) {
     if (!expr || !string)
         return PSTRING_EINVAL;
+
+    struct matcher m = { 0 };
+    m.curr = pstrbuf(string);
+    m.end = pstrend(string);
+    m.xcurr = pstrbuf(&expr->bytecode);
+    m.xend = pstrend(&expr->bytecode);
 
     return PSTRING_OK;
 }
