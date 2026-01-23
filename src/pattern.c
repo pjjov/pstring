@@ -29,6 +29,7 @@
 
 #define BRANCH_SIZE (sizeof(size_t) + 1)
 #define PARSER_DEPTH 64
+#define VALUE_BUFFER_SIZE (64 * sizeof(struct value))
 
 enum {
     VAL_BYTE,
@@ -54,9 +55,7 @@ struct value {
 
 typedef struct pstrexpr_t {
     allocator_t *allocator;
-    pstring_t source;
     pstring_t bytecode;
-    pstring_t values;
 } pstrexpr_t;
 
 enum {
@@ -74,7 +73,7 @@ struct parser {
 
     const pstring_t *source;
     pstring_t *bytecode;
-    pstring_t *vbuffer;
+    pstring_t vbuffer;
 
     size_t numCaptures;
     size_t numValues;
@@ -97,31 +96,48 @@ static inline void emit_buffer(struct parser *p, void *buffer, size_t length) {
         p->errno = PSTRING_ENOMEM;
 }
 
-static inline void emit_value(struct parser *p, struct value *value) {
-    if (pstrcats(p->vbuffer, (char *)value, sizeof(*value)))
+static inline void emit_number(struct parser *p, size_t num) {
+    emit_buffer(p, &index, sizeof(index));
+}
+
+static inline void push_value(struct parser *p, struct value *value) {
+    if (pstrcats(&p->vbuffer, (char *)value, sizeof(*value)))
         p->errno = PSTRING_ENOMEM;
 
-    p->values = (struct value *)pstrbuf(p->vbuffer);
-    p->numValues = pstrlen(p->vbuffer) * sizeof(*value);
+    p->values = (struct value *)pstrbuf(&p->vbuffer);
+    p->numValues = pstrlen(&p->vbuffer) * sizeof(*value);
 
     if (((uintptr_t)p->values) & (alignof(*value) - 1))
         p->errno = PSTRING_ENOMEM;
 }
 
 static inline void emit_index(struct parser *p, size_t index) {
-    if (index < UINT8_MAX - 1) {
-        emit_op(p, (uint8_t)index);
-    } else {
-        emit_op(p, UINT8_MAX);
-        emit_buffer(p, &index, sizeof(index));
+    struct value *val = &p->values[index];
+    emit_op(p, val->type);
+
+    switch (val->type) {
+    case VAL_BYTE:
+    case VAL_CLASS:
+        emit_op(p, val->as.byte);
+        break;
+
+    case VAL_NSET:
+    case VAL_SET:
+    case VAL_UTF8:
+        emit_number(p, val->length);
+        emit_buffer(p, pstrslot(p->source, val->as.offset), val->length);
+        break;
+
+    default:
+        break;
     }
 }
 
 static inline void emit_match(struct parser *p, size_t min, size_t max) {
     emit_op(p, OP_MATCH);
     emit_index(p, p->numValues - 1);
-    emit_index(p, min);
-    emit_index(p, max);
+    emit_number(p, min);
+    emit_number(p, max);
 }
 
 static inline void push_stack(struct parser *p, int op) {
@@ -193,12 +209,10 @@ static void regex_postfix(struct parser *p, size_t value) {
     default:  emit_match(p, 1, 1);        break;
         /* clang-format on */
     };
-
-    emit_index(p, value);
 }
 
 static void regex_char(struct parser *p) {
-    emit_value(p, &VAL(BYTE, .as.byte = peek(p, 0)));
+    push_value(p, &VAL(BYTE, .as.byte = peek(p, 0)));
     regex_postfix(p, p->numValues);
 }
 
@@ -215,7 +229,7 @@ static inline int is_metaescape(char chr) {
 static void regex_esc_wb(struct parser *p) { p->errno = PSTRING_ENOSYS; }
 
 static void regex_esc_meta(struct parser *p) {
-    emit_value(p, &VAL(CLASS, .as.byte = peek(p, 0)));
+    push_value(p, &VAL(CLASS, .as.byte = peek(p, 0)));
 }
 
 static void regex_esc(struct parser *p) {
@@ -266,7 +280,7 @@ static void regex_set(struct parser *p) {
     if (p->chr < p->end) {
         value.as.offset = start - pstrbuf(p->source);
         value.length = p->chr - start;
-        emit_value(p, &value);
+        push_value(p, &value);
     } else {
         p->errno = PSTRING_EINVAL;
     }
@@ -277,7 +291,7 @@ static void regex_alt(struct parser *p) {
 
     emit_op(p, OP_BRANCH);
     push_stack(p, OP_BRANCH);
-    emit_index(p, 0);
+    emit_number(p, 0);
 }
 
 static void regex_group_open(struct parser *p) {
@@ -285,7 +299,7 @@ static void regex_group_open(struct parser *p) {
     emit_op(p, OP_CAPTURE_START);
     emit_op(p, OP_BRANCH); /* first alternation */
     push_stack(p, OP_CAPTURE_START);
-    emit_index(p, 0);
+    emit_number(p, 0);
 }
 
 static void regex_group_close(struct parser *p) {
@@ -302,7 +316,7 @@ static void regex_utf8(struct parser *p) {
     value.type = VAL_UTF8;
     value.as.offset = start - pstrbuf(p->source);
     value.length = p->chr - start;
-    emit_value(p, &value);
+    push_value(p, &value);
 }
 
 static void regex_next(struct parser *p) {
@@ -334,48 +348,55 @@ static void regex_next(struct parser *p) {
     }
 }
 
-static void init_parser(pstrexpr_t *out, struct parser *p) {
-    p->chr = pstrbuf(&out->source);
-    p->end = pstrend(&out->source);
+static void init_parser(
+    pstrexpr_t *out, const pstring_t *source, struct parser *p
+) {
+    p->chr = pstrbuf(source);
+    p->end = pstrend(source);
 
     p->errno = PSTRING_OK;
     p->numCaptures = 0;
     p->numValues = 0;
     p->top = 0;
 
-    p->source = &out->source;
-    p->vbuffer = &out->values;
+    p->source = source;
     p->bytecode = &out->bytecode;
+
+    if (pstralloc(&p->vbuffer, VALUE_BUFFER_SIZE, out->allocator))
+        p->errno = PSTRING_ENOMEM;
 }
 
-static int parse_regex(pstrexpr_t *out) {
-    struct parser p;
-    init_parser(out, &p);
+static int parse_regex(const pstring_t *source, pstrexpr_t *out) {
+    struct parser p = { 0 };
+    init_parser(out, source, &p);
 
-    while (p.chr < p.end)
+    while (!p.errno && p.chr < p.end)
         regex_next(&p);
 
+    pstrfree(&p.vbuffer);
     return p.errno <= 0 ? p.errno : PSTRING_OK;
 }
 
-static int parse_pattern(pstrexpr_t *out) { return parse_regex(out); }
+static int parse_pattern(const pstring_t *source, pstrexpr_t *out) {
+    return parse_regex(source, out);
+}
 
 pstrexpr_t *pstrexpr_new(const char *pattern, allocator_t *allocator) {
     if (!allocator)
         allocator = &standard_allocator;
 
+    pstring_t source;
     pstrexpr_t *expr;
 
     if (!(expr = zallocate(allocator, sizeof(*expr))))
         return NULL;
 
     expr->allocator = allocator;
-    int res = pstrnew(&expr->source, pattern, 0, allocator)
-        || pstralloc(&expr->values, pstrcap(&expr->source), allocator)
-        || pstralloc(&expr->bytecode, pstrcap(&expr->source), allocator)
-        || parse_pattern(expr);
+    pstrwrap(&source, (char *)pattern, 0, 0);
+    if (pstralloc(&expr->bytecode, pstrcap(&source), allocator))
+        return NULL;
 
-    if (res) {
+    if (parse_pattern(&source, expr)) {
         pstrexpr_free(expr);
         return NULL;
     }
