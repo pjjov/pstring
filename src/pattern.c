@@ -27,16 +27,19 @@
 
 #include "allocator_std.h"
 
-#define BRANCH_SIZE (sizeof(size_t) + 1)
+#define BRANCH_SIZE (sizeof(size_t))
 #define PARSER_DEPTH 64
+#define MATCHER_DEPTH 64
 #define VALUE_BUFFER_SIZE (64 * sizeof(struct value))
 
 enum {
     VAL_BYTE,
-    VAL_UTF8,
     VAL_CLASS,
+    VAL_UTF8,
     VAL_SET,
     VAL_NSET,
+
+    VAL__MULTIBYTE = VAL_UTF8,
 };
 
 struct value {
@@ -135,9 +138,9 @@ static inline void emit_index(struct parser *p, size_t index) {
 
 static inline void emit_match(struct parser *p, size_t min, size_t max) {
     emit_op(p, OP_MATCH);
-    emit_index(p, p->numValues - 1);
     emit_number(p, min);
     emit_number(p, max);
+    emit_index(p, p->numValues - 1);
 }
 
 static inline void push_stack(struct parser *p, int op) {
@@ -176,14 +179,8 @@ static inline void patch_branch(struct parser *p) {
     size_t jump = pstrlen(p->bytecode) - branch;
     char *buf = pstrslot(p->bytecode, branch);
 
-    if (jump < UINT8_MAX - 1) {
-        *buf = (uint8_t)jump;
-        return;
-    }
-
-    *buf = UINT8_MAX;
-    memcpy(buf + 1, buf + BRANCH_SIZE, pstrlen(p->bytecode) - branch - 1);
-    memcpy(buf + 1, &jump, sizeof(jump));
+    memcpy(buf, buf + BRANCH_SIZE, pstrlen(p->bytecode) - branch - 1);
+    memcpy(buf, &jump, sizeof(jump));
 }
 
 static inline char peek(struct parser *p, size_t i) {
@@ -408,8 +405,163 @@ void pstrexpr_free(pstrexpr_t *expr) {
     if (!expr)
         return;
 
-    pstrfree(&expr->source);
     pstrfree(&expr->bytecode);
-    pstrfree(&expr->values);
     deallocate(expr->allocator, expr, sizeof(*expr));
+}
+
+struct range {
+    const char *opcode;
+    const char *start;
+    const char *end;
+};
+
+struct matcher {
+    pstrexpr_t *expr;
+    int error;
+
+    const char *curr;
+    const char *end;
+
+    const char *xcurr;
+    const char *xend;
+
+    size_t top;
+    struct range stack[MATCHER_DEPTH];
+};
+
+static size_t read_number(struct matcher *m) {
+    size_t out;
+    memcpy(&out, m->xcurr, sizeof(out));
+    m->xcurr += sizeof(out);
+    return out;
+}
+
+static int match_class_s(char c) {
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+        || (c >= '0' && c <= '9') || c == '_';
+}
+
+static int match_class_w(char c) { return NULL != strchr(" \t\r\n\v\f", c); }
+static int match_class_d(char c) { return c >= '0' && c <= '9'; }
+
+static int match_class(struct matcher *m, char cl, char chr) {
+    char lower = cl;
+    int result = 0;
+
+    if (cl >= 'A' && cl <= 'Z')
+        lower -= 'A' + 'a';
+
+    switch (lower) {
+        /* clang-format off */
+    case 'd': match_class_d(chr);
+    case 'w': match_class_w(chr);
+    case 's': match_class_s(chr);
+    default:  result = PSTRING_FALSE;
+        /* clang-format on */
+    }
+
+    return chr != lower ? !result : result;
+}
+
+static int match_set_esc(struct matcher *m, char cl, char chr) {
+    if (is_metaescape(cl))
+        return match_class(m, cl, chr);
+    else
+        return cl == chr;
+}
+
+static int match_set(struct matcher *m, size_t length) {
+    const char *s = m->xcurr;
+    char chr = *m->curr++;
+
+    for (size_t i = 0; i < length; i++) {
+        if (s[i] == '-' && s[i + 1] < length) {
+            if (chr >= s[i - 1] && chr <= s[i + 1])
+                return PSTRING_TRUE;
+        } else if (s[i] != '\\') {
+            if (chr == s[i])
+                return PSTRING_TRUE;
+        } else if (match_set_esc(m, s[++i], chr)) {
+            return PSTRING_TRUE;
+        }
+    }
+
+    return PSTRING_FALSE;
+};
+
+static int match_utf8(struct matcher *m, size_t length) {
+    if (m->end - m->curr < length)
+        return PSTRING_FALSE;
+
+    int cmp = memcmp(m->curr, m->xcurr, length);
+    m->curr += length;
+    return cmp == 0;
+}
+
+static int match_value(struct matcher *m, int type, size_t length) {
+    switch (type) {
+        /* clang-format off */
+    case VAL_BYTE:  return *m->xcurr == *m->curr++;
+    case VAL_CLASS: return match_class(m, *m->xcurr, *m->curr++);
+    case VAL_UTF8:  return match_utf8(m, length);
+    case VAL_SET:   return match_set(m, length);
+    case VAL_NSET:  return !match_set(m, length);
+    default:        return PSTRING_FALSE;
+        /* clang-format on */
+    }
+}
+
+static int op_match(struct matcher *m) {
+    size_t min = read_number(m);
+    size_t max = read_number(m);
+    int type = *m->xcurr++;
+
+    size_t length = 1;
+    if (type >= VAL__MULTIBYTE)
+        length = read_number(m);
+
+    size_t i;
+    for (i = 0; i < max && m->curr < m->end; i++)
+        if (!match_value(m, type, length))
+            break;
+
+    m->xcurr += length;
+
+    if (i < min)
+        return PSTRING_FALSE;
+    return PSTRING_TRUE;
+}
+
+static int op_next(struct matcher *m) {
+    m->stack[m->top].opcode = m->xcurr;
+    m->stack[m->top].start = m->curr;
+    m->stack[m->top].end = m->end;
+
+    int result;
+
+    switch (*m->xcurr++) {
+    case OP_NOP:
+        result = PSTRING_TRUE;
+    case OP_MATCH:
+        result = op_match(m);
+    case OP_BRANCH:
+    case OP_CAPTURE_START:
+    case OP_CAPTURE_END:
+    default:
+        result = PSTRING_FALSE;
+    }
+
+    m->stack[m->top].end = m->curr;
+    m->top++;
+
+    return result;
+}
+
+int pstrexpr_match(
+    const pstrexpr_t *expr, const pstring_t *string, pstring_t *capture
+) {
+    if (!expr || !string)
+        return PSTRING_EINVAL;
+
+    return PSTRING_OK;
 }
