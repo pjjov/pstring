@@ -318,6 +318,20 @@ PSTR_API int pstrrepl(
     pstring_t *str, const pstring_t *src, const pstring_t *dst, size_t max
 );
 
+/** Replaces at most `max` instances of substring `src` with `dst`.
+    If `max` is zero, all instances of `src` will be replaced.
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
+**/
+PSTR_API int pstrrepls(
+    pstring_t *str, const char *src, const char *dst, size_t max
+);
+
+/** Replaces at most `max` instances of character `src` with `dst`.
+    If `max` is zero, all instances of `src` will be replaced.
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
+**/
+PSTR_API int pstrreplc(pstring_t *str, char src, char dst, size_t max);
+
 /** Returns a non-unique integer value representing the contents of `str`.
     Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
 **/

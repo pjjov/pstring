@@ -844,6 +844,33 @@ int pstrrepl(
     return PSTRING_OK;
 }
 
+int pstrrepls(pstring_t *str, const char *src, const char *dst, size_t max) {
+    if (!src || !dst)
+        return PSTRING_EINVAL;
+
+    pstring_t _src, _dst;
+    pstrwrap(&_src, (char *)src, 0, 0);
+    pstrwrap(&_dst, (char *)dst, 0, 0);
+    return pstrrepl(str, &_src, &_dst, max);
+}
+
+int pstrreplc(pstring_t *str, char src, char dst, size_t max) {
+    if (!str || src == dst)
+        return PSTRING_EINVAL;
+
+    pstring_t search;
+    char *match = pstrbuf(str);
+
+    pstrrange(&search, NULL, match, pstrend(str));
+
+    while ((match = pstrchr(&search, src))) {
+        *match = dst;
+        pstrrange(&search, NULL, match, pstrend(str));
+    }
+
+    return PSTRING_OK;
+}
+
 #ifdef PSTRING_USE_XXHASH
 
     #include <xxhash.h>
