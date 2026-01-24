@@ -59,6 +59,7 @@ struct value {
 typedef struct pstrexpr_t {
     allocator_t *allocator;
     pstring_t bytecode;
+    int numCaptures;
 } pstrexpr_t;
 
 enum {
@@ -78,13 +79,16 @@ struct parser {
     pstring_t *bytecode;
     pstring_t vbuffer;
 
-    size_t numCaptures;
+    size_t openCaptures;
+    size_t closedCaptures;
+
     size_t numValues;
     struct value *values;
     size_t top;
 
     struct {
         int op;
+        int id;
         size_t index;
     } stack[PARSER_DEPTH];
 };
@@ -146,6 +150,7 @@ static inline void emit_match(struct parser *p, size_t min, size_t max) {
 static inline void push_stack(struct parser *p, int op) {
     if (p->top < PARSER_DEPTH) {
         p->stack[p->top].op = op;
+        p->stack[p->top].id = p->openCaptures;
         p->stack[p->top].index = pstrlen(p->bytecode);
         p->top++;
     } else {
@@ -181,6 +186,13 @@ static inline void patch_branch(struct parser *p) {
 
     memcpy(buf, buf + BRANCH_SIZE, pstrlen(p->bytecode) - branch - 1);
     memcpy(buf, &jump, sizeof(jump));
+}
+
+static inline int find_id(struct parser *p, int op) {
+    for (size_t i = p->top; i > 0; i--)
+        if (p->stack[i - 1].op == op)
+            return p->stack[i - 1].id;
+    return -1;
 }
 
 static inline char peek(struct parser *p, size_t i) {
@@ -292,17 +304,19 @@ static void regex_alt(struct parser *p) {
 }
 
 static void regex_group_open(struct parser *p) {
-    p->numCaptures++;
+    p->openCaptures++;
     emit_op(p, OP_CAPTURE_START);
     emit_op(p, OP_BRANCH); /* first alternation */
     push_stack(p, OP_CAPTURE_START);
-    emit_number(p, 0);
+    emit_number(p, p->openCaptures);
 }
 
 static void regex_group_close(struct parser *p) {
     if (peek_stack(p) == OP_BRANCH)
         patch_branch(p);
     emit_op(p, OP_CAPTURE_END);
+    emit_number(p, find_id(p, OP_CAPTURE_START));
+    p->closedCaptures++;
 }
 
 static void regex_utf8(struct parser *p) {
@@ -352,7 +366,6 @@ static void init_parser(
     p->end = pstrend(source);
 
     p->error = PSTRING_OK;
-    p->numCaptures = 0;
     p->numValues = 0;
     p->top = 0;
 
@@ -371,6 +384,7 @@ static int parse_regex(const pstring_t *source, pstrexpr_t *out) {
         regex_next(&p);
 
     pstrfree(&p.vbuffer);
+    out->numCaptures = p.openCaptures;
     return p.error <= 0 ? p.error : PSTRING_OK;
 }
 
@@ -419,6 +433,7 @@ struct matcher {
     pstrexpr_t *expr;
     int error;
 
+    const char *start;
     const char *curr;
     const char *end;
 
@@ -596,15 +611,45 @@ static int op_rewind(struct matcher *m) {
 
         m->top--;
     }
+
+    return PSTRING_FALSE;
 }
 
-static int match(struct matcher *m) {
+static int match_once(struct matcher *m) {
     while (m->xcurr < m->end) {
-        if (!op_match(m) && !op_rewind(m))
+        if (!op_next(m) && !op_rewind(m))
             return PSTRING_FALSE;
     }
 
     return PSTRING_TRUE;
+}
+
+static int match(struct matcher *m) {
+    for (; m->start < m->end; m->start++)
+        if (match_once(m))
+            return PSTRING_TRUE;
+
+    return PSTRING_FALSE;
+}
+
+static int save_captures(struct matcher *m, pstring_t *capture) {
+    if (!capture)
+        return PSTRING_EINVAL;
+
+    pstrrange(&capture[0], NULL, m->start, m->curr);
+
+    for (size_t i = 0; i < m->top; i++) {
+        struct range *r = &m->stack[i];
+        if (*r->opcode == OP_CAPTURE_START) {
+            size_t id = read_number(m);
+            pstrrange(&capture[id], NULL, r->start, m->end);
+        } else if (*r->opcode == OP_CAPTURE_END) {
+            size_t id = read_number(m);
+            pstrrange(&capture[id], NULL, pstrbuf(&capture[id]), r->end);
+        }
+    }
+
+    return PSTRING_OK;
 }
 
 int pstrexpr_match(
@@ -614,10 +659,16 @@ int pstrexpr_match(
         return PSTRING_EINVAL;
 
     struct matcher m = { 0 };
-    m.curr = pstrbuf(string);
+    m.start = pstrbuf(string);
+    m.curr = m.start;
     m.end = pstrend(string);
+
     m.xcurr = pstrbuf(&expr->bytecode);
     m.xend = pstrend(&expr->bytecode);
 
-    return PSTRING_OK;
+    if (!match(&m))
+        return PSTRING_FALSE;
+
+    save_captures(&m, capture);
+    return PSTRING_TRUE;
 }
