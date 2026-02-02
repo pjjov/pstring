@@ -326,6 +326,31 @@ int pstrslice(pstring_t *out, const pstring_t *str, size_t from, size_t to) {
     return pstrwrap(out, &pstrbuf(str)[from], to - from, to - from);
 }
 
+int pstrcut(pstring_t *str, size_t from, size_t to) {
+    if (!str)
+        return PSTRING_EINVAL;
+
+    if (to > pstrlen(str))
+        to = pstrlen(str);
+    if (from > to)
+        from = to;
+
+    if (pstrowned(str)) {
+        if (to - from == 0) {
+            pstrclear(str);
+            return PSTRING_OK;
+        }
+
+        if (from > 0)
+            memmove(pstrslot(str, 0), pstrslot(str, from), to - from);
+        pstr__setlen(str, to - from);
+    } else {
+        pstrrange(str, NULL, pstrslot(str, from), pstrslot(str, to));
+    }
+
+    return PSTRING_OK;
+}
+
 int pstrrange(
     pstring_t *out, const pstring_t *str, const char *from, const char *to
 ) {

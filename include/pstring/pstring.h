@@ -187,6 +187,17 @@ PSTR_API int pstrslice(
     pstring_t *out, const pstring_t *str, size_t from, size_t to
 );
 
+/** Removes characters around the specified slice of bytes from `str`,
+    starting at `from` (inclusive) and ending at `to` (exclusive).
+    Both indices are set to the length of `str` if they are larger.
+    If `to` is smaller than `from`, the length of `str` is set to zero.
+
+    > If `str` is a slice, it is repositioned instead.
+
+    Possible error codes: PSTRING_EINVAL.
+**/
+PSTR_API int pstrcut(pstring_t *str, size_t from, size_t to);
+
 /** Initializes `out` as a range of bytes from `str`, starting
     at `from` (inclusive) and ending at `to` (exclusive).
     If `from` is `NULL` or invalid, it's set to the start of the pstring.
