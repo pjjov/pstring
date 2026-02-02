@@ -21,6 +21,8 @@
 #include <stdint.h>
 #include <string.h>
 
+#include <pf_bitwise.h>
+
 #include "allocator_std.h"
 
 #if !defined(PSTRING_NO_AVX) && defined(__AVX__)
@@ -51,11 +53,11 @@
 #define PSTRING_MAX_SET 256
 
 #ifdef PSTRING_AVX
-static int pstr__match_set_avx(
+static uint64_t pstr__match_set_avx(
     const char *buffer, const char *set, size_t length
 ) {
     __m256i vec = _mm256_loadu_si256((const __m256i *)buffer);
-    int result = 0;
+    uint64_t result = 0;
 
     #ifndef PSTRING_ALT_SPN
     __m256i tmp = _mm256_setzero_si256();
@@ -74,13 +76,13 @@ static int pstr__match_set_avx(
     return result;
 }
 
-static int pstr__match_chr_avx(const char *buffer, int ch) {
+static uint64_t pstr__match_chr_avx(const char *buffer, int ch) {
     __m256i vec = _mm256_set1_epi8((char)ch);
     __m256i chars = _mm256_loadu_si256((const __m256i *)buffer);
     return _mm256_movemask_epi8(_mm256_cmpeq_epi8(vec, chars));
 }
 
-static int pstr__compare_avx(const char *left, const char *right) {
+static uint64_t pstr__compare_avx(const char *left, const char *right) {
     __m256i leftVec = _mm256_loadu_si256((const __m256i *)left);
     __m256i rightVec = _mm256_loadu_si256((const __m256i *)right);
     return _mm256_movemask_epi8(_mm256_cmpeq_epi8(leftVec, rightVec));
@@ -88,11 +90,11 @@ static int pstr__compare_avx(const char *left, const char *right) {
 #endif
 
 #ifdef PSTRING_SSE
-static int pstr__match_set_sse(
+static uint64_t pstr__match_set_sse(
     const char *buffer, const char *set, size_t length
 ) {
     __m128i vec = _mm_loadu_si128((const __m128i *)buffer);
-    int result = 0;
+    uint64_t result = 0;
 
     #ifndef PSTRING_ALT_SPN
     __m128i tmp = _mm_setzero_si128();
@@ -111,13 +113,13 @@ static int pstr__match_set_sse(
     return result;
 }
 
-static int pstr__match_chr_sse(const char *buffer, int ch) {
+static uint64_t pstr__match_chr_sse(const char *buffer, int ch) {
     __m128i vec = _mm_set1_epi8((char)ch);
     __m128i chars = _mm_loadu_si128((const __m128i *)buffer);
     return _mm_movemask_epi8(_mm_cmpeq_epi8(vec, chars));
 }
 
-static int pstr__compare_sse(const char *left, const char *right) {
+static uint64_t pstr__compare_sse(const char *left, const char *right) {
     __m128i leftVec = _mm_loadu_si128((const __m128i *)left);
     __m128i rightVec = _mm_loadu_si128((const __m128i *)right);
     return _mm_movemask_epi8(_mm_cmpeq_epi8(leftVec, rightVec));
@@ -127,9 +129,9 @@ static int pstr__compare_sse(const char *left, const char *right) {
 
 static struct {
     size_t size; /* vector size */
-    int (*match_set)(const char *buffer, const char *set, size_t length);
-    int (*match_chr)(const char *buffer, int ch);
-    int (*compare)(const char *left, const char *right);
+    uint64_t (*match_set)(const char *buffer, const char *set, size_t length);
+    uint64_t (*match_chr)(const char *buffer, int ch);
+    uint64_t (*compare)(const char *left, const char *right);
 } g_impl = {
 #if !defined(PSTRING_DETECT) && defined(PSTRING_AVX)
     .size = 32,
@@ -171,49 +173,8 @@ void pstrdetect(void) {
 #endif
 }
 
-#ifndef __has_builtin
-    #define __has_builtin(...) 0
-#endif
-
-static inline int pstr__ctz(int x) {
-#if __has_builtin(__builtin_ctz)
-    return __builtin_ctz(x);
-#else
-    /* graphics.stanford.edu/~seander/bithacks.html#ZerosOnRightLinear */
-    static const int MultiplyDeBruijnBitPos[32] = {
-        0,  1,  28, 2,  29, 14, 24, 3, 30, 22, 20, 15, 25, 17, 4,  8,
-        31, 27, 13, 23, 21, 19, 16, 7, 26, 12, 18, 6,  11, 5,  10, 9
-    };
-
-    unsigned int v = x;
-    return MultiplyDeBruijnBitPos[((uint32_t)((v & -v) * 0x077CB531U)) >> 27];
-#endif
-}
-
-static inline int pstr__clz(int x) {
-#if __has_builtin(__builtin_clz)
-    return __builtin_clz(x);
-#else
-    /* en.wikipedia.org/wiki/Find_first_set */
-    int r, q;
-    r = (x > 0xFFFF) << 4;
-    x >>= r;
-    q = (x > 0xFF) << 3;
-    x >>= q;
-    r |= q;
-    q = (x > 0xF) << 2;
-    x >>= q;
-    r |= q;
-    q = (x > 0x3) << 1;
-    x >>= q;
-    r |= q;
-    r |= (x >> 1);
-    return r;
-#endif
-}
-
-static inline int pstr__clz2(int x, int bits) {
-    return pstr__clz(x & ((1 << bits) - 1)) - bits;
+static inline int pstr__clz_masked(uint64_t x, int bits) {
+    return pf_clz(x & ((1 << bits) - 1)) - bits;
 }
 
 size_t pstr__nlen(const char *str, size_t max) {
@@ -229,7 +190,7 @@ size_t pstr__nlen(const char *str, size_t max) {
     if (g_impl.size > 0) {
         for (int result; max - i >= g_impl.size; i += g_impl.size) {
             if ((result = g_impl.match_chr(str, '\0'))) {
-                int bit = pstr__ctz(result);
+                int bit = pf_ctz64(result);
                 return i + bit;
             }
         }
@@ -475,7 +436,7 @@ int pstrcmp(const pstring_t *left, const pstring_t *right) {
         for (; length - i >= g_impl.size; i += g_impl.size) {
             int result = g_impl.compare(&leftBuf[i], &rightBuf[i]);
             if (result) {
-                int bit = pstr__clz2(result, g_impl.size);
+                int bit = pstr__clz_masked(result, g_impl.size);
                 return leftBuf[bit] - rightBuf[bit];
             }
         }
@@ -577,7 +538,7 @@ char *pstrchr(const pstring_t *str, int ch) {
             int result = g_impl.match_chr(&buffer[i], ch);
 
             if (result) {
-                int bit = pstr__ctz(result);
+                int bit = pf_ctz64(result);
                 return &buffer[i + bit];
             }
         }
@@ -604,7 +565,7 @@ char *pstrrchr(const pstring_t *str, int ch) {
             int result = g_impl.match_chr(slot, ch);
 
             if (result) {
-                int bit = pstr__clz2(result, g_impl.size);
+                int bit = pstr__clz_masked(result, g_impl.size);
                 return &slot[g_impl.size - bit - 1];
             }
         }
@@ -632,7 +593,7 @@ size_t pstrspn(const pstring_t *str, const char *set) {
             result = g_impl.match_set(&buffer[i], set, setlen);
 
             if (~result) {
-                int bit = result ? pstr__ctz(~result) : 0;
+                int bit = result ? pf_ctz64(~result) : 0;
                 return i + bit;
             }
         }
@@ -665,7 +626,7 @@ size_t pstrcspn(const pstring_t *str, const char *set) {
             result = g_impl.match_set(&buffer[i], set, setlen);
 
             if (result) {
-                int bit = ~result ? pstr__ctz(result) : 0;
+                int bit = ~result ? pf_ctz64(result) : 0;
                 return i + bit;
             }
         }
@@ -695,7 +656,7 @@ size_t pstrrspn(const pstring_t *str, const char *set) {
             result = g_impl.match_set(slot, set, setlen);
 
             if (~result) {
-                int bit = result ? pstr__clz2(~result, g_impl.size) : 0;
+                int bit = result ? pstr__clz_masked(~result, g_impl.size) : 0;
                 return i + bit;
             }
         }
@@ -729,7 +690,7 @@ size_t pstrrcspn(const pstring_t *str, const char *set) {
             result = g_impl.match_set(slot, set, setlen);
 
             if (result) {
-                int bit = ~result ? pstr__clz2(result, g_impl.size) : 0;
+                int bit = ~result ? pstr__clz_masked(result, g_impl.size) : 0;
                 return i + bit;
             }
         }
@@ -758,7 +719,7 @@ char *pstrpbrk(const pstring_t *str, const char *set) {
             int result = g_impl.match_set(&buffer[i], set, setlen);
 
             if (result) {
-                int bit = pstr__ctz(result);
+                int bit = pf_ctz64(result);
                 return &buffer[i + bit];
             }
         }
@@ -788,7 +749,7 @@ char *pstrcpbrk(const pstring_t *str, const char *set) {
             result = ~result & ((1 << g_impl.size) - 1);
 
             if (result) {
-                int bit = pstr__ctz(result);
+                int bit = pf_ctz64(result);
                 return &buffer[i + bit];
             }
         }
@@ -801,6 +762,72 @@ char *pstrcpbrk(const pstring_t *str, const char *set) {
 
         if (j == setlen)
             return &buffer[i];
+    }
+
+    return NULL;
+}
+
+char *pstrrpbrk(const pstring_t *str, const char *set) {
+    if (!str || !set)
+        return 0;
+
+    size_t length = pstrlen(str);
+    size_t setlen = pstr__nlen(set, 256);
+    char *buffer = pstrbuf(str);
+    size_t i = 0;
+
+    if (g_impl.size > 0) {
+        for (; length - i >= g_impl.size; i += g_impl.size) {
+            int result = g_impl.match_set(
+                &buffer[length - i - g_impl.size], set, setlen
+            );
+
+            if (result) {
+                int bit = pstr__clz_masked(result, g_impl.size);
+                return &buffer[length - i - bit - 1];
+            }
+        }
+    }
+
+    for (; i > 0; i--) {
+        for (size_t j = 0; j < setlen; j++)
+            if (buffer[length - i - 1] == set[j])
+                return &buffer[length - i - 1];
+    }
+
+    return NULL;
+}
+
+char *pstrrcpbrk(const pstring_t *str, const char *set) {
+    if (!str || !set)
+        return NULL;
+
+    size_t length = pstrlen(str);
+    size_t setlen = pstr__nlen(set, 256);
+    char *buffer = pstrbuf(str);
+    size_t i = 0, j;
+
+    if (g_impl.size > 0) {
+        for (; length - i >= g_impl.size; i += g_impl.size) {
+            int result = g_impl.match_set(
+                &buffer[length - i - g_impl.size], set, setlen
+            );
+            result = ~result & ((1 << g_impl.size) - 1);
+
+            if (result) {
+                int bit = ~result ? pstr__clz_masked(result, g_impl.size) : 0;
+                return &buffer[length - i - bit - 1];
+            }
+        }
+    }
+
+    for (; i < length; i++) {
+        for (j = 0; j < setlen; j++)
+            if (buffer[length - i - 1] == set[j])
+                break;
+
+        if (j == setlen)
+            return &buffer[length - i - 1];
     }
 
     return NULL;

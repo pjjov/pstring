@@ -270,6 +270,16 @@ PSTR_API char *pstrpbrk(const pstring_t *str, const char *set);
 **/
 PSTR_API char *pstrcpbrk(const pstring_t *str, const char *set);
 
+/** Searches for a character in `str` that is also found in `set`,
+    from behind, returning it's address if found and `NULL` otherwise.
+**/
+PSTR_API char *pstrrpbrk(const pstring_t *str, const char *set);
+
+/** Searches for a character in `str` that is not found in `set`,
+    from behind, returning it's address if found and `NULL` otherwise.
+**/
+PSTR_API char *pstrrcpbrk(const pstring_t *str, const char *set);
+
 /** Searches for `sub` inside `str`, returning the address of the
     first character of the first match, or `NULL` if not found.
 **/

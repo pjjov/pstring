@@ -301,7 +301,7 @@ static int test_pstring_span(int seed, int repetition) {
 int test_pstring_breakset(int seed, int repetition) {
     pstring_t str = PSTRWRAP("AbccDef%$a3145bcb");
 
-    pf_assert(&pstrbuf(&str)[7] == pstrpbrk(&str, "%$"));
+    pf_assert(&pstrbuf(&str)[0] == pstrpbrk(&str, "AbcD"));
     pf_assert(&pstrbuf(&str)[10] == pstrpbrk(&str, "12345"));
     pf_assert(&pstrbuf(&str)[7] == pstrpbrk(&str, "%$"));
     pf_assert_null(pstrpbrk(&str, " "));
@@ -314,6 +314,20 @@ int test_pstring_breakset(int seed, int repetition) {
     pf_assert_null(pstrcpbrk(&str, "AbccDef%$a3145bcb"));
     pf_assert_not_null(pstrcpbrk(&str, "\0"));
     pf_assert_null(pstrcpbrk(NULL, NULL));
+
+    pf_assert(&pstrbuf(&str)[16] == pstrrpbrk(&str, "AbcD"));
+    pf_assert(&pstrbuf(&str)[13] == pstrrpbrk(&str, "12345"));
+    pf_assert(&pstrbuf(&str)[8] == pstrrpbrk(&str, "%$"));
+    pf_assert_null(pstrrpbrk(&str, " "));
+    pf_assert_null(pstrrpbrk(&str, "\0"));
+    pf_assert_null(pstrrpbrk(NULL, NULL));
+
+    pf_assert(&pstrbuf(&str)[13] == pstrrcpbrk(&str, "AbcD"));
+    pf_assert(&pstrbuf(&str)[13] == pstrrcpbrk(&str, "AbcDef%$"));
+    pf_assert(&pstrbuf(&str)[16] == pstrrcpbrk(&str, "%$"));
+    pf_assert_null(pstrrcpbrk(&str, "AbccDef%$a3145bcb"));
+    pf_assert_not_null(pstrrcpbrk(&str, "\0"));
+    pf_assert_null(pstrrcpbrk(NULL, NULL));
 
     return 0;
 }
