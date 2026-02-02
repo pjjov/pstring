@@ -214,6 +214,12 @@ static int test_pstring_concat(int seed, int repetition) {
     pf_assert_memcmp(pstrbuf(&a), "Hello, world!", 13);
     pf_assert(*pstrend(&a) == '\0');
 
+    pstrclear(&a);
+
+    pf_assert_ok(pstrrcats(&a, "world!", 0));
+    pf_assert_ok(pstrrcats(&a, "Hello, ", 0));
+    pf_assert_true(pstrequals(&a, "Hello, world!", 0));
+
     pstrfree(&a);
     return 0;
 }

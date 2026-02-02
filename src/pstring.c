@@ -502,6 +502,22 @@ int pstrcatc(pstring_t *dst, char chr) {
     return PSTRING_OK;
 }
 
+int pstrrcat(pstring_t *dst, const pstring_t *src) {
+    if (!dst || !src)
+        return PSTRING_EINVAL;
+
+    if (pstrlen(src) > 0) {
+        if (pstrreserve(dst, pstrlen(src)))
+            return PSTRING_ENOMEM;
+
+        memmove(pstrslot(dst, pstrlen(src)), pstrbuf(dst), pstrlen(dst));
+        memcpy(pstrbuf(dst), pstrbuf(src), pstrlen(src));
+        pstr__setlen(dst, pstrlen(dst) + pstrlen(src));
+    }
+
+    return PSTRING_OK;
+}
+
 int pstrcpy(pstring_t *dst, const pstring_t *src) {
     if (!dst || !src)
         return PSTRING_EINVAL;

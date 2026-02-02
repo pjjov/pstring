@@ -328,6 +328,28 @@ PSTR_API int pstrcats(pstring_t *dst, const char *src, size_t length);
 **/
 PSTR_API int pstrcatc(pstring_t *dst, char chr);
 
+/** Concatenates `src` onto the start of `dst`.
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
+**/
+PSTR_API int pstrrcat(pstring_t *dst, const pstring_t *src);
+
+/** Concatenates `src` onto the start of `dst`.
+    If `length` is zero, `src` is treated as a null-terminated string.
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
+**/
+PSTR_INLINE int pstrrcats(pstring_t *dst, const char *src, size_t length) {
+    pstring_t tmp;
+    pstrwrap(&tmp, (char *)src, length, length);
+    return pstrrcat(dst, &tmp);
+}
+
+/** Concatenates character `chr` onto the start of `dst`.
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
+**/
+PSTR_INLINE int pstrrcatc(pstring_t *dst, char chr) {
+    return pstrrcats(dst, &chr, 1);
+}
+
 /** Copies the contents of `src` into `dst`
     Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
 **/
