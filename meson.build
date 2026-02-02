@@ -5,10 +5,11 @@
 project('pstring', 'c')
 
 src = [
-    './src/encoding.c',
-    './src/io.c',
-    './src/pstring.c',
-    './src/pstrdict.c',
+    'src/encoding.c',
+    'src/io.c',
+    'src/pattern.c',
+    'src/pstring.c',
+    'src/pstrdict.c',
 ]
 
 args = []
@@ -26,7 +27,8 @@ lib = library(
     c_args: args,
     dependencies: [cpolyfill_dep, xxhash_dep],
     sources: src,
-    include_directories: inc
+    include_directories: inc,
+    install: true
 )
 
 pstring_dep = declare_dependency(
@@ -46,6 +48,14 @@ tests = executable(
         'test/pstring.c',
         'test/pstrdict.c',
     ]
+)
+
+install_headers(
+    'include/pstring/encoding.h',
+    'include/pstring/io.h',
+    'include/pstring/pstrdict.h',
+    'include/pstring/pstring.h',
+    subdir: 'pstring'
 )
 
 test('pstring/pstring', tests, args: ['pstring'], protocol: 'tap')
