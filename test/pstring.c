@@ -157,6 +157,11 @@ static int test_pstring_compare(int seed, int repetitition) {
     pf_assert_true(pstrequal(&a, &b));
     pf_assert(0 == pstrcmp(&a, &b));
 
+    pf_assert_true(pstrprefix(&a, "Hello"));
+    pf_assert_true(pstrsuffix(&a, "world!"));
+    pf_assert_false(pstrprefix(&a, "Hello "));
+    pf_assert_false(pstrsuffix(&a, "world"));
+
     pf_assert_ok(pstrwrap(&a, "foo", 0, 0));
     pf_assert_ok(pstrwrap(&b, "fo0", 0, 0));
     pf_assert_false(pstrequal(&a, &b));

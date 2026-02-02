@@ -980,6 +980,28 @@ int pstrstrip(pstring_t *str, const char *chars) {
     return pstrcut(str, left - pstrbuf(str), (right + 1) - pstrbuf(str));
 }
 
+int pstrprefix(pstring_t *str, const char *prefix) {
+    if (!str || !prefix)
+        return PSTRING_EINVAL;
+
+    size_t length = strlen(prefix);
+    if (length > pstrlen(str))
+        return PSTRING_FALSE;
+
+    return 0 == memcmp(pstrbuf(str), prefix, length);
+}
+
+int pstrsuffix(pstring_t *str, const char *suffix) {
+    if (!str || !suffix)
+        return PSTRING_EINVAL;
+
+    size_t length = strlen(suffix);
+    if (length > pstrlen(str))
+        return PSTRING_FALSE;
+
+    return 0 == memcmp(pstrslot(str, pstrlen(str) - length), suffix, length);
+}
+
 #ifdef PSTRING_USE_XXHASH
 
     #include <xxhash.h>
