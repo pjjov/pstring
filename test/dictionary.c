@@ -20,8 +20,8 @@
 #include <pf_assert.h>
 #include <pf_test.h>
 
+#include <pstring/dictionary.h>
 #include <pstring/pstring.h>
-#include <pstring/pstrdict.h>
 
 int test_pstrdict_new(int seed, int rep) {
     pstrdict_t *dict = pstrdict_new(NULL, NULL);
@@ -87,7 +87,9 @@ int test_pstrdict_insert_remove(int seed, int rep) {
         pf_assert_ok(pstrdict_insert(dict, &keys[i], &values[i]));
 
     for (size_t i = 0; i < 5; i++) {
-        pf_assert(PSTRING_EEXIST == pstrdict_insert(dict, &keys[i], &values[i]));
+        pf_assert(
+            PSTRING_EEXIST == pstrdict_insert(dict, &keys[i], &values[i])
+        );
         pf_assert(pstrdict_get(dict, &keys[i]) == &values[i]);
     }
 

@@ -5,11 +5,11 @@
 project('pstring', 'c')
 
 src = [
+    'src/dictionary.c',
     'src/encoding.c',
     'src/io.c',
     'src/pattern.c',
     'src/pstring.c',
-    'src/pstrdict.c',
 ]
 
 args = []
@@ -42,23 +42,26 @@ tests = executable(
     'pstring-test',
     dependencies: [pstring_dep, cpolyfill_dep],
     sources: [
+        'test/dictionary.c',
         'test/encoding.c',
         'test/io.c',
         'test/main.c',
+        'test/pattern.c',
         'test/pstring.c',
-        'test/pstrdict.c',
     ]
 )
 
 install_headers(
+    'include/pstring/dictionary.h',
     'include/pstring/encoding.h',
     'include/pstring/io.h',
-    'include/pstring/pstrdict.h',
+    'include/pstring/pattern.h',
     'include/pstring/pstring.h',
     subdir: 'pstring'
 )
 
 test('pstring/pstring', tests, args: ['pstring'], protocol: 'tap')
-test('pstring/dict', tests, args: ['dict'], protocol: 'tap')
+test('pstring/dictionary', tests, args: ['dictionary'], protocol: 'tap')
 test('pstring/encoding', tests, args: ['encoding'], protocol: 'tap')
 test('pstring/io', tests, args: ['io'], protocol: 'tap')
+test('pstring/pattern', tests, args: ['pattern'], protocol: 'tap')

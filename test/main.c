@@ -20,18 +20,33 @@
 #include <pf_test.h>
 #include <string.h>
 
+/* clang-format off */
+
 extern const pf_test suite_pstring[];
 extern const pf_test suite_dict[];
 extern const pf_test suite_encoding[];
 extern const pf_test suite_io[];
+extern const pf_test suite_pattern[];
 
 static const pf_test *suites[] = {
-    suite_pstring, suite_dict, suite_encoding, suite_io, NULL,
+    suite_pstring,
+    suite_dict,
+    suite_encoding,
+    suite_io,
+    suite_pattern,
+    NULL,
 };
 
 static const char *names[] = {
-    "pstring", "dict", "encoding", "io", NULL,
+    "pstring",
+    "dictionary",
+    "encoding",
+    "io",
+    "pattern",
+    NULL,
 };
+
+/* clang-format on */
 
 int main(int argc, char *argv[]) {
     if (argc > 2) {

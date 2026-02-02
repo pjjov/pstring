@@ -17,7 +17,7 @@
     limitations under the License.
 */
 
-#include <pstring/pstrdict.h>
+#include <pstring/dictionary.h>
 #include <pstring/pstring.h>
 
 #include <stdint.h>
@@ -211,7 +211,7 @@ allocator_t *pstrdict_allocator(const pstrdict_t *dict) {
     return dict ? dict->allocator : 0;
 }
 
-uint8_t bitset_next(uint64_t *set) {
+static uint8_t bitset_next(uint64_t *set) {
     if (!set)
         return 0;
 
@@ -239,7 +239,9 @@ static inline struct bucket *iter_end(const pstrdict_t *dict) {
     return &dict->buckets[end];
 }
 
-static inline struct bucket *iter_next(const pstrdict_t *dict, struct bucket *prev) {
+static inline struct bucket *iter_next(
+    const pstrdict_t *dict, struct bucket *prev
+) {
     return ++prev >= iter_end(dict) ? dict->buckets : prev;
 }
 
@@ -270,9 +272,7 @@ void *pstrdict_get(const pstrdict_t *dict, const pstring_t *key) {
     return NULL;
 }
 
-void *pstrdict_gets(
-    const pstrdict_t *dict, const char *key, size_t length
-) {
+void *pstrdict_gets(const pstrdict_t *dict, const char *key, size_t length) {
     if (!dict || (!key && length > 0))
         return NULL;
 
@@ -428,7 +428,7 @@ int pstrdict_each(pstrdict_t *dict, pstrdict_fn *fn, void *user) {
 
     for (; b < iter_end(dict); b++) {
         uint64_t matches = bucket_match(&b->meta, PSTRDICT_EMPTY)
-                         | bucket_match(&b->meta, PSTRDICT_TOMB);
+            | bucket_match(&b->meta, PSTRDICT_TOMB);
 
         matches = (~matches) & ((1 << PSTRDICT_BUCKET_SIZE) - 1);
 
@@ -454,7 +454,7 @@ PSTR_API int pstrdict_filter(pstrdict_t *dict, pstrdict_fn *fn, void *user) {
 
     for (; b < iter_end(dict); b++) {
         uint64_t matches = bucket_match(&b->meta, PSTRDICT_EMPTY)
-                         | bucket_match(&b->meta, PSTRDICT_TOMB);
+            | bucket_match(&b->meta, PSTRDICT_TOMB);
 
         matches = (~matches) & ((1 << PSTRDICT_BUCKET_SIZE) - 1);
 
