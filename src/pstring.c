@@ -306,7 +306,7 @@ int pstrcut(pstring_t *str, size_t from, size_t to) {
             memmove(pstrslot(str, 0), pstrslot(str, from), to - from);
         pstr__setlen(str, to - from);
     } else {
-        pstrrange(str, NULL, pstrslot(str, from), pstrslot(str, to));
+        pstrslice(str, str, from, to);
     }
 
     return PSTRING_OK;
@@ -407,13 +407,12 @@ int pstrequal(const pstring_t *left, const pstring_t *right) {
 
     const char *leftBuf = pstrbuf(left);
     const char *rightBuf = pstrbuf(right);
-    size_t i = 0;
+    size_t i = 0, mask = (1ull << g_impl.size) - 1;
 
     if (g_impl.size > 0) {
-        for (; length - i >= g_impl.size; i += g_impl.size) {
-            if (g_impl.compare(&leftBuf[i], &rightBuf[i]))
+        for (; length - i >= g_impl.size; i += g_impl.size)
+            if (mask != g_impl.compare(&leftBuf[i], &rightBuf[i]))
                 return PSTRING_FALSE;
-        }
     }
 
     for (; i < length; i++)
@@ -421,6 +420,14 @@ int pstrequal(const pstring_t *left, const pstring_t *right) {
             return PSTRING_FALSE;
 
     return PSTRING_TRUE;
+}
+
+PSTR_API int pstrequals(
+    const pstring_t *left, const char *right, size_t length
+) {
+    pstring_t tmp;
+    pstrwrap(&tmp, (char *)right, length, length);
+    return pstrequal(left, &tmp);
 }
 
 int pstrcmp(const pstring_t *left, const pstring_t *right) {
@@ -434,7 +441,8 @@ int pstrcmp(const pstring_t *left, const pstring_t *right) {
 
     if (g_impl.size > 0) {
         for (; length - i >= g_impl.size; i += g_impl.size) {
-            int result = g_impl.compare(&leftBuf[i], &rightBuf[i]);
+            int result = ~g_impl.compare(&leftBuf[i], &rightBuf[i]);
+
             if (result) {
                 int bit = pstr__clz_masked(result, g_impl.size);
                 return leftBuf[bit] - rightBuf[bit];
@@ -921,6 +929,55 @@ int pstrreplc(pstring_t *str, char src, char dst, size_t max) {
     }
 
     return PSTRING_OK;
+}
+
+int pstrlstrip(pstring_t *str, const char *chars) {
+    if (!str)
+        return PSTRING_EINVAL;
+
+    if (!chars)
+        chars = " \t\r\n\v\f";
+
+    char *left = pstrcpbrk(str, chars);
+    if (left == NULL)
+        return PSTRING_OK;
+
+    return pstrcut(str, left - pstrbuf(str), pstrlen(str));
+}
+
+int pstrrstrip(pstring_t *str, const char *chars) {
+    if (!str)
+        return PSTRING_EINVAL;
+
+    if (!chars)
+        chars = " \t\r\n\v\f";
+
+    char *right = pstrrcpbrk(str, chars);
+    if (right == NULL)
+        return PSTRING_OK;
+
+    return pstrcut(str, 0, right - pstrbuf(str) + 1);
+}
+
+int pstrstrip(pstring_t *str, const char *chars) {
+    if (!str)
+        return PSTRING_EINVAL;
+
+    if (!chars)
+        chars = " \t\r\n\v\f";
+
+    char *left = pstrcpbrk(str, chars);
+    if (left == NULL)
+        left = pstrbuf(str);
+
+    pstring_t tmp;
+    pstrrange(&tmp, NULL, left, pstrend(str));
+
+    char *right = pstrrcpbrk(&tmp, chars);
+    if (right == NULL)
+        right = pstrend(str);
+
+    return pstrcut(str, left - pstrbuf(str), (right + 1) - pstrbuf(str));
 }
 
 #ifdef PSTRING_USE_XXHASH

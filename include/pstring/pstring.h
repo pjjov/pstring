@@ -243,6 +243,13 @@ PSTR_API int pstrshrink(pstring_t *str);
 /** Checks if `left` and `right` pstring are equal. **/
 PSTR_API int pstrequal(const pstring_t *left, const pstring_t *right);
 
+/** Checks if `left` pstring and `right` string are equal.
+    If `length` is zero, `right` is treated as a null-terminated string.
+**/
+PSTR_API int pstrequals(
+    const pstring_t *left, const char *right, size_t length
+);
+
 /** Compares `left` and `right` lexicographically, returning:
     - a positive number if `left` should appear before `right`.
     - a negative number if `left` should appear after `right`.
@@ -367,6 +374,27 @@ PSTR_API int pstrread(pstring_t *out, const char *path);
     Possible error codes: PSTRING_EINVAL, PSTRING_EIO.
 **/
 PSTR_API int pstrwrite(const pstring_t *str, const char *path);
+
+/** Removes trailing characters from `str` that are specified in
+    `chars`. If `str` is a slice, it will be resliced to omit them instead.
+
+    Possible error codes: PSTRING_EINVAL.
+**/
+PSTR_API int pstrrstrip(pstring_t *str, const char *chars);
+
+/** Removes leading characters from `str` that are specified in
+    `chars`. If `str` is a slice, it will be resliced to omit them instead.
+
+    Possible error codes: PSTRING_EINVAL.
+**/
+PSTR_API int pstrlstrip(pstring_t *str, const char *chars);
+
+/** Removes leading and trailing characters from `str` that are specified in
+    `chars`. If `str` is a slice, it will be resliced to omit them instead.
+
+    Possible error codes: PSTRING_EINVAL.
+**/
+PSTR_API int pstrstrip(pstring_t *str, const char *chars);
 
 /** Naively sets the length of `str` to `length` **/
 PSTR_INLINE void pstr__setlen(pstring_t *str, size_t length) {

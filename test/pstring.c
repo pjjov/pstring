@@ -332,6 +332,23 @@ int test_pstring_breakset(int seed, int repetition) {
     return 0;
 }
 
+int test_pstring_strip(int seed, int rep) {
+    pstring_t str = PSTRWRAP("   Hello, world!   ");
+    pf_assert_ok(pstrlstrip(&str, NULL));
+    pf_assert_true(pstrequals(&str, "Hello, world!   ", 0));
+
+    pf_assert_ok(pstrrstrip(&str, NULL));
+    pf_assert_true(pstrequals(&str, "Hello, world!", 0));
+
+    pstring_t other = PSTRWRAP("   Hello, world!   ");
+    pf_assert_ok(pstrstrip(&other, NULL));
+    pf_assert_true(pstrequal(&str, &other));
+    pf_assert_ok(pstrstrip(&str, NULL));
+    pf_assert_true(pstrequal(&str, &other));
+
+    return 0;
+}
+
 int test_pstring_substring(int seed, int repetition) {
     pstring_t str = PSTRWRAP("Hello, world!");
 
@@ -388,6 +405,7 @@ const struct pf_test suite_pstring[] = {
     { test_pstring_chr, "/pstring/chr", 1 },
     { test_pstring_span, "/pstring/span", 1 },
     { test_pstring_breakset, "/pstring/breakset", 1 },
+    { test_pstring_strip, "/pstring/strip", 1 },
     { test_pstring_substring, "/pstring/substring", 1 },
     { test_pstring_replace, "/pstring/replace", 1 },
     { 0 },
