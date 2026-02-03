@@ -21,9 +21,11 @@
 #include <pf_typeid.h>
 #include <pstring/io.h>
 #include <pstring/pstring.h>
+
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #define PRINTF_BUFFER_SIZE 1024

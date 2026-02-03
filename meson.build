@@ -15,6 +15,13 @@ src = [
 args = []
 inc = include_directories('./include/')
 
+cc = meson.get_compiler('c')
+
+allocator_dep = dependency(
+    'allocator_t',
+    required: not cc.has_header('allocator.h')
+)
+
 cpolyfill_dep = dependency('cpolyfill', required: true)
 xxhash_dep = dependency('xxhash', 'libxxhash', required: false)
 
@@ -25,7 +32,7 @@ endif
 lib = library(
     'pstring',
     c_args: args,
-    dependencies: [cpolyfill_dep, xxhash_dep],
+    dependencies: [allocator_dep, cpolyfill_dep, xxhash_dep],
     sources: src,
     include_directories: inc,
     install: true

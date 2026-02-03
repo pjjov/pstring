@@ -29,8 +29,9 @@
     #define PSTR_API
 #endif
 
-#include "allocator.h"
 #include <stddef.h>
+
+typedef struct allocator_t allocator_t;
 
 #ifndef PSTRING_SSO_EXTEND
     #define PSTRING_SSO_EXTEND 0

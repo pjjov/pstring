@@ -23,7 +23,8 @@
 
 #include <pf_bitwise.h>
 
-#include "allocator_std.h"
+#include <allocator.h>
+#include <allocator_std.h>
 
 #if !defined(PSTRING_NO_AVX) && defined(__AVX__)
     #include <immintrin.h>
