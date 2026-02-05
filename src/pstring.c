@@ -285,7 +285,11 @@ int pstrslice(pstring_t *out, const pstring_t *str, size_t from, size_t to) {
     if (from > to)
         from = to;
 
-    return pstrwrap(out, &pstrbuf(str)[from], to - from, to - from);
+    out->buffer = &pstrbuf(str)[from];
+    out->base.allocator = NULL;
+    out->base.capacity = to - from;
+    out->base.length = to - from;
+    return PSTRING_OK;
 }
 
 int pstrcut(pstring_t *str, size_t from, size_t to) {
@@ -997,22 +1001,26 @@ int pstrstrip(pstring_t *str, const char *chars) {
     return pstrcut(str, left - pstrbuf(str), (right + 1) - pstrbuf(str));
 }
 
-int pstrprefix(pstring_t *str, const char *prefix) {
+int pstrprefix(pstring_t *str, const char *prefix, size_t length) {
     if (!str || !prefix)
         return PSTRING_EINVAL;
 
-    size_t length = strlen(prefix);
+    if (length == 0)
+        length = strlen(prefix);
+
     if (length > pstrlen(str))
         return PSTRING_FALSE;
 
     return 0 == memcmp(pstrbuf(str), prefix, length);
 }
 
-int pstrsuffix(pstring_t *str, const char *suffix) {
+int pstrsuffix(pstring_t *str, const char *suffix, size_t length) {
     if (!str || !suffix)
         return PSTRING_EINVAL;
 
-    size_t length = strlen(suffix);
+    if (length == 0)
+        length = strlen(suffix);
+
     if (length > pstrlen(str))
         return PSTRING_FALSE;
 

@@ -420,10 +420,10 @@ PSTR_API int pstrlstrip(pstring_t *str, const char *chars);
 PSTR_API int pstrstrip(pstring_t *str, const char *chars);
 
 /** Checks if `str` starts with a `prefix`. **/
-PSTR_API int pstrprefix(pstring_t *str, const char *prefix);
+PSTR_API int pstrprefix(pstring_t *str, const char *prefix, size_t length);
 
 /** Checks if `str` ends with a `suffix`. **/
-PSTR_API int pstrsuffix(pstring_t *str, const char *suffix);
+PSTR_API int pstrsuffix(pstring_t *str, const char *suffix, size_t length);
 
 /** Naively sets the length of `str` to `length` **/
 PSTR_INLINE void pstr__setlen(pstring_t *str, size_t length) {
