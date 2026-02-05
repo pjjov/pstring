@@ -293,6 +293,47 @@ PSTR_API char *pstrrcpbrk(const pstring_t *str, const char *set);
 **/
 PSTR_API char *pstrstr(const pstring_t *str, const pstring_t *sub);
 
+/** Tokenizes input string `src` into a sequence of tokens separated by
+    a character inside `set`. If not found, `PSTRING_ENOENT` is returned.
+
+    Tokens and state are stored in `dst`. To initialize `dst`,
+    call this function with `NULL` passed for `set`.
+
+    The next token is started at the first character not found in `set` and
+    ends in the first character that is found in `set`, or the end of `src`.
+
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOENT.
+**/
+PSTR_API int pstrtok(pstring_t *dst, const pstring_t *src, const char *set);
+
+/** Tokenizes input string `src` into a sequence of tokens separated by
+    a substring `sep`. If not found, `PSTRING_ENOENT` is returned.
+
+    Tokens and state are stored in `dst`. To initialize `dst`,
+    call this function with `NULL` passed for `sep`.
+
+    If `sep` comes right after the end of `dst`, it is skipped before searching
+    for the next token. This behaviour can be suprising when using  different
+    separators between function calls.
+
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOENT.
+**/
+PSTR_API int pstrsplit(
+    pstring_t *dst, const pstring_t *src, const pstring_t *sep
+);
+
+/** Null-terminated string variant of `pstrsplit`. **/
+PSTR_INLINE int pstrsplits(
+    pstring_t *dst, const pstring_t *src, const char *sep, size_t length
+) {
+    if (sep == NULL)
+        return pstrsplit(dst, src, NULL);
+
+    pstring_t tmp;
+    pstrwrap(&tmp, (char *)sep, length, length);
+    return pstrsplit(dst, src, &tmp);
+}
+
 /** Returns the number of consecutive characters that appear
     at the start of `str` that are included in the `set`.
 **/

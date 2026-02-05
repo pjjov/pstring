@@ -885,6 +885,53 @@ char *pstrstr(const pstring_t *str, const pstring_t *sub) {
     return NULL;
 }
 
+int pstrtok(pstring_t *dst, const pstring_t *src, const char *set) {
+    if (!dst || !src)
+        return PSTRING_EINVAL;
+
+    if (!set) {
+        pstrslice(dst, src, 0, 0);
+        return PSTRING_OK;
+    }
+
+    pstring_t search;
+
+    pstrrange(&search, src, pstrend(dst), pstrend(src));
+    const char *start = pstrcpbrk(&search, set);
+
+    pstrrange(&search, src, start, pstrend(src));
+    const char *end = pstrpbrk(&search, set);
+
+    if (!start)
+        return PSTRING_ENOENT;
+
+    pstrrange(dst, src, start, end ? end : pstrend(src));
+    return PSTRING_OK;
+}
+
+int pstrsplit(pstring_t *dst, const pstring_t *src, const pstring_t *sep) {
+    if (!dst || !src)
+        return PSTRING_EINVAL;
+
+    if (!sep) {
+        pstrslice(dst, src, 0, 0);
+        return PSTRING_OK;
+    }
+
+    pstring_t search;
+    const char *prev = pstrend(dst);
+
+    pstrrange(&search, src, prev, pstrend(src));
+    if (pstrprefix(&search, pstrbuf(sep), pstrlen(sep))) {
+        prev += pstrlen(sep);
+        pstrrange(&search, src, prev, pstrend(src));
+    }
+
+    const char *next = pstrstr(&search, sep);
+    pstrrange(dst, src, prev, next ? next : pstrend(src));
+    return prev == pstrend(src) ? PSTRING_ENOENT : PSTRING_OK;
+}
+
 int pstrrepl(
     pstring_t *str, const pstring_t *src, const pstring_t *dst, size_t max
 ) {

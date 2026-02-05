@@ -404,6 +404,42 @@ int test_pstring_replace(int seed, int rep) {
     return 0;
 }
 
+int test_pstring_split(int seed, int rep) {
+    pstring_t src, token;
+
+    src = PSTRWRAP("Hello, world!");
+    pf_assert_ok(pstrtok(&token, &src, NULL));
+    pf_assert_ok(pstrtok(&token, &src, ", "));
+    pf_assert_true(pstrequals(&token, "Hello", 0));
+    pf_assert_ok(pstrtok(&token, &src, ", "));
+    pf_assert_true(pstrequals(&token, "world!", 0));
+    pf_assert(PSTRING_ENOENT == pstrtok(&token, &src, ", "));
+
+    src = PSTRWRAP("1<>2<>3");
+    pf_assert_ok(pstrsplits(&token, &src, NULL, 0));
+
+    pf_assert_ok(pstrsplits(&token, &src, "<>", 0));
+    pf_assert_true(pstrequals(&token, "1", 0));
+    pf_assert_ok(pstrsplits(&token, &src, "<>", 0));
+    pf_assert_true(pstrequals(&token, "2", 0));
+    pf_assert_ok(pstrsplits(&token, &src, "<>", 0));
+    pf_assert_true(pstrequals(&token, "3", 0));
+    pf_assert(PSTRING_ENOENT == pstrsplits(&token, &src, "<>", 0));
+
+    src = PSTRWRAP("1,,2");
+    pf_assert_ok(pstrsplits(&token, &src, NULL, 0));
+
+    pf_assert_ok(pstrsplits(&token, &src, ",", 0));
+    pf_assert_true(pstrequals(&token, "1", 0));
+    pf_assert_ok(pstrsplits(&token, &src, ",", 0));
+    pf_assert_true(pstrlen(&token) == 0);
+    pf_assert_ok(pstrsplits(&token, &src, ",", 0));
+    pf_assert_true(pstrequals(&token, "2", 0));
+    pf_assert(PSTRING_ENOENT == pstrsplits(&token, &src, ",", 0));
+
+    return 0;
+}
+
 const struct pf_test suite_pstring[] = {
     { test_pstring_new, "/pstring/new", 1 },
     { test_pstring_alloc, "/pstring/alloc", 1 },
@@ -419,5 +455,6 @@ const struct pf_test suite_pstring[] = {
     { test_pstring_strip, "/pstring/strip", 1 },
     { test_pstring_substring, "/pstring/substring", 1 },
     { test_pstring_replace, "/pstring/replace", 1 },
+    { test_pstring_split, "/pstring/split", 1 },
     { 0 },
 };
