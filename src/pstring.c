@@ -20,6 +20,7 @@
 #include <pstring/pstring.h>
 #include <stdint.h>
 #include <string.h>
+#include <time.h>
 
 #include <pf_bitwise.h>
 
@@ -1072,6 +1073,19 @@ int pstrsuffix(pstring_t *str, const char *suffix, size_t length) {
         return PSTRING_FALSE;
 
     return 0 == memcmp(pstrslot(str, pstrlen(str) - length), suffix, length);
+}
+
+int pstrftime(pstring_t *dst, const char *fmt, struct tm *src) {
+    if (!dst || !fmt || !src)
+        return PSTRING_EINVAL;
+
+    if (pstrreserve(dst, strlen(fmt) * 2))
+        return PSTRING_ENOMEM;
+
+    size_t space = pstrcap(dst) - pstrlen(dst);
+    size_t written = strftime(pstrend(dst), space, fmt, src);
+    pstr__setlen(dst, pstrlen(dst) + written);
+    return written > 0 ? PSTRING_OK : PSTRING_ENOMEM;
 }
 
 #ifdef PSTRING_USE_XXHASH

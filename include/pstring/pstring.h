@@ -32,6 +32,7 @@
 #include <stddef.h>
 
 typedef struct allocator_t allocator_t;
+struct tm; /* <time.h> */
 
 #ifndef PSTRING_SSO_EXTEND
     #define PSTRING_SSO_EXTEND 0
@@ -438,6 +439,11 @@ PSTR_API int pstrread(pstring_t *out, const char *path);
     Possible error codes: PSTRING_EINVAL, PSTRING_EIO.
 **/
 PSTR_API int pstrwrite(const pstring_t *str, const char *path);
+
+/** Concatenates a string formatted by `fmt` using date and time from `src`.
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
+**/
+PSTR_API int pstrftime(pstring_t *dst, const char *fmt, struct tm *src);
 
 /** Removes trailing characters from `str` that are specified in
     `chars`. If `str` is a slice, it will be resliced to omit them instead.
