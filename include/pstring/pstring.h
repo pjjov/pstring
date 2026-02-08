@@ -484,6 +484,12 @@ PSTR_API int pstrfmt(pstring_t *dst, const char *fmt, ...);
 /** Variable argument list variant of `pstrfmt`. **/
 PSTR_API int pstrfmtv(pstring_t *dst, const char *fmt, va_list args);
 
+/** Prints a formatted string to standard output **/
+PSTR_API int pstrprintf(const char *fmt, ...);
+
+/** Prints a formatted string to standard output **/
+PSTR_API int pstrvprintf(const char *fmt, va_list args);
+
 /** Removes trailing characters from `str` that are specified in
     `chars`. If `str` is a slice, it will be resliced to omit them instead.
 

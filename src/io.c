@@ -243,21 +243,13 @@ int pstrfmtv(pstring_t *dst, const char *fmt, va_list args) {
         return PSTRING_EINVAL;
 
     size_t original = pstrlen(dst);
+    int result;
 
-    const char *prev = fmt;
-    const char *match = fmt;
-    while ((match = strchr(prev, '%'))) {
-        pstream_write(&stream, prev, match - prev);
-
-        if (format_next(&stream, &match, args)) {
-            pstr__setlen(dst, original);
-            return PSTRING_EINVAL;
-        }
-
-        prev = match;
+    if ((result = pstream_formatv(&stream, fmt, args))) {
+        pstr__setlen(dst, original);
+        return result;
     }
 
-    pstream_write(&stream, prev, strlen(prev));
     return PSTRING_OK;
 }
 
@@ -267,6 +259,50 @@ int pstrfmt(pstring_t *dst, const char *fmt, ...) {
     int result = pstrfmtv(dst, fmt, args);
     va_end(args);
     return result;
+}
+
+int pstrprintf(const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    int result = pstrvprintf(fmt, args);
+    va_end(args);
+    return result;
+}
+
+int pstrvprintf(const char *fmt, va_list args) {
+    pstream_t stream;
+
+    if (pstream_file(&stream, stdout))
+        return PSTRING_EINVAL;
+
+    return pstream_format(&stream, fmt, args);
+}
+
+int pstream_format(pstream_t *stream, const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    int result = pstream_formatv(stream, fmt, args);
+    va_end(args);
+    return result;
+}
+
+int pstream_formatv(pstream_t *stream, const char *fmt, va_list args) {
+    if (!stream || !fmt)
+        return PSTRING_EINVAL;
+
+    const char *prev = fmt;
+    const char *match = fmt;
+    while ((match = strchr(prev, '%'))) {
+        pstream_write(stream, prev, match - prev);
+
+        if (format_next(stream, &match, args))
+            return PSTRING_EINVAL;
+
+        prev = match;
+    }
+
+    pstream_write(stream, prev, strlen(prev));
+    return PSTRING_OK;
 }
 
 int pstrio_vprintf(pstring_t *dst, const char *fmt, va_list args) {
