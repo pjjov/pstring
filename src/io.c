@@ -27,6 +27,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #define PRINTF_BUFFER_SIZE 1024
 
@@ -74,6 +75,200 @@ int pstrwrite(const pstring_t *str, const char *path) {
     return PSTRING_OK;
 }
 
+static char format_parse(const char **esc, char *buffer) {
+    const char *start = *esc;
+    const char *curr = *esc + 1;
+    int precision = PSTRING_FALSE;
+
+    for (char c; (c = *curr); curr++)
+        if (c != '#' && c != '-' && c != '+' && c != '0' && c != ' ')
+            break;
+
+    while (*curr == '.' || (*curr >= '0' && *curr <= '9')) {
+        if (*curr == '.') {
+            if (precision)
+                break;
+            precision = PSTRING_TRUE;
+            curr++;
+        }
+
+        curr++;
+    }
+
+    switch (*curr) {
+    case 'h':
+    case 'l':
+        if (curr[1] == curr[0])
+            curr++;
+    case 'L':
+    case 'z':
+    case 'j':
+    case 't':
+        curr++;
+    default:
+        break;
+    }
+
+    if (*curr)
+        curr++;
+
+    if (curr - start < 32) {
+        memcpy(buffer, start, curr - start);
+        buffer[curr - start] = '\0';
+    } else {
+        buffer[0] = '\0';
+    }
+
+    *esc = curr;
+    return curr - start;
+}
+
+static int format_unsigned(unsigned long long *value, char chr, va_list args) {
+    uintmax_t max;
+
+    switch (chr) {
+        /* clang-format off */
+    case 'b': max = (uint8_t)va_arg(args, unsigned int);  break;
+    case 'w': max = (uint16_t)va_arg(args, unsigned int); break;
+    case 'd': max = va_arg(args, uint32_t);               break;
+    case 'q': max = va_arg(args, uint64_t);               break;
+    case 'm': max = va_arg(args, uintmax_t);              break;
+    case 'p': max = va_arg(args, uintptr_t);              break;
+    case 's': max = va_arg(args, size_t);                 break;
+    default: return PSTRING_EINVAL;
+        /* clang-format on */
+    }
+
+    if (max > ULLONG_MAX)
+        return PSTRING_ERANGE;
+
+    *value = max;
+    return PSTRING_OK;
+}
+
+static int format_signed(long long *value, char chr, va_list args) {
+    intmax_t max;
+
+    switch (chr) {
+        /* clang-format off */
+    case 'b': max = (int8_t)va_arg(args, int);  break;
+    case 'w': max = (int16_t)va_arg(args, int); break;
+    case 'd': max = va_arg(args, int32_t);      break;
+    case 'q': max = va_arg(args, int64_t);      break;
+    case 'm': max = va_arg(args, intmax_t);     break;
+    case 'p': max = va_arg(args, intptr_t);     break;
+    case 'P': max = va_arg(args, ptrdiff_t);    break;
+    default: return PSTRING_EINVAL;
+        /* clang-format on */
+    }
+
+    if (max > LLONG_MAX || max < LLONG_MIN)
+        return PSTRING_ERANGE;
+
+    *value = max;
+    return PSTRING_OK;
+}
+
+static int format_next(pstream_t *dst, const char **esc, va_list args) {
+    char format[32];
+    int len = format_parse(esc, format);
+
+    switch (format[len - 1]) {
+    case 'P': {
+        pstring_t *arg = va_arg(args, pstring_t *);
+        size_t written = pstream_write(dst, pstrbuf(arg), pstrlen(arg));
+        return written == pstrlen(arg) ? PSTRING_OK : PSTRING_EIO;
+    }
+
+    case '?': {
+        int typeid = va_arg(args, int);
+        void *arg = va_arg(args, void *);
+        return pstream_serialize(dst, typeid, arg);
+    }
+
+    case 'D': {
+        const char *fmt = va_arg(args, const char *);
+        struct tm *tp = va_arg(args, struct tm *);
+
+        char buffer[256];
+        if (0 == strftime(buffer, 256, fmt, tp))
+            return PSTRING_EINVAL;
+
+        size_t fmtlen = pstr__nlen(buffer, 256);
+        size_t written = pstream_write(dst, buffer, fmtlen);
+        return written == fmtlen ? PSTRING_OK : PSTRING_EIO;
+    }
+
+    case 'U': {
+        if (strchr(format, '*'))
+            return PSTRING_EINVAL;
+
+        unsigned long long value;
+        if (format_unsigned(&value, *(*esc)++, args))
+            return PSTRING_EINVAL;
+
+        format[len - 1] = 'l';
+        format[len] = 'l';
+        format[len + 1] = 'u';
+        return pstream_printf(dst, format, value);
+    }
+
+    case 'I': {
+        if (strchr(format, '*'))
+            return PSTRING_EINVAL;
+
+        long long value;
+        if (format_signed(&value, *(*esc)++, args))
+            return PSTRING_EINVAL;
+
+        format[len - 1] = 'l';
+        format[len] = 'l';
+        format[len + 1] = 'd';
+        return pstream_printf(dst, format, value);
+    }
+
+    default:
+        return pstream_vprintf(dst, format, args);
+    }
+
+    return PSTRING_OK;
+}
+
+int pstrfmtv(pstring_t *dst, const char *fmt, va_list args) {
+    if (!dst || !fmt)
+        return PSTRING_EINVAL;
+
+    pstream_t stream;
+    if (pstream_string(&stream, dst))
+        return PSTRING_EINVAL;
+
+    size_t original = pstrlen(dst);
+
+    const char *prev = fmt;
+    const char *match = fmt;
+    while ((match = strchr(prev, '%'))) {
+        pstream_write(&stream, prev, match - prev);
+
+        if (format_next(&stream, &match, args)) {
+            pstr__setlen(dst, original);
+            return PSTRING_EINVAL;
+        }
+
+        prev = match;
+    }
+
+    pstream_write(&stream, prev, strlen(prev));
+    return PSTRING_OK;
+}
+
+int pstrfmt(pstring_t *dst, const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    int result = pstrfmtv(dst, fmt, args);
+    va_end(args);
+    return result;
+}
+
 int pstrio_vprintf(pstring_t *dst, const char *fmt, va_list args) {
     if (!dst || !fmt)
         return PSTRING_EINVAL;
@@ -112,7 +307,7 @@ int pstrio_printf(pstring_t *dst, const char *fmt, ...) {
     return result;
 }
 
-PSTR_API int pstream_printf(pstream_t *stream, const char *fmt, ...) {
+int pstream_printf(pstream_t *stream, const char *fmt, ...) {
     va_list args;
 
     va_start(args, fmt);
@@ -122,14 +317,21 @@ PSTR_API int pstream_printf(pstream_t *stream, const char *fmt, ...) {
     return res;
 }
 
-PSTR_API int pstream_vprintf(pstream_t *stream, const char *fmt, va_list args) {
+int pstream_vprintf(pstream_t *stream, const char *fmt, va_list args) {
+    if (!stream || !fmt)
+        return PSTRING_EINVAL;
+
     char buffer[PRINTF_BUFFER_SIZE];
 
     int res = vsnprintf(buffer, PRINTF_BUFFER_SIZE, fmt, args);
+
     if (res >= PRINTF_BUFFER_SIZE)
         return PSTRING_ENOMEM;
 
-    return res < 0 ? PSTRING_EIO : PSTRING_OK;
+    if (res < 0 || res != pstream_write(stream, buffer, res))
+        return PSTRING_EIO;
+
+    return PSTRING_OK;
 }
 
 static int srlz_text_int(pstream_t *stream, int type, const void *item) {

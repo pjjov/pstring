@@ -21,6 +21,8 @@
 #include <pf_test.h>
 #include <pf_typeid.h>
 
+#include <stdint.h>
+
 #include <pstring/io.h>
 #include <pstring/pstring.h>
 
@@ -110,9 +112,23 @@ int test_io_serialize(int seed, int rep) {
     return 0;
 }
 
+int test_io_format(int seed, int rep) {
+    pstring_t buffer = { 0 };
+    pstring_t str = PSTRWRAP("Hello");
+    struct tm tp = { .tm_mday = 31 };
+    int8_t byte = 3;
+
+    pf_assert_ok(pstrfmt(&buffer, "%P %D %.2Ib", &str, "%d", &tp, byte));
+    pf_assert_true(pstrequals(&buffer, "Hello 31 03", 0));
+
+    pstrfree(&buffer);
+    return 0;
+}
+
 const struct pf_test suite_io[] = {
     { test_io_read, "/pstring/io/read", 1 },
     { test_io_write, "/pstring/io/write", 1 },
     { test_io_serialize, "/pstring/io/serialize", 1 },
+    { test_io_format, "/pstring/io/format", 1 },
     { 0 },
 };

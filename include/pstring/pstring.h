@@ -29,6 +29,7 @@
     #define PSTR_API
 #endif
 
+#include <stdarg.h>
 #include <stddef.h>
 
 typedef struct allocator_t allocator_t;
@@ -70,6 +71,8 @@ enum pstring_error {
     PSTRING_ENOMEM = -12,
     PSTRING_EEXIST = -17,
     PSTRING_EINVAL = -22,
+    PSTRING_EDOM = -33,
+    PSTRING_ERANGE = -34,
     PSTRING_ENOSYS = -38,
     PSTRING_ENODATA = -61,
 };
@@ -444,6 +447,42 @@ PSTR_API int pstrwrite(const pstring_t *str, const char *path);
     Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
 **/
 PSTR_API int pstrftime(pstring_t *dst, const char *fmt, struct tm *src);
+
+/** Concatenates a string formatted according to `fmt`. Alongside standard
+    formatting options, this function offers a couple of extensions:
+
+    - `%P` - prints the passed `pstring_t *` argument.
+    - `%D` - prints calendar time using the passed format.
+    - `%?` - serializes a pointer to a type indicated by the passed `int` id.
+    - `%Ib`, `%Ub` - prints `int8_t` and `uint8_t` respectively.
+    - `%Iw`, `%Uw` - prints `int16_t` and `uint16_t` respectively.
+    - `%Id`, `%Ud` - prints `int32_t` and `uint32_t` respectively.
+    - `%Iq`, `%Uq` - prints `int64_t` and `uint64_t` respectively.
+    - `%Im`, `%Um` - prints `intmax_t` and `uintmax_t` respectively.
+    - `%Ip`, `%Up` - prints `intptr_t` and `uintptr_t` respectively.
+    - `%IP`, `%Us` - prints `ptrdiff_t` and `size_t` respectively.
+
+    Example of extension formats:
+
+    ```c
+        pstring_t *str, *other;
+        pstrfmt(str, "%P", other);
+
+        int num;
+        pstrfmt(str, "%?", PF_TYPE_INT, &num);
+
+        struct tm date = { .tm_mday = 30 };
+        pstrfmt(str, "%D", "%A %c", &date);
+    ```
+
+    > If you don't want to use extensions, use `pstrio_printf` instead.
+
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
+**/
+PSTR_API int pstrfmt(pstring_t *dst, const char *fmt, ...);
+
+/** Variable argument list variant of `pstrfmt`. **/
+PSTR_API int pstrfmtv(pstring_t *dst, const char *fmt, va_list args);
 
 /** Removes trailing characters from `str` that are specified in
     `chars`. If `str` is a slice, it will be resliced to omit them instead.
