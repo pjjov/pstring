@@ -174,26 +174,26 @@ PSTR_INLINE int pstream_putc(pstream_t *stream, char chr) {
 /** Writes to stream a string formatted as `fmt` using variable arguments.
     Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
 **/
-PSTR_API int pstream_format(pstream_t *stream, const char *fmt, ...);
+PSTR_API int pstream_printf(pstream_t *stream, const char *fmt, ...);
 
 /** Writes to stream a string formatted as `fmt` using variable arguments.
     Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
 **/
-PSTR_API int pstream_formatv(pstream_t *stream, const char *fmt, va_list args);
-
-/** Writes to stream a string formatted as `fmt` using variable
-    arguments and only standard library formatting options.
-
-    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
-**/
-PSTR_API int pstream_printf(pstream_t *stream, const char *fmt, ...);
-
-/** Writes to stream a string formatted as `fmt` using variable
-    arguments and only standard library formatting options.
-
-    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
-**/
 PSTR_API int pstream_vprintf(pstream_t *stream, const char *fmt, va_list args);
+
+/** Writes to stream a string formatted as `fmt` using variable
+    arguments and only standard library formatting options.
+
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
+**/
+PSTR_API int pstream__printf(pstream_t *stream, const char *fmt, ...);
+
+/** Writes to stream a string formatted as `fmt` using variable
+    arguments and only standard library formatting options.
+
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
+**/
+PSTR_API int pstream__vprintf(pstream_t *stream, const char *fmt, va_list args);
 
 PSTR_INLINE int pstream_serialize(
     pstream_t *stream, int type, const void *item

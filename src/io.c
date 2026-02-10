@@ -210,7 +210,7 @@ static int format_next(pstream_t *dst, const char **esc, va_list args) {
         format[len - 1] = 'l';
         format[len] = 'l';
         format[len + 1] = 'u';
-        return pstream_printf(dst, format, value);
+        return pstream__printf(dst, format, value);
     }
 
     case 'I': {
@@ -224,11 +224,11 @@ static int format_next(pstream_t *dst, const char **esc, va_list args) {
         format[len - 1] = 'l';
         format[len] = 'l';
         format[len + 1] = 'd';
-        return pstream_printf(dst, format, value);
+        return pstream__printf(dst, format, value);
     }
 
     default:
-        return pstream_vprintf(dst, format, args);
+        return pstream__vprintf(dst, format, args);
     }
 
     return PSTRING_OK;
@@ -245,7 +245,7 @@ int pstrfmtv(pstring_t *dst, const char *fmt, va_list args) {
     size_t original = pstrlen(dst);
     int result;
 
-    if ((result = pstream_formatv(&stream, fmt, args))) {
+    if ((result = pstream_vprintf(&stream, fmt, args))) {
         pstr__setlen(dst, original);
         return result;
     }
@@ -275,18 +275,18 @@ int pstrvprintf(const char *fmt, va_list args) {
     if (pstream_file(&stream, stdout))
         return PSTRING_EINVAL;
 
-    return pstream_format(&stream, fmt, args);
+    return pstream_printf(&stream, fmt, args);
 }
 
-int pstream_format(pstream_t *stream, const char *fmt, ...) {
+int pstream_printf(pstream_t *stream, const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
-    int result = pstream_formatv(stream, fmt, args);
+    int result = pstream_vprintf(stream, fmt, args);
     va_end(args);
     return result;
 }
 
-int pstream_formatv(pstream_t *stream, const char *fmt, va_list args) {
+int pstream_vprintf(pstream_t *stream, const char *fmt, va_list args) {
     if (!stream || !fmt)
         return PSTRING_EINVAL;
 
@@ -343,17 +343,17 @@ int pstrio_printf(pstring_t *dst, const char *fmt, ...) {
     return result;
 }
 
-int pstream_printf(pstream_t *stream, const char *fmt, ...) {
+int pstream__printf(pstream_t *stream, const char *fmt, ...) {
     va_list args;
 
     va_start(args, fmt);
-    int res = pstream_vprintf(stream, fmt, args);
+    int res = pstream__vprintf(stream, fmt, args);
     va_end(args);
 
     return res;
 }
 
-int pstream_vprintf(pstream_t *stream, const char *fmt, va_list args) {
+int pstream__vprintf(pstream_t *stream, const char *fmt, va_list args) {
     if (!stream || !fmt)
         return PSTRING_EINVAL;
 
@@ -424,7 +424,7 @@ static int srlz_text(pstream_t *stream, int type, const void *item) {
     if (type == PF_TYPE_CHAR)
         return 1 != pstream_write(stream, item, 1);
     if (type == PF_TYPE_PTR)
-        return pstream_printf(stream, "%p", *(void **)item);
+        return pstream__printf(stream, "%p", *(void **)item);
 
     if (type == PF_TYPE_CSTRING) {
         size_t length = strlen(item);
@@ -518,6 +518,7 @@ int pstream_file(pstream_t *out, FILE *file) {
     };
 
     out->vtable = &vtable;
+    out->state.ptr[0] = file;
     return PSTRING_OK;
 }
 
