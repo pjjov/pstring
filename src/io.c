@@ -278,6 +278,23 @@ int pstrvprintf(const char *fmt, va_list args) {
     return pstream_printf(&stream, fmt, args);
 }
 
+int pstrerrorf(const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    int result = pstrverrorf(fmt, args);
+    va_end(args);
+    return result;
+}
+
+int pstrverrorf(const char *fmt, va_list args) {
+    pstream_t stream;
+
+    if (pstream_file(&stream, stderr))
+        return PSTRING_EINVAL;
+
+    return pstream_printf(&stream, fmt, args);
+}
+
 int pstream_printf(pstream_t *stream, const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
