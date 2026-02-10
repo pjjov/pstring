@@ -75,6 +75,22 @@ int pstrwrite(const pstring_t *str, const char *path) {
     return PSTRING_OK;
 }
 
+int pstream_puts(pstream_t *stream, const char *str) {
+    if (!stream || !str)
+        return PSTRING_EINVAL;
+    size_t length = strlen(str);
+    if (length == 0)
+        return PSTRING_OK;
+    return pstream_write(stream, str, length);
+}
+int pstream_putp(pstream_t *stream, const pstring_t *str) {
+    if (!stream || !str)
+        return PSTRING_EINVAL;
+    if (pstrlen(str) == 0)
+        return PSTRING_OK;
+    return pstream_write(stream, pstrbuf(str), pstrlen(str));
+}
+
 static char format_parse(const char **esc, char *buffer) {
     const char *start = *esc;
     const char *curr = *esc + 1;

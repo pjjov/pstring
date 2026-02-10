@@ -171,6 +171,16 @@ PSTR_INLINE int pstream_putc(pstream_t *stream, char chr) {
     return 1 != pstream_write(stream, &chr, 1);
 }
 
+/** Writes a null-terminated string to `stream`.
+    Possible error codes: PSTRING_EINVAL, PSTRING_EIO.
+**/
+PSTR_API int pstream_puts(pstream_t *stream, const char *str);
+
+/** Writes a `pstring_t` to `stream`.
+    Possible error codes: PSTRING_EINVAL, PSTRING_EIO.
+**/
+PSTR_API int pstream_putp(pstream_t *stream, const pstring_t *str);
+
 /** Writes to stream a string formatted as `fmt` using variable arguments.
     Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
 **/
