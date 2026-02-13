@@ -476,6 +476,17 @@ int test_pstring_indent(int seed, int rep) {
     return 0;
 }
 
+int test_pstring_distance(int seed, int rep) {
+    pf_assert(3 == pstrdistance(PSTR("ca"), PSTR("abc")));
+    pf_assert(0 == pstrdistance(PSTR("abc"), PSTR("abc")));
+    pf_assert(3 == pstrdistance(PSTR("kitten"), PSTR("sitting")));
+    pf_assert(1 == pstrdistance(PSTR("ab"), PSTR("ba")));
+    pf_assert(1 == pstrdistance(PSTR("abc"), PSTR("acb")));
+    pf_assert(3 == pstrdistance(PSTR("saturday"), PSTR("sunday")));
+
+    return 0;
+}
+
 const struct pf_test suite_pstring[] = {
     { test_pstring_new, "/pstring/new", 1 },
     { test_pstring_alloc, "/pstring/alloc", 1 },
@@ -494,5 +505,6 @@ const struct pf_test suite_pstring[] = {
     { test_pstring_split, "/pstring/split", 1 },
     { test_pstring_insert_remove, "/pstring/insert_remove", 1 },
     { test_pstring_indent, "/pstring/indent", 1 },
+    { test_pstring_distance, "/pstring/distance", 1 },
     { 0 },
 };

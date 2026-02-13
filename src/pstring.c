@@ -24,6 +24,7 @@
 #include <time.h>
 
 #include <pf_bitwise.h>
+#include <pf_macro.h>
 
 #include <allocator.h>
 #include <allocator_std.h>
@@ -1230,6 +1231,68 @@ int pstrftime(pstring_t *dst, const char *fmt, struct tm *src) {
     size_t written = strftime(pstrend(dst), space, fmt, src);
     pstr__setlen(dst, pstrlen(dst) + written);
     return written > 0 ? PSTRING_OK : PSTRING_ENOMEM;
+}
+
+static int distance(const pstring_t *left, const pstring_t *right, int **rows) {
+    const char *lbuf = pstrbuf(left);
+    const char *rbuf = pstrbuf(right);
+
+#define MIN3(a, b, c) (PF_MIN(PF_MIN((a), (b)), (c)))
+    int *transpose = rows[0];
+    int *prev = rows[1];
+    int *curr = rows[2];
+
+    for (int j = 0; j <= pstrlen(right); j++)
+        prev[j] = j;
+
+    for (int i = 1; i <= pstrlen(left); i++) {
+        curr[0] = i;
+
+        for (int j = 1; j <= pstrlen(right); j++) {
+            int cost = (lbuf[i - 1] == rbuf[j - 1]) ? 0 : 1;
+
+            curr[j] = MIN3(curr[j - 1] + 1, prev[j] + 1, prev[j - 1] + cost);
+
+            if (i > 1 && j > 1 && lbuf[i - 1] == rbuf[j - 2]
+                && lbuf[i - 2] == rbuf[j - 1]) {
+                curr[j] = MIN(curr[j], transpose[j - 2] + cost);
+            }
+        }
+
+        int *tmp = transpose;
+        transpose = prev;
+        prev = curr;
+        curr = tmp;
+    }
+
+    return prev[pstrlen(right)];
+}
+
+int pstrdistance(const pstring_t *left, const pstring_t *right) {
+    if (!left || !right)
+        return PSTRING_EINVAL;
+
+    size_t mlen = PF_MAX(pstrlen(left), pstrlen(right)) + 1;
+
+    if (pstrlen(left) == 0 || pstrlen(right) == 0)
+        return mlen - 1;
+
+#define PSTRDISTANCE_BUF_SIZE 1024
+    int _buffer[3 * PSTRDISTANCE_BUF_SIZE];
+    int *buffer = _buffer;
+
+    if (mlen > PSTRDISTANCE_BUF_SIZE)
+        buffer = allocate(&standard_allocator, mlen * sizeof(int));
+
+    if (buffer == NULL)
+        return PSTRING_ENOMEM;
+
+    int *rows[3] = { buffer, &buffer[mlen], &buffer[2 * mlen] };
+    int result = distance(left, right, rows);
+
+    if (mlen > PSTRDISTANCE_BUF_SIZE)
+        deallocate(&standard_allocator, buffer, mlen * sizeof(int));
+    return result;
 }
 
 #ifdef PSTRING_USE_XXHASH

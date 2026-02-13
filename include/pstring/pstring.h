@@ -488,6 +488,11 @@ PSTR_API int pstrreplc(pstring_t *str, char src, char dst, size_t max);
 **/
 PSTR_API size_t pstrhash(const pstring_t *str);
 
+/** Returns Damerau–Levenshtein distance between `left` and `right`.
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
+**/
+PSTR_API int pstrdistance(const pstring_t *left, const pstring_t *right);
+
 /** Concatenates the contents of the file onto the end of `out`.
     Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM, PSTRING_EIO.
 **/
