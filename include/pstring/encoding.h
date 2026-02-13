@@ -33,6 +33,37 @@
 #include <stdint.h>
 typedef struct pstring_t pstring_t;
 
+/** ## NAME
+
+    **pstring-encoding** - encoding and decoding functions for **pstrings**.
+
+    ## DESCRIPTION
+
+    The **pstring** library supports encoding and decoding many common
+    formats out of the box. Since strings are assumed to be UTF-8 encoded,
+    the encoding functions are divided into two groups:
+
+    - pstrenc - for encoding UTF-8 to a particular format.
+    - pstrdec - for decoding from a particular format to UTF-8.
+
+    Both of those groups use the same function prototype, where the contents
+    of parameter `src` are encoded and concatenated to parameter `dst`:
+
+    ```c
+    int pstrenc_*(pstring_t *dst, const pstring_t *src);
+    ```
+
+    This way of handling parameters allows for encoding a stream of data.
+
+    Many operations on pstrings are encoding-agnostic, while others assume
+    an ASCII or UTF-8 encoding. For those, UTF-16 support is not explicitly
+    supported and pstrings need to be converted to UTF-8 for them to work.
+
+    [TOC]
+
+    ## REFERENCE
+**/
+
 /** Encodes the bytes from `src` as a string of hexadecimal numbers.
     Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
 **/
