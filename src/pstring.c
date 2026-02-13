@@ -1102,6 +1102,97 @@ int pstrstrip(pstring_t *str, const char *chars) {
     return pstrcut(str, left - pstrbuf(str), (right + 1) - pstrbuf(str));
 }
 
+static int count_indent(const pstring_t *str, int max, int tab, int *out) {
+    const char *chr;
+    int length = 0;
+    int count = 0;
+
+    for (chr = pstrbuf(str); count < max && chr < pstrend(str); chr++) {
+        if (*chr == ' ' || *chr == '\t') {
+            count += *chr == '\t' ? tab : 1;
+            length++;
+        } else if (*chr != '\r' && *chr != '\v' && *chr != '\f') {
+            break;
+        }
+    }
+
+    if (out)
+        *out = count;
+    return length;
+}
+
+int pstrdedent(pstring_t *str, int count, int tab) {
+    if (!str)
+        return PSTRING_EINVAL;
+
+    if (count <= 0)
+        count = INT_MAX;
+    if (tab <= 0)
+        tab = 4;
+
+    pstring_t search;
+    char *prev = pstrbuf(str);
+    char *end = pstrend(str);
+    char *match = prev;
+    char *out = prev;
+
+    pstrrange(&search, NULL, prev, pstrend(str));
+
+    while (match < end) {
+        match = pstrchr(&search, '\n');
+        if (!match)
+            match = end;
+
+        pstrrange(&search, NULL, prev, match);
+
+        int length = count_indent(&search, count, tab, NULL);
+        memmove(out, &prev[length], match - prev - length + 1);
+        out += match - prev - length + 1;
+
+        prev = match + 1;
+        pstrrange(&search, NULL, prev, pstrend(str));
+    }
+
+    pstr__setlen(str, out - pstrbuf(str) - 1);
+    return PSTRING_OK;
+}
+
+int pstrindent(pstring_t *str, int count, int tab) {
+    if (!str)
+        return PSTRING_EINVAL;
+
+    if (count < 0)
+        count = 0;
+    if (tab <= 0)
+        tab = 4;
+
+    pstring_t search;
+    const char *prev = pstrbuf(str);
+    const char *match = prev;
+
+    pstrrange(&search, NULL, prev, pstrend(str));
+    int indent, min = -1;
+
+    while (prev < pstrend(str)) {
+        if (!(match = pstrchr(&search, '\n')))
+            match = pstrend(str);
+
+        pstrrange(&search, NULL, prev, match);
+
+        if (count <= 0) {
+            count_indent(&search, INT_MAX, tab, &indent);
+            if (min == -1 || min > indent)
+                min = indent;
+        } else if (pstrinsertc(str, prev - pstrbuf(str), count, ' '))
+            return PSTRING_ENOMEM;
+
+        prev = match + count + 1;
+        pstrrange(&search, NULL, prev, pstrend(str));
+    }
+
+    return min == -1 ? 0 : min;
+}
+
 int pstrprefix(pstring_t *str, const char *prefix, size_t length) {
     if (!str || !prefix)
         return PSTRING_EINVAL;

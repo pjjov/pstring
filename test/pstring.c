@@ -446,11 +446,31 @@ int test_pstring_insert_remove(int seed, int rep) {
 
     pf_assert_ok(pstrnew(&str, "Hello!", 0, NULL));
     pf_assert_ok(pstrinserts(&str, 5, ", world", 0));
-    pf_assert(pstrequals(&str, "Hello, world!", 0));
+    pf_assert_true(pstrequals(&str, "Hello, world!", 0));
     pf_assert_ok(pstrremove(&str, 5, 12));
-    pf_assert(pstrequals(&str, "Hello!", 0));
+    pf_assert_true(pstrequals(&str, "Hello!", 0));
     pf_assert_ok(pstrinsertc(&str, 5, 3, 'o'));
-    pf_assert(pstrequals(&str, "Helloooo!", 0));
+    pf_assert_true(pstrequals(&str, "Helloooo!", 0));
+
+    pstrfree(&str);
+    return 0;
+}
+
+int test_pstring_indent(int seed, int rep) {
+    const char *base = "\tHello\n    world!\n\t \n \n    ";
+    const char *indent = "  \tHello\n      world!\n  \t \n   \n      ";
+    const char *dedent = "Hello\n   world!\n \n\n   ";
+    const char *last = "Hello\nworld!\n\n\n";
+    pstring_t str;
+
+    pf_assert_ok(pstrnew(&str, base, 0, NULL));
+    pf_assert(1 == pstrindent(&str, 0, 2));
+    pf_assert_ok(pstrindent(&str, 2, 2));
+    pf_assert_true(pstrequals(&str, indent, 0));
+    pf_assert_ok(pstrdedent(&str, 3, 2));
+    pf_assert_true(pstrequals(&str, dedent, 0));
+    pf_assert_ok(pstrdedent(&str, 0, 2));
+    pf_assert_true(pstrequals(&str, last, 0));
 
     pstrfree(&str);
     return 0;
@@ -473,5 +493,6 @@ const struct pf_test suite_pstring[] = {
     { test_pstring_replace, "/pstring/replace", 1 },
     { test_pstring_split, "/pstring/split", 1 },
     { test_pstring_insert_remove, "/pstring/insert_remove", 1 },
+    { test_pstring_indent, "/pstring/indent", 1 },
     { 0 },
 };

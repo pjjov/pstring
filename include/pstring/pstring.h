@@ -543,6 +543,22 @@ PSTR_API int pstrlstrip(pstring_t *str, const char *chars);
 **/
 PSTR_API int pstrstrip(pstring_t *str, const char *chars);
 
+/** Removes leading whitespace up to `count`, assuming that `\t` character
+    is equivalent to `tab` blank characters (defaults to 4 instead).
+    If `count` is zero or less, all whitespace is removed.
+
+    Possible error codes: PSTRING_EINVAL.
+**/
+PSTR_API int pstrdedent(pstring_t *str, int count, int tab);
+
+/** Inserts leading whitespace up to `count`, assuming that `\t` character
+    is equivalent to `tab` blank characters (defaults to 4 instead). If `count`
+    is zero or less, the minimum indentation already present is returned.
+
+    Possible error codes: PSTRING_EINVAL.
+**/
+PSTR_API int pstrindent(pstring_t *str, int count, int tab);
+
 /** Checks if `str` starts with a `prefix`. **/
 PSTR_API int pstrprefix(pstring_t *str, const char *prefix, size_t length);
 
