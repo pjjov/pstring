@@ -35,6 +35,35 @@
 typedef struct allocator_t allocator_t;
 struct tm; /* <time.h> */
 
+/** ## NAME
+
+    **pstring** - fully-featured string library for C
+
+    ## DESCRIPTION
+
+    The `pstring_t` structure describes strings using 4 variables:
+    - string's character buffer (`pstrbuf`),
+    - the number of characters inside the buffer (`pstrlen`),
+    - buffer's size/capacity (`pstrcap`),
+    - allocator which owns the buffer's memory (`pstrallocator`).
+
+    Strings initialized with `{0}` or created using `pstrnew`, `pstralloc`,
+    `pstrdup` and others, own their buffers and can be resized and expanded,
+    but require calling `pstrfree` to free memory resources.
+
+    Strings can also be initialized as slices using `pstrwrap`, `pstrslice` and
+    `pstrrange`. Since slices represent chunks of other strings, they don't
+    need to be freed, but their buffer needs to be valid during their usage.
+
+    Shorter strings can be stored directly in the `pstring_t` using SSO,
+    provided they have been allocated using the default allocator. This mechanism
+    is not noticable most of the time, but can cause obscure bugs if misused.
+
+    [TOC]
+
+    ## REFERENCE
+**/
+
 #ifndef PSTRING_SSO_EXTEND
     #define PSTRING_SSO_EXTEND 0
 #endif
