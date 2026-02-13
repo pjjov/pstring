@@ -525,6 +525,58 @@ int pstrrcat(pstring_t *dst, const pstring_t *src) {
     return PSTRING_OK;
 }
 
+static int pstr__move(pstring_t *dst, size_t at, size_t count) {
+    if (pstrreserve(dst, count))
+        return PSTRING_ENOMEM;
+
+    size_t dlen = pstrlen(dst);
+
+    if (at < dlen)
+        memmove(pstrslot(dst, at + count), pstrslot(dst, at), dlen - at);
+
+    pstr__setlen(dst, dlen + count);
+    return PSTRING_OK;
+}
+
+int pstrinsert(pstring_t *dst, size_t at, pstring_t *src) {
+    if (!dst || !src || at > pstrlen(dst))
+        return PSTRING_EINVAL;
+
+    if (pstrlen(src) == 0)
+        return PSTRING_OK;
+
+    if (pstr__move(dst, at, pstrlen(src)))
+        return PSTRING_ENOMEM;
+
+    memcpy(pstrslot(dst, at), pstrbuf(src), pstrlen(src));
+    return PSTRING_OK;
+}
+
+int pstrinsertc(pstring_t *dst, size_t at, size_t count, char chr) {
+    if (!dst || count == 0 || at > pstrlen(dst))
+        return PSTRING_EINVAL;
+
+    if (pstr__move(dst, at, count))
+        return PSTRING_ENOMEM;
+
+    memset(pstrslot(dst, at), chr, count);
+    return PSTRING_OK;
+}
+
+int pstrremove(pstring_t *str, size_t from, size_t to) {
+    if (!str || from >= to)
+        return PSTRING_EINVAL;
+
+    size_t len = pstrlen(str);
+    if (from >= len || to > len)
+        return PSTRING_EINVAL;
+
+    if (to < len)
+        memmove(pstrslot(str, from), pstrslot(str, to), len - to);
+    pstr__setlen(str, len - (to - from));
+    return PSTRING_OK;
+}
+
 int pstrcpy(pstring_t *dst, const pstring_t *src) {
     if (!dst || !src)
         return PSTRING_EINVAL;

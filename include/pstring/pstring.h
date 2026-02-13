@@ -396,6 +396,32 @@ PSTR_INLINE int pstrrcatc(pstring_t *dst, char chr) {
     return pstrrcats(dst, &chr, 1);
 }
 
+/** Inserts characters from `src` into `dst` at index `at`.
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
+**/
+PSTR_API int pstrinsert(pstring_t *dst, size_t at, pstring_t *src);
+
+/** Inserts characters from `src` into `dst` at index `at`.
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
+**/
+PSTR_INLINE int pstrinserts(
+    pstring_t *dst, size_t at, const char *src, size_t length
+) {
+    pstring_t tmp;
+    pstrwrap(&tmp, (char *)src, length, length);
+    return pstrinsert(dst, at, &tmp);
+}
+
+/** Inserts `chr` character `count` times into `dst` at index `at`.
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
+**/
+PSTR_API int pstrinsertc(pstring_t *dst, size_t at, size_t count, char chr);
+
+/** Removes characters from `str` in the specified range.
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
+**/
+PSTR_API int pstrremove(pstring_t *str, size_t from, size_t to);
+
 /** Copies the contents of `src` into `dst`
     Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
 **/

@@ -441,6 +441,21 @@ int test_pstring_split(int seed, int rep) {
     return 0;
 }
 
+int test_pstring_insert_remove(int seed, int rep) {
+    pstring_t str;
+
+    pf_assert_ok(pstrnew(&str, "Hello!", 0, NULL));
+    pf_assert_ok(pstrinserts(&str, 5, ", world", 0));
+    pf_assert(pstrequals(&str, "Hello, world!", 0));
+    pf_assert_ok(pstrremove(&str, 5, 12));
+    pf_assert(pstrequals(&str, "Hello!", 0));
+    pf_assert_ok(pstrinsertc(&str, 5, 3, 'o'));
+    pf_assert(pstrequals(&str, "Helloooo!", 0));
+
+    pstrfree(&str);
+    return 0;
+}
+
 const struct pf_test suite_pstring[] = {
     { test_pstring_new, "/pstring/new", 1 },
     { test_pstring_alloc, "/pstring/alloc", 1 },
@@ -457,5 +472,6 @@ const struct pf_test suite_pstring[] = {
     { test_pstring_substring, "/pstring/substring", 1 },
     { test_pstring_replace, "/pstring/replace", 1 },
     { test_pstring_split, "/pstring/split", 1 },
+    { test_pstring_insert_remove, "/pstring/insert_remove", 1 },
     { 0 },
 };
