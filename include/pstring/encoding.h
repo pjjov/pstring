@@ -64,6 +64,18 @@ typedef struct pstring_t pstring_t;
     ## REFERENCE
 **/
 
+typedef int(pstrenc_fn)(pstring_t *dst, const pstring_t *src);
+
+/** Converts `src` into the requested encoding format.
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
+**/
+PSTR_API int pstrenc(pstring_t *dst, const pstring_t *src, const char *enc);
+
+/** Converts `src` from the given encoding format into UTF-8.
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
+**/
+PSTR_API int pstrdec(pstring_t *dst, const pstring_t *src, const char *enc);
+
 /** Encodes the bytes from `src` as a string of hexadecimal numbers.
     Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
 **/

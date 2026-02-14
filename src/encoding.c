@@ -26,6 +26,44 @@
 
 static const char *hexdigits = "0123456789ABCDEF";
 
+static struct {
+    const char *name;
+    pstrenc_fn *enc;
+    pstrenc_fn *dec;
+} encodings[] = {
+    { "base64", pstrenc_base64, pstrdec_base64 },
+    { "cstring", pstrenc_cstring, pstrdec_cstring },
+    { "hex", pstrenc_hex, pstrdec_hex },
+    { "html", pstrenc_html, pstrdec_html },
+    { "json", pstrenc_json, pstrdec_json },
+    { "url", pstrenc_url, pstrdec_url },
+    { "xml", pstrenc_xml, pstrdec_xml },
+    { 0 },
+};
+
+static int find_encoding(const char *name) {
+    for (int i = 0; encodings[i].name; i++)
+        if (0 == strcmp(name, encodings[i].name))
+            return i;
+    return -1;
+}
+
+int pstrenc(pstring_t *dst, const pstring_t *src, const char *enc) {
+    if (!dst || !src || !enc)
+        return PSTRING_EINVAL;
+
+    int i = find_encoding(enc);
+    return i != -1 ? encodings[i].enc(dst, src) : PSTRING_ENOSYS;
+}
+
+int pstrdec(pstring_t *dst, const pstring_t *src, const char *enc) {
+    if (!dst || !src || !enc)
+        return PSTRING_EINVAL;
+
+    int i = find_encoding(enc);
+    return i != -1 ? encodings[i].dec(dst, src) : PSTRING_ENOSYS;
+}
+
 int pstrenc_hex(pstring_t *dst, const pstring_t *src) {
     if (!dst || !src)
         return PSTRING_EINVAL;
