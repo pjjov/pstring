@@ -114,15 +114,23 @@ int test_io_serialize(int seed, int rep) {
 }
 
 int test_io_format(int seed, int rep) {
-    pstring_t buffer = { 0 };
+    pstring_t buf = { 0 };
     pstring_t str = PSTRWRAP("Hello");
     struct tm tp = { .tm_mday = 31 };
     int8_t byte = 3;
 
-    pf_assert_ok(pstrfmt(&buffer, "%P %D %.2Ib", &str, "%d", &tp, byte));
-    pf_assert_true(pstrequals(&buffer, "Hello 31 03", 0));
+    pf_assert_ok(pstrfmt(&buf, "%P %D %.2Ib", &str, "%d", &tp, byte));
+    pf_assert_true(pstrequals(&buf, "Hello 31 03", 0));
 
-    pstrfree(&buffer);
+    pstrclear(&buf);
+
+    pf_assert_ok(pstrfmt(
+        &buf, "%!html%P world! Bye %!*%s!", PSTR("<Hello>"), "hex", "world"
+    ));
+
+    pf_assert_true(pstrequals(&buf, "&lt;Hello&gt; world! Bye 776F726C64!", 0));
+
+    pstrfree(&buf);
     return 0;
 }
 

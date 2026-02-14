@@ -20,6 +20,7 @@
 
 #define PF_TYPE_HELPERS
 #include <pf_typeid.h>
+#include <pstring/encoding.h>
 #include <pstring/io.h>
 #include <pstring/pstring.h>
 
@@ -84,6 +85,7 @@ int pstream_puts(pstream_t *stream, const char *str) {
         return PSTRING_OK;
     return pstream_write(stream, str, length);
 }
+
 int pstream_putp(pstream_t *stream, const pstring_t *str) {
     if (!stream || !str)
         return PSTRING_EINVAL;
@@ -91,6 +93,8 @@ int pstream_putp(pstream_t *stream, const pstring_t *str) {
         return PSTRING_OK;
     return pstream_write(stream, pstrbuf(str), pstrlen(str));
 }
+
+static int format_next(pstream_t *dst, const char **esc, va_list args);
 
 static char format_parse(const char **esc, char *buffer) {
     const char *start = *esc;
@@ -186,6 +190,41 @@ static int format_signed(long long *value, char chr, va_list args) {
     return PSTRING_OK;
 }
 
+static int format_parse_enc(const char **esc, char *out, int max) {
+    const char *end, *start = *esc;
+
+    for (end = start; *end != '%'; end++)
+        if (*end == '\0')
+            return PSTRING_EINVAL;
+
+    if (end - start >= max)
+        return PSTRING_EINVAL;
+
+    memcpy(out, start, end - start);
+    out[end - start] = '\0';
+    *esc = end;
+    return PSTRING_OK;
+}
+
+static int format_encoded(pstring_t *dst, const char **esc, va_list args) {
+    pstring_t buf = { 0 };
+    pstream_t stream;
+    char format[32];
+
+    if (format_parse_enc(esc, format, 32))
+        return PSTRING_EINVAL;
+    pstream_string(&stream, &buf);
+
+    const char *encoding = format;
+    if (0 == strcmp(format, "*"))
+        encoding = va_arg(args, const char *);
+
+    int result = format_next(&stream, esc, args)
+        || pstrenc(dst, &buf, encoding);
+    pstrfree(&buf);
+    return result;
+}
+
 static int format_next(pstream_t *dst, const char **esc, va_list args) {
     char format[32];
     int len = format_parse(esc, format);
@@ -201,6 +240,17 @@ static int format_next(pstream_t *dst, const char **esc, va_list args) {
         int typeid = va_arg(args, int);
         void *arg = va_arg(args, void *);
         return pstream_serialize(dst, typeid, arg);
+    }
+
+    case '!': {
+        pstring_t enc = { 0 };
+
+        int result = format_encoded(&enc, esc, args);
+        if (result == PSTRING_OK)
+            pstream_putp(dst, &enc);
+
+        pstrfree(&enc);
+        return result;
     }
 
     case 'D': {
@@ -292,7 +342,7 @@ int pstrvprintf(const char *fmt, va_list args) {
     if (pstream_file(&stream, stdout))
         return PSTRING_EINVAL;
 
-    return pstream_printf(&stream, fmt, args);
+    return pstream_vprintf(&stream, fmt, args);
 }
 
 int pstrerrorf(const char *fmt, ...) {
@@ -309,7 +359,7 @@ int pstrverrorf(const char *fmt, va_list args) {
     if (pstream_file(&stream, stderr))
         return PSTRING_EINVAL;
 
-    return pstream_printf(&stream, fmt, args);
+    return pstream_vprintf(&stream, fmt, args);
 }
 
 int pstream_printf(pstream_t *stream, const char *fmt, ...) {

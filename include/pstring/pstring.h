@@ -514,6 +514,7 @@ PSTR_API int pstrftime(pstring_t *dst, const char *fmt, struct tm *src);
     - `%P` - prints the passed `pstring_t *` argument.
     - `%D` - prints calendar time using the passed format.
     - `%?` - serializes a pointer to a type indicated by the passed `int` id.
+    - `%!` - encodes the following format option using the specified encoding.
     - `%Ib`, `%Ub` - prints `int8_t` and `uint8_t` respectively.
     - `%Iw`, `%Uw` - prints `int16_t` and `uint16_t` respectively.
     - `%Id`, `%Ud` - prints `int32_t` and `uint32_t` respectively.
@@ -533,6 +534,10 @@ PSTR_API int pstrftime(pstring_t *dst, const char *fmt, struct tm *src);
 
         struct tm date = { .tm_mday = 30 };
         pstrfmt(str, "%D", "%A %c", &date);
+
+        pstrfmt(str, "%!html%P world!", PSTR("<Hello>"));
+
+        pstrfmt(str, "Bye %!*%s!", "hex", "world");
     ```
 
     > If you don't want to use extensions, use `pstrio_printf` instead.
