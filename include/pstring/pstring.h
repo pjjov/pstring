@@ -114,7 +114,6 @@ PSTR_INLINE char *pstrbuf(const pstring_t *str) {
     if (!str)
         return NULL;
 #endif
-
     return str->buffer ? str->buffer : (char *)str->sso.buffer;
 }
 
@@ -124,7 +123,6 @@ PSTR_INLINE size_t pstrlen(const pstring_t *str) {
     if (!str)
         return 0;
 #endif
-
     size_t mask = (str->buffer == NULL) - 1;
     return PSTRING_BLEND(str->sso.length, str->base.length, mask);
 }
@@ -135,7 +133,6 @@ PSTR_INLINE size_t pstrcap(const pstring_t *str) {
     if (!str)
         return 0;
 #endif
-
     size_t mask = (str->buffer == NULL) - 1;
     return PSTRING_BLEND(PSTRING_SSO_SIZE, str->base.capacity, mask);
 }
@@ -293,32 +290,23 @@ PSTR_API int pstrcmp(const pstring_t *left, const pstring_t *right);
 
 /** Searches for character `ch` from the start of `str`,
     returning it's address if found and `NULL` otherwise.
+
+    The `pstrrchr` variant searches from the end instead.
 **/
 PSTR_API char *pstrchr(const pstring_t *str, int ch);
-
-/** Searches for character `ch` from the end of `str`,
-    returning it's address if found and `NULL` otherwise.
-**/
 PSTR_API char *pstrrchr(const pstring_t *str, int ch);
 
 /** Searches for a character in `str` that is also found in `set`,
     returning it's address if found and `NULL` otherwise.
+
+    The `pstrrpbrk` and `pstrrcpbrk` variants search from the end instead.
+
+    `pstrcpbrk` and `pstrrcpbrk` variants search for a character that is not
+    found in `set` returning it's address if found and `NULL` otherwise.
 **/
 PSTR_API char *pstrpbrk(const pstring_t *str, const char *set);
-
-/** Searches for a character in `str` that is not found in `set`,
-    returning it's address if found and `NULL` otherwise.
-**/
 PSTR_API char *pstrcpbrk(const pstring_t *str, const char *set);
-
-/** Searches for a character in `str` that is also found in `set`,
-    from behind, returning it's address if found and `NULL` otherwise.
-**/
 PSTR_API char *pstrrpbrk(const pstring_t *str, const char *set);
-
-/** Searches for a character in `str` that is not found in `set`,
-    from behind, returning it's address if found and `NULL` otherwise.
-**/
 PSTR_API char *pstrrcpbrk(const pstring_t *str, const char *set);
 
 /** Searches for `sub` inside `str`, returning the address of the
@@ -354,14 +342,11 @@ PSTR_API int pstrtok(pstring_t *dst, const pstring_t *src, const char *set);
 PSTR_API int pstrsplit(
     pstring_t *dst, const pstring_t *src, const pstring_t *sep
 );
-
-/** Null-terminated string variant of `pstrsplit`. **/
 PSTR_INLINE int pstrsplits(
     pstring_t *dst, const pstring_t *src, const char *sep, size_t length
 ) {
     if (sep == NULL)
         return pstrsplit(dst, src, NULL);
-
     pstring_t tmp;
     pstrwrap(&tmp, (char *)sep, length, length);
     return pstrsplit(dst, src, &tmp);
@@ -369,58 +354,33 @@ PSTR_INLINE int pstrsplits(
 
 /** Returns the number of consecutive characters that appear
     at the start of `str` that are included in the `set`.
+
+    The `pstrrspn` and `pstrrcspn` variants count from the end instead.
+
+    `pstrcspn` and `pstrrcspn` variants count the number of consecutive
+    characters that aren't included in `set`, from start and end respectively.
 **/
 PSTR_API size_t pstrspn(const pstring_t *str, const char *set);
-
-/** Returns the number of consecutive characters that appear
-    at the start of `str` that are not included in the `set`.
-**/
 PSTR_API size_t pstrcspn(const pstring_t *str, const char *set);
-
-/** Returns the number of consecutive characters that appear
-    at the end of `str` that are included in the `set`.
-**/
 PSTR_API size_t pstrrspn(const pstring_t *str, const char *set);
-
-/** Returns the number of consecutive characters that appear
-    at the end of `str` that are not included in the `set`.
-**/
 PSTR_API size_t pstrrcspn(const pstring_t *str, const char *set);
 
 /** Concatenates `src` onto the end of `dst`.
     Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
 **/
 PSTR_API int pstrcat(pstring_t *dst, const pstring_t *src);
-
-/** Concatenates `src` onto the end of `dst`.
-    If `length` is zero, `src` is treated as a null-terminated string.
-    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
-**/
 PSTR_API int pstrcats(pstring_t *dst, const char *src, size_t length);
-
-/** Concatenates character `chr` onto the end of `dst`.
-    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
-**/
 PSTR_API int pstrcatc(pstring_t *dst, char chr);
 
 /** Concatenates `src` onto the start of `dst`.
     Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
 **/
 PSTR_API int pstrrcat(pstring_t *dst, const pstring_t *src);
-
-/** Concatenates `src` onto the start of `dst`.
-    If `length` is zero, `src` is treated as a null-terminated string.
-    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
-**/
 PSTR_INLINE int pstrrcats(pstring_t *dst, const char *src, size_t length) {
     pstring_t tmp;
     pstrwrap(&tmp, (char *)src, length, length);
     return pstrrcat(dst, &tmp);
 }
-
-/** Concatenates character `chr` onto the start of `dst`.
-    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
-**/
 PSTR_INLINE int pstrrcatc(pstring_t *dst, char chr) {
     return pstrrcats(dst, &chr, 1);
 }
@@ -429,10 +389,6 @@ PSTR_INLINE int pstrrcatc(pstring_t *dst, char chr) {
     Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
 **/
 PSTR_API int pstrinsert(pstring_t *dst, size_t at, pstring_t *src);
-
-/** Inserts characters from `src` into `dst` at index `at`.
-    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
-**/
 PSTR_INLINE int pstrinserts(
     pstring_t *dst, size_t at, const char *src, size_t length
 ) {
@@ -468,19 +424,9 @@ PSTR_API int pstrjoin(pstring_t *dst, const pstring_t *srcs, size_t count);
 PSTR_API int pstrrepl(
     pstring_t *str, const pstring_t *src, const pstring_t *dst, size_t max
 );
-
-/** Replaces at most `max` instances of substring `src` with `dst`.
-    If `max` is zero, all instances of `src` will be replaced.
-    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
-**/
 PSTR_API int pstrrepls(
     pstring_t *str, const char *src, const char *dst, size_t max
 );
-
-/** Replaces at most `max` instances of character `src` with `dst`.
-    If `max` is zero, all instances of `src` will be replaced.
-    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
-**/
 PSTR_API int pstrreplc(pstring_t *str, char src, char dst, size_t max);
 
 /** Returns a non-unique integer value representing the contents of `str`.
@@ -545,42 +491,27 @@ PSTR_API int pstrftime(pstring_t *dst, const char *fmt, struct tm *src);
     Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
 **/
 PSTR_API int pstrfmt(pstring_t *dst, const char *fmt, ...);
-
-/** Variable argument list variant of `pstrfmt`. **/
 PSTR_API int pstrfmtv(pstring_t *dst, const char *fmt, va_list args);
 
 /** Prints a formatted string to standard output **/
 PSTR_API int pstrprintf(const char *fmt, ...);
-
-/** Prints a formatted string to standard output **/
 PSTR_API int pstrvprintf(const char *fmt, va_list args);
 
 /** Prints a formatted string to standard error output **/
 PSTR_API int pstrerrorf(const char *fmt, ...);
-
-/** Prints a formatted string to standard error output **/
 PSTR_API int pstrverrorf(const char *fmt, va_list args);
-
-/** Removes trailing characters from `str` that are specified in
-    `chars`. If `str` is a slice, it will be resliced to omit them instead.
-
-    Possible error codes: PSTRING_EINVAL.
-**/
-PSTR_API int pstrrstrip(pstring_t *str, const char *chars);
-
-/** Removes leading characters from `str` that are specified in
-    `chars`. If `str` is a slice, it will be resliced to omit them instead.
-
-    Possible error codes: PSTRING_EINVAL.
-**/
-PSTR_API int pstrlstrip(pstring_t *str, const char *chars);
 
 /** Removes leading and trailing characters from `str` that are specified in
     `chars`. If `str` is a slice, it will be resliced to omit them instead.
 
+    The `pstrlstrip` variant only removes leading, while `pstrrstrip` only
+    removes trailing characters from `str` that are specified in `chars`.
+
     Possible error codes: PSTRING_EINVAL.
 **/
 PSTR_API int pstrstrip(pstring_t *str, const char *chars);
+PSTR_API int pstrlstrip(pstring_t *str, const char *chars);
+PSTR_API int pstrrstrip(pstring_t *str, const char *chars);
 
 /** Removes leading whitespace up to `count`, assuming that `\t` character
     is equivalent to `tab` blank characters (defaults to 4 instead).
