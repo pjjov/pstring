@@ -19,6 +19,7 @@
 */
 
 #define PF_TYPE_HELPERS
+#include <pf_macro.h>
 #include <pf_typeid.h>
 #include <pstring/encoding.h>
 #include <pstring/io.h>
@@ -515,6 +516,12 @@ static int srlz_text(pstream_t *stream, int type, const void *item) {
         return length != pstream_write(stream, item, length);
     }
 
+    if (type == PSTRING_TYPE) {
+        const pstring_t *str = item;
+        size_t length = pstrlen(str);
+        return length != pstream_write(stream, pstrbuf(item), length);
+    }
+
     return PSTRING_EINVAL;
 }
 
@@ -702,4 +709,40 @@ int pstream_string(pstream_t *out, pstring_t *str) {
     out->state.ptr[0] = str;
     out->state.ptr[1] = (void *)(uintptr_t)pstrlen(str);
     return PSTRING_OK;
+}
+
+static int save_member(
+    pstream_t *stream, const void *obj, const struct pstrmodel_member *member
+) {
+    const void *item = PF_OFFSET(obj, member->offset);
+
+    if (member->type == PSTRMODEL_TYPE)
+        return pstream_save(stream, item, member->model);
+
+    return pstream_serialize(stream, PSTRMODEL__KEY, member->name)
+        || pstream_serialize(stream, member->type, item);
+}
+
+int pstream_save(
+    pstream_t *stream, const void *obj, const struct pstrmodel *model
+) {
+    if (!stream || !obj || !model || !model->members)
+        return PSTRING_EINVAL;
+
+    int result = PSTRING_OK;
+
+    result = pstream_serialize(stream, PSTRMODEL__BEGIN, model->name);
+
+    for (size_t i = 0; result && model->members[i].type; i++)
+        result = save_member(stream, obj, &model->members[i]);
+
+    result = pstream_serialize(stream, PSTRMODEL__END, model->name);
+
+    return result;
+}
+
+int pstream_load(
+    pstream_t *stream, const void *obj, const struct pstrmodel *model
+) {
+    return PSTRING_ENOSYS;
 }

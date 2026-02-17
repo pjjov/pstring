@@ -45,6 +45,14 @@ enum pstream_origin {
 
 enum pstring_typeid {
     PSTRING_TYPE = 3 | ('P' << 8),
+    PSTRING_PTR_TYPE,
+    PSTRDICT_TYPE,
+    PSTREAM_TYPE,
+    PSTRMODEL_TYPE,
+
+    PSTRMODEL__KEY,
+    PSTRMODEL__BEGIN,
+    PSTRMODEL__END,
 };
 
 /** Concatenates string formated by standard library functions to `dst`.
@@ -76,6 +84,18 @@ struct pstream_t {
         void *_align;
         void *ptr[PSTREAM_STATE_SIZE / sizeof(void *)];
     } state;
+};
+
+struct pstrmodel_member {
+    const char *name;
+    int type;
+    size_t offset;
+    void *model;
+};
+
+struct pstrmodel {
+    const char *name;
+    struct pstrmodel_member *members;
 };
 
 /** Opens the file located at `path` as a stream.
@@ -216,5 +236,13 @@ PSTR_INLINE int pstream_deserialize(pstream_t *stream, int type, void *item) {
     PSTREAM_ASSERT(deserialize, -22);
     return stream->vtable->deserialize(stream, type, item);
 }
+
+PSTR_API int pstream_save(
+    pstream_t *stream, const void *obj, const struct pstrmodel *model
+);
+
+PSTR_API int pstream_load(
+    pstream_t *stream, const void *obj, const struct pstrmodel *model
+);
 
 #endif
