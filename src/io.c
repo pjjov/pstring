@@ -84,7 +84,9 @@ int pstream_puts(pstream_t *stream, const char *str) {
     size_t length = strlen(str);
     if (length == 0)
         return PSTRING_OK;
-    return pstream_write(stream, str, length);
+
+    size_t written = pstream_write(stream, str, length);
+    return length != written ? PSTRING_EIO : PSTRING_OK;
 }
 
 int pstream_putp(pstream_t *stream, const pstring_t *str) {
@@ -92,7 +94,9 @@ int pstream_putp(pstream_t *stream, const pstring_t *str) {
         return PSTRING_EINVAL;
     if (pstrlen(str) == 0)
         return PSTRING_OK;
-    return pstream_write(stream, pstrbuf(str), pstrlen(str));
+
+    size_t written = pstream_write(stream, pstrbuf(str), pstrlen(str));
+    return pstrlen(str) != written ? PSTRING_EIO : PSTRING_OK;
 }
 
 static int format_next(pstream_t *dst, const char **esc, va_list args);
@@ -296,6 +300,7 @@ static int format_next(pstream_t *dst, const char **esc, va_list args) {
     }
 
     default:
+        /* todo: passing args is UB */
         return pstream__vprintf(dst, format, args);
     }
 
@@ -507,19 +512,16 @@ static int srlz_text(pstream_t *stream, int type, const void *item) {
     if (pf_type_is_float(type))
         return srlz_text_float(stream, type, item);
     if (type == PF_TYPE_CHAR)
-        return 1 != pstream_write(stream, item, 1);
+        return pstream_putc(stream, *(const char *)item);
     if (type == PF_TYPE_PTR)
-        return pstream__printf(stream, "%p", *(void **)item);
+        return pstream__printf(stream, "%p", *(const void **)item);
+    if (type == PF_TYPE_CSTRING)
+        return pstream_puts(stream, *(const char **)item);
 
-    if (type == PF_TYPE_CSTRING) {
-        size_t length = strlen(item);
-        return length != pstream_write(stream, item, length);
-    }
-
-    if (type == PSTRING_TYPE) {
-        const pstring_t *str = item;
-        size_t length = pstrlen(str);
-        return length != pstream_write(stream, pstrbuf(item), length);
+    if (type == PSTRING_TYPE || type == PSTRING_PTR_TYPE) {
+        return pstream_putp(
+            stream, type == PSTRING_TYPE ? item : *(const pstring_t **)item
+        );
     }
 
     return PSTRING_EINVAL;
@@ -556,12 +558,12 @@ int pstream_open(pstream_t *out, const char *path, const char *mode) {
 
 static size_t file_read(pstream_t *stream, void *buffer, size_t size) {
     FILE *file = stream->state.ptr[0];
-    return fread(buffer, size, 1, file);
+    return fread(buffer, 1, size, file);
 }
 
 static size_t file_write(pstream_t *stream, const void *buffer, size_t size) {
     FILE *file = stream->state.ptr[0];
-    return fwrite(buffer, size, 1, file);
+    return fwrite(buffer, 1, size, file);
 }
 
 static int file_seek(pstream_t *stream, long offset, int origin) {
@@ -733,6 +735,18 @@ static void json_close(pstream_t *stream) {
     return pstream_close(json->base);
 }
 
+static int json_seek(pstream_t *stream, long offset, int origin) {
+    return PSTRING_ENOSYS;
+}
+
+static size_t json_write(pstream_t *stream, const void *buffer, size_t size) {
+    return 0;
+}
+
+static size_t json_read(pstream_t *stream, void *buffer, size_t size) {
+    return 0;
+}
+
 static int json_serialize(pstream_t *stream, int type, const void *item) {
     struct json_stream *json = JSON_STREAM(stream);
     pstring_t str;
@@ -807,7 +821,10 @@ int pstream_json(pstream_t *out, pstream_t *base) {
         return PSTRING_ENOSYS;
 
     static const struct pstream_vt vtable = {
+        .read = json_read,
+        .write = json_write,
         .tell = json_tell,
+        .seek = json_seek,
         .flush = json_flush,
         .close = json_close,
         .serialize = json_serialize,

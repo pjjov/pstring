@@ -105,7 +105,9 @@ int test_io_serialize(int seed, int rep) {
 
     pf_assert(pstrequal(&buffer, PSTR("1 2 3 4 5 ")));
     pf_assert_ok(pstream_seek(&stream, 0, PSTR_SEEK_SET));
-    pf_assert_ok(pstream_serialize(&stream, PF_TYPE_CSTRING, "Hello!"));
+
+    const char *str = "Hello!";
+    pf_assert_ok(pstream_serialize(&stream, PF_TYPE_CSTRING, &str));
     pf_assert(pstrequal(&buffer, PSTR("Hello!4 5 ")));
 
     pstream_close(&stream);

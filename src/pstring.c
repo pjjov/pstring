@@ -1194,7 +1194,7 @@ int pstrindent(pstring_t *str, int count, int tab) {
     return min == -1 ? 0 : min;
 }
 
-int pstrprefix(pstring_t *str, const char *prefix, size_t length) {
+int pstrprefix(const pstring_t *str, const char *prefix, size_t length) {
     if (!str || !prefix)
         return PSTRING_EINVAL;
 
@@ -1207,7 +1207,7 @@ int pstrprefix(pstring_t *str, const char *prefix, size_t length) {
     return 0 == memcmp(pstrbuf(str), prefix, length);
 }
 
-int pstrsuffix(pstring_t *str, const char *suffix, size_t length) {
+int pstrsuffix(const pstring_t *str, const char *suffix, size_t length) {
     if (!str || !suffix)
         return PSTRING_EINVAL;
 

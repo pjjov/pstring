@@ -530,10 +530,14 @@ PSTR_API int pstrdedent(pstring_t *str, int count, int tab);
 PSTR_API int pstrindent(pstring_t *str, int count, int tab);
 
 /** Checks if `str` starts with a `prefix`. **/
-PSTR_API int pstrprefix(pstring_t *str, const char *prefix, size_t length);
+PSTR_API int pstrprefix(
+    const pstring_t *str, const char *prefix, size_t length
+);
 
 /** Checks if `str` ends with a `suffix`. **/
-PSTR_API int pstrsuffix(pstring_t *str, const char *suffix, size_t length);
+PSTR_API int pstrsuffix(
+    const pstring_t *str, const char *suffix, size_t length
+);
 
 /** Naively sets the length of `str` to `length` **/
 PSTR_INLINE void pstr__setlen(pstring_t *str, size_t length) {

@@ -105,7 +105,7 @@ PSTR_API int pstrdict_finsert(
 );
 
 /** Callback that traverses the key-value pairs of a dictionary. **/
-typedef int (pstrdict_fn)(void *user, pstring_t *key, void *value);
+typedef int(pstrdict_fn)(void *user, pstring_t *key, void *value);
 
 /** Calls `fn` for each key-value pair inside `dict`.
     If a non-zero value is returned by `fn`, the iteration is interrupted.
