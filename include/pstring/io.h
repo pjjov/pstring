@@ -117,6 +117,11 @@ PSTR_API int pstream_file(pstream_t *out, FILE *file);
 **/
 PSTR_API int pstream_string(pstream_t *out, pstring_t *str);
 
+/** Initializes a stream that can serialize or deserialize JSON data.
+    Possible error codes: PSTRING_EINVAL, PSTRING_EIO.
+**/
+PSTR_API int pstream_json(pstream_t *out, pstream_t *base);
+
 /** Initializes `out` as a custom stream.
     `vtable` and it's members cannot be `NULL`.
 

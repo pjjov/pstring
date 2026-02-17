@@ -711,6 +711,116 @@ int pstream_string(pstream_t *out, pstring_t *str) {
     return PSTRING_OK;
 }
 
+#define JSON_STREAM(x) ((struct json_stream *)&(x)->state._size)
+
+struct json_stream {
+    pstream_t *base;
+    int prev;
+};
+
+static size_t json_tell(pstream_t *stream) {
+    struct json_stream *json = JSON_STREAM(stream);
+    return pstream_tell(json->base);
+}
+
+static void json_flush(pstream_t *stream) {
+    struct json_stream *json = JSON_STREAM(stream);
+    return pstream_flush(json->base);
+}
+
+static void json_close(pstream_t *stream) {
+    struct json_stream *json = JSON_STREAM(stream);
+    return pstream_close(json->base);
+}
+
+static int json_serialize(pstream_t *stream, int type, const void *item) {
+    struct json_stream *json = JSON_STREAM(stream);
+    pstring_t str;
+    int res = PSTRING_OK;
+
+    if (type == PSTRMODEL__KEY && json->prev != PSTRMODEL__BEGIN)
+        res = pstream_putc(json->base, ',');
+
+    if (res != PSTRING_OK)
+        return res;
+
+    switch (type) {
+    case PSTRMODEL__BEGIN:
+        res = pstream_putc(json->base, '{');
+        break;
+    case PSTRMODEL__END:
+        res = pstream_putc(json->base, '}');
+        break;
+    case PSTRMODEL__KEY:
+        pstrwrap(&str, (char *)item, 0, 0);
+        res = pstream_printf(json->base, "\"%!json%P\":", &str);
+        break;
+
+    case PF_TYPE_BOOL: {
+        pf_bool value = *(pf_bool *)item;
+        res = pstream_puts(json->base, value ? "true" : "false");
+        break;
+    }
+
+    case PF_TYPE_CHAR:
+        res = pstream__printf(json->base, "\"%c\"", *(char *)item);
+        break; /* todo: escape character */
+    case PF_TYPE_CSTRING:
+        pstrwrap(&str, *(char **)item, 0, 0);
+        res = pstream_printf(json->base, "\"%!json%P\"", &str);
+        break;
+    case PSTRING_TYPE:
+        res = pstream_printf(json->base, "\"%!json%P\"", item);
+        break;
+    case PSTRING_PTR_TYPE:
+        res = pstream_printf(json->base, "\"%!json%P\"", *(pstring_t **)item);
+        break;
+
+    case PF_TYPE_PTR:
+        res = pstream__printf(json->base, "\"%p\"", *(void **)item);
+        break;
+
+    default:
+        if (pf_type_is_integer(type))
+            res = srlz_text_int(json->base, type, item);
+        else if (pf_type_is_float(type))
+            res = srlz_text_float(json->base, type, item);
+        else
+            res = PSTRING_ENOSYS;
+    }
+
+    json->prev = type;
+    return res;
+}
+
+static int json_deserialize(pstream_t *stream, int type, void *item) {
+    return PSTRING_ENOSYS;
+}
+
+int pstream_json(pstream_t *out, pstream_t *base) {
+    if (!out || !base)
+        return PSTRING_EINVAL;
+
+    if (sizeof(struct json_stream) > PSTREAM_STATE_SIZE)
+        return PSTRING_ENOSYS;
+    if (_Alignof(struct json_stream) > _Alignof(void *))
+        return PSTRING_ENOSYS;
+
+    static const struct pstream_vt vtable = {
+        .tell = json_tell,
+        .flush = json_flush,
+        .close = json_close,
+        .serialize = json_serialize,
+        .deserialize = json_deserialize,
+    };
+
+    struct json_stream *json = JSON_STREAM(out);
+    out->vtable = &vtable;
+    json->base = base;
+    json->prev = PSTRMODEL__END;
+    return PSTRING_OK;
+}
+
 static int save_member(
     pstream_t *stream, const void *obj, const struct pstrmodel_member *member
 ) {
@@ -733,7 +843,7 @@ int pstream_save(
 
     result = pstream_serialize(stream, PSTRMODEL__BEGIN, model->name);
 
-    for (size_t i = 0; result && model->members[i].type; i++)
+    for (size_t i = 0; !result && model->members[i].type; i++)
         result = save_member(stream, obj, &model->members[i]);
 
     result = pstream_serialize(stream, PSTRMODEL__END, model->name);

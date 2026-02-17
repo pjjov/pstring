@@ -134,10 +134,52 @@ int test_io_format(int seed, int rep) {
     return 0;
 }
 
+struct example {
+    int i;
+    pstring_t pstr;
+    double d;
+    const char *str;
+};
+
+struct pstrmodel_member members[] = {
+    { "i", PF_TYPE_INT, offsetof(struct example, i), NULL },
+    { "pstr", PSTRING_TYPE, offsetof(struct example, pstr), NULL },
+    { "d", PF_TYPE_DOUBLE, offsetof(struct example, d), NULL },
+    { "str", PF_TYPE_CSTRING, offsetof(struct example, str), NULL },
+    { 0 },
+};
+
+struct pstrmodel model = { "struct example", members };
+
+int test_io_json(int seed, int rep) {
+    struct example e = { 13, PSTRWRAP("Hello\n"), 5.5, "\"world\"" };
+
+    pstring_t str = { 0 };
+    pstream_t base, json;
+
+    pf_assert_ok(pstream_string(&base, &str));
+    pf_assert_ok(pstream_json(&json, &base));
+
+    pf_assert_ok(pstream_save(&json, &e, &model));
+
+    pf_assert_true(pstrequals(
+        &str,
+        "{\"i\":13,\"pstr\":\"Hello\\n\",\"d\":5.500000,\"str\":"
+        "\"\\\"world\\\"\"}",
+        0
+    ));
+
+    pstream_close(&json);
+    pstream_close(&base);
+    pstrfree(&str);
+    return 0;
+}
+
 const struct pf_test suite_io[] = {
     { test_io_read, "/pstring/io/read", 1 },
     { test_io_write, "/pstring/io/write", 1 },
     { test_io_serialize, "/pstring/io/serialize", 1 },
     { test_io_format, "/pstring/io/format", 1 },
+    { test_io_json, "/pstring/io/json", 1 },
     { 0 },
 };
