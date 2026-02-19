@@ -1,0 +1,363 @@
+.\" pstring - String library for C with SIMD acceleration
+.\"
+.\" SPDX-FileCopyrightText: 2026 Предраг Јовановић
+.\" SPDX-License-Identifier: Apache-2.0
+.TH pstring-encoding 3 "February 19, 2026" pstring 
+.SH NAME
+
+.PP
+\fBpstring\-encoding\fR \- encoding and decoding functions for \fBpstrings\fR\&.
+
+.SH DESCRIPTION
+
+.PP
+The \fBpstring\fR library supports encoding and decoding many common formats out of the box\&. Since strings are assumed to be UTF\-8 encoded, the encoding functions are divided into two groups:
+
+.IP \(bu 2
+pstrenc \- for encoding UTF\-8 to a particular format\&.
+.IP \(bu 2
+pstrdec \- for decoding from a particular format to UTF\-8\&.
+
+.PP
+Both of those groups use the same function prototype, where the contents of parameter \fBsrc\fR are encoded and concatenated to parameter \fBdst\fR:
+
+.nf
+.RS
+int pstrenc_*(pstring_t *dst, const pstring_t *src);
+.RE
+.fi
+
+.PP
+This way of handling parameters allows for encoding a stream of data\&.
+
+.PP
+Many operations on pstrings are encoding\-agnostic, while others assume an ASCII or UTF\-8 encoding\&. For those, UTF\-16 support is not explicitly supported and pstrings need to be converted to UTF\-8 for them to work\&.
+
+.PP
+.SH SYNOPSIS
+.P
+.nf
+PSTR_API int pstrenc(pstring_t *dst, const pstring_t *src, const char *enc);
+PSTR_API int pstrdec(pstring_t *dst, const pstring_t *src, const char *enc);
+PSTR_API int pstrenc_hex(pstring_t *dst, const pstring_t *src);
+PSTR_API int pstrdec_hex(pstring_t *dst, const pstring_t *src);
+PSTR_API int pstrenc_url(pstring_t *dst, const pstring_t *src);
+PSTR_API int pstrdec_url(pstring_t *dst, const pstring_t *src);
+PSTR_API int pstrenc_base64(pstring_t *dst, const pstring_t *src);
+PSTR_API int pstrenc_base64url(pstring_t *dst, const pstring_t *src);
+PSTR_API int pstrenc_base64table(
+    pstring_t *dst, const pstring_t *src, const pstring_t *table
+);
+PSTR_API int pstrdec_base64(pstring_t *dst, const pstring_t *src);
+PSTR_API int pstrdec_base64url(pstring_t *dst, const pstring_t *src);
+PSTR_API int pstrdec_base64table(
+    pstring_t *dst, const pstring_t *src, const pstring_t *table
+);
+PSTR_API int pstrenc_cstring(pstring_t *dst, const pstring_t *src);
+PSTR_API int pstrdec_cstring(pstring_t *dst, const pstring_t *src);
+PSTR_API int pstrenc_utf8(pstring_t *dst, const uint32_t *src, size_t length);
+PSTR_API int pstrdec_utf8(uint32_t *dst, size_t *length, const pstring_t *src);
+PSTR_API int pstrenc_json(pstring_t *dst, const pstring_t *src);
+PSTR_API int pstrdec_json(pstring_t *dst, const pstring_t *src);
+PSTR_API int pstrenc_xml(pstring_t *dst, const pstring_t *src);
+PSTR_API int pstrdec_xml(pstring_t *dst, const pstring_t *src);
+PSTR_INLINE int pstrenc_html(pstring_t *dst, const pstring_t *src) 
+PSTR_INLINE int pstrdec_html(pstring_t *dst, const pstring_t *src) 
+PSTR_API const char *pstr_read_utf8(
+    const char *chr, const char *end, uint32_t *out
+);
+PSTR_API char *pstr_write_utf8(char *out, uint32_t c);
+.fi
+
+
+.SH REFERENCE
+
+.SS pstrenc
+
+.nf
+.RS
+PSTR_API int pstrenc(pstring_t *dst, const pstring_t *src, const char *enc);
+.RE
+.fi
+
+.PP
+Converts \fBsrc\fR into the requested encoding format\&. Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM\&.
+
+.SS pstrdec
+
+.nf
+.RS
+PSTR_API int pstrdec(pstring_t *dst, const pstring_t *src, const char *enc);
+.RE
+.fi
+
+.PP
+Converts \fBsrc\fR from the given encoding format into UTF\-8\&. Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM\&.
+
+.SS pstrenc_hex
+
+.nf
+.RS
+PSTR_API int pstrenc_hex(pstring_t *dst, const pstring_t *src);
+.RE
+.fi
+
+.PP
+Encodes the bytes from \fBsrc\fR as a string of hexadecimal numbers\&. Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM\&.
+
+.SS pstrdec_hex
+
+.nf
+.RS
+PSTR_API int pstrdec_hex(pstring_t *dst, const pstring_t *src);
+.RE
+.fi
+
+.PP
+Decodes a series of hexadecimal numbers from \fBsrc\fR into a series of bytes\&. The source string should have an even length and contain only hexadecimal digits ('0123456789abcdefABCDEF')\&. Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM\&.
+
+.SS pstrenc_url
+
+.nf
+.RS
+PSTR_API int pstrenc_url(pstring_t *dst, const pstring_t *src);
+.RE
+.fi
+
+.PP
+Encodes \fBsrc\fR into a URL compatible string\&. Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM\&.
+
+.SS pstrdec_url
+
+.nf
+.RS
+PSTR_API int pstrdec_url(pstring_t *dst, const pstring_t *src);
+.RE
+.fi
+
+.PP
+Decodes a URL\-encoded string from \fBsrc\fR\&. Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM\&.
+
+.SS pstrenc_base64
+
+.nf
+.RS
+PSTR_API int pstrenc_base64(pstring_t *dst, const pstring_t *src);
+.RE
+.fi
+
+.PP
+Encodes \fBsrc\fR into a Base64\-encoded string\&. Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM\&.
+
+.nf
+.RS
+PSTR_API int pstrenc_base64url(pstring_t *dst, const pstring_t *src);
+.RE
+.fi
+
+.PP
+Encodes \fBsrc\fR into a URL\-safe Base64\-encoded string\&. Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM\&.
+
+.SS pstrenc_base64table
+
+.nf
+.RS
+PSTR_API int pstrenc_base64table(
+    pstring_t *dst, const pstring_t *src, const pstring_t *table
+);
+.RE
+.fi
+
+.PP
+Encodes \fBsrc\fR into a Base64\-encoded string using the provided translation table\&. \fBtable\fR must be exactly 64 characters long\&. Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM\&.
+
+.SS pstrdec_base64
+
+.nf
+.RS
+PSTR_API int pstrdec_base64(pstring_t *dst, const pstring_t *src);
+.RE
+.fi
+
+.PP
+Decodes a Base64\-encoded string from \fBsrc\fR\&. Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM\&.
+
+.nf
+.RS
+PSTR_API int pstrdec_base64url(pstring_t *dst, const pstring_t *src);
+.RE
+.fi
+
+.PP
+Decodes a URL\-safe Base64\-encoded string from \fBsrc\fR\&. Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM\&.
+
+.SS pstrdec_base64table
+
+.nf
+.RS
+PSTR_API int pstrdec_base64table(
+    pstring_t *dst, const pstring_t *src, const pstring_t *table
+);
+.RE
+.fi
+
+.PP
+Decodes a Base64\-encoded string from \fBsrc\fR using the provided translation table\&. \fBtable\fR must be exactly 64 characters long\&. Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM\&.
+
+.SS pstrenc_cstring
+
+.nf
+.RS
+PSTR_API int pstrenc_cstring(pstring_t *dst, const pstring_t *src);
+.RE
+.fi
+
+.PP
+Stores an escaped version of \fBsrc\fR into \fBdst\fR, which, if surrounded by quotes, is safe to use as a string literal in C source code\&. Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM\&.
+
+.SS pstrdec_cstring
+
+.nf
+.RS
+PSTR_API int pstrdec_cstring(pstring_t *dst, const pstring_t *src);
+.RE
+.fi
+
+.PP
+Expands C escape sequences found in \fBsrc\fR\&. Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM\&.
+
+.SS pstrenc_utf8
+
+.nf
+.RS
+PSTR_API int pstrenc_utf8(pstring_t *dst, const uint32_t *src, size_t length);
+.RE
+.fi
+
+.PP
+Encodes codepoints from \fBsrc\fR as UTF8 characters\&. Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM\&.
+
+.SS pstrdec_utf8
+
+.nf
+.RS
+PSTR_API int pstrdec_utf8(uint32_t *dst, size_t *length, const pstring_t *src);
+.RE
+.fi
+
+.PP
+Decodes UTF\-8 characters from \fBsrc\fR as Unicode codepoints\&. Parameter \fBlength\fR should point to the maximum length of the buffer \fBdst\fR, which will be changed by the function to the number of codepoints decoded\&. Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM\&.
+
+.SS pstrenc_json
+
+.nf
+.RS
+PSTR_API int pstrenc_json(pstring_t *dst, const pstring_t *src);
+.RE
+.fi
+
+.PP
+Encodes \fBsrc\fR as a JSON string into \fBdst\fR\&. Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM\&.
+
+.SS pstrdec_json
+
+.nf
+.RS
+PSTR_API int pstrdec_json(pstring_t *dst, const pstring_t *src);
+.RE
+.fi
+
+.PP
+Decodes a JSON string from \fBsrc\fR into \fBdst\fR\&. Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM\&.
+
+.SS pstrenc_xml
+
+.nf
+.RS
+PSTR_API int pstrenc_xml(pstring_t *dst, const pstring_t *src);
+.RE
+.fi
+
+.PP
+Encodes \fBsrc\fR as a XML string into \fBdst\fR\&. Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM, PSTRING_ENOENT\&.
+
+.SS pstrdec_xml
+
+.nf
+.RS
+PSTR_API int pstrdec_xml(pstring_t *dst, const pstring_t *src);
+.RE
+.fi
+
+.PP
+Decodes a XML string from \fBsrc\fR into \fBdst\fR\&. Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM, PSTRING_ENOENT\&.
+
+.SS pstrenc_html
+
+.nf
+.RS
+PSTR_INLINE int pstrenc_html(pstring_t *dst, const pstring_t *src) {
+    return pstrenc_xml(dst, src);
+}
+.RE
+.fi
+
+.PP
+Encodes \fBsrc\fR as a HTML string into \fBdst\fR\&. Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM, PSTRING_ENOENT\&.
+
+.SS pstrdec_html
+
+.nf
+.RS
+PSTR_INLINE int pstrdec_html(pstring_t *dst, const pstring_t *src) {
+    return pstrdec_xml(dst, src);
+}
+.RE
+.fi
+
+.PP
+Decodes a HTML string from \fBsrc\fR into \fBdst\fR\&. Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM, PSTRING_ENOENT\&.
+
+.SS pstr_read_utf8
+
+.nf
+.RS
+PSTR_API const char *pstr_read_utf8(
+    const char *chr, const char *end, uint32_t *out
+);
+.RE
+.fi
+
+.PP
+Reads a UTF\-8 character and stores it in \fBout\fR if it's not \fBNULL\fR\&. Returns a pointer to the first byte after the read character\&.
+
+.SS pstr_write_utf8
+
+.nf
+.RS
+PSTR_API char *pstr_write_utf8(char *out, uint32_t c);
+.RE
+.fi
+
+.PP
+Writes a UTF\-8 character and stores it in \fBout\fR, returning the end of the written byte sequence\&. The output buffer should be big enough to store at least 4 bytes\&.
+
+
+.SH RETURN VALUE
+.PP
+For functions that return signed integers, a \fB0\fR indicates that the function exited successfully.
+If instead a negative number is returned, it indicates a specific error that occurred during function's execution.
+The returned error codes are made to resemble POSIX in both meaning and numeric value.
+
+.PP
+Some functions can also return boolean constants (\fIPSTRING_TRUE\fR and \fPSTRING_FALSE\fR) alongside negative error codes,
+which might require you to explicitly compare returned values in order to prevent bugs.
+
+.SH SEE ALSO
+.BR pstring (3),
+.BR pstring-dictionary (3),
+.BR pstring-encoding (3),
+.BR pstring-io (3),
+.BR pstring-pattern (3).
+.SH AUTHOR
+Copyright (C) 2026 Предраг Јовановић

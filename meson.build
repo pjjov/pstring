@@ -68,7 +68,8 @@ install_headers(
 )
 
 install_man(
-    'docs/pstring.3'
+    'docs/pstring.3',
+    'docs/pstring-encoding.3'
 )
 
 test('pstring/pstring', tests, args: ['pstring'], protocol: 'tap')
