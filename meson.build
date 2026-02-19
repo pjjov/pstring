@@ -67,6 +67,10 @@ install_headers(
     subdir: 'pstring'
 )
 
+install_man(
+    'docs/pstring.3'
+)
+
 test('pstring/pstring', tests, args: ['pstring'], protocol: 'tap')
 test('pstring/dictionary', tests, args: ['dictionary'], protocol: 'tap')
 test('pstring/encoding', tests, args: ['encoding'], protocol: 'tap')

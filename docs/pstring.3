@@ -1,0 +1,987 @@
+.\" pstring - String library for C with SIMD acceleration
+.\"
+.\" SPDX-FileCopyrightText: 2026 Предраг Јовановић
+.\" SPDX-License-Identifier: Apache-2.0
+.TH pstring 3 "February 19, 2026" pstring 
+.SH NAME
+
+.PP
+\fBpstring\fR \- fully\-featured string library for C
+
+.SH DESCRIPTION
+
+.PP
+The \fBpstring_t\fR structure describes strings using 4 variables:
+
+.IP \(bu 2
+string's character buffer (\fBpstrbuf\fR),
+.IP \(bu 2
+the number of characters inside the buffer (\fBpstrlen\fR),
+.IP \(bu 2
+buffer's size/capacity (\fBpstrcap\fR),
+.IP \(bu 2
+allocator which owns the buffer's memory (\fBpstrallocator\fR)\&.
+
+.PP
+Strings initialized with \fB{0}\fR or created using \fBpstrnew\fR, \fBpstralloc\fR, \fBpstrdup\fR and others, own their buffers and can be resized and expanded, but require calling \fBpstrfree\fR to free memory resources\&.
+
+.PP
+Strings can also be initialized as slices using \fBpstrwrap\fR, \fBpstrslice\fR and \fBpstrrange\fR\&. Since slices represent chunks of other strings, they don't need to be freed, but their buffer needs to be valid during their usage\&.
+
+.PP
+Shorter strings can be stored directly in the \fBpstring_t\fR using SSO, provided they have been allocated using the default allocator\&. This mechanism is not noticable most of the time, but can cause obscure bugs if misused\&.
+
+.PP
+.SH SYNOPSIS
+.P
+.nf
+enum pstring_error 
+PSTR_INLINE char *pstrbuf(const pstring_t *str) 
+PSTR_INLINE size_t pstrlen(const pstring_t *str) 
+PSTR_INLINE size_t pstrcap(const pstring_t *str) 
+PSTR_INLINE allocator_t *pstrallocator(const pstring_t *str) 
+PSTR_INLINE int pstrsso(pstring_t *str) 
+PSTR_INLINE int pstrowned(pstring_t *str) 
+PSTR_INLINE char *pstrend(const pstring_t *str) 
+PSTR_INLINE char pstrget(const pstring_t *str, size_t i) 
+PSTR_INLINE char *pstrslot(const pstring_t *str, size_t i) 
+PSTR_API int pstrnew(
+    pstring_t *out, const char *str, size_t len, allocator_t *alloc
+);
+PSTR_API int pstrdup(
+    pstring_t *out, const pstring_t *str, allocator_t *allocator
+);
+PSTR_API int pstralloc(pstring_t *out, size_t capacity, allocator_t *alloc);
+PSTR_API void pstrdetect(void);
+PSTR_API int pstrwrap(
+    pstring_t *out, char *buffer, size_t length, size_t capacity
+);
+PSTR_API int pstrslice(
+    pstring_t *out, const pstring_t *str, size_t from, size_t to
+);
+PSTR_API int pstrcut(pstring_t *str, size_t from, size_t to);
+PSTR_API int pstrrange(
+    pstring_t *out, const pstring_t *str, const char *from, const char *to
+);
+PSTR_API int pstrreserve(pstring_t *str, size_t count);
+PSTR_API int pstrgrow(pstring_t *str, size_t count);
+PSTR_API int pstrshrink(pstring_t *str);
+PSTR_API int pstrequal(const pstring_t *left, const pstring_t *right);
+PSTR_API int pstrequals(
+    const pstring_t *left, const char *right, size_t length
+);
+PSTR_API int pstrcmp(const pstring_t *left, const pstring_t *right);
+PSTR_API char *pstrchr(const pstring_t *str, int ch);
+PSTR_API char *pstrrchr(const pstring_t *str, int ch);
+PSTR_API char *pstrpbrk(const pstring_t *str, const char *set);
+PSTR_API char *pstrcpbrk(const pstring_t *str, const char *set);
+PSTR_API char *pstrrpbrk(const pstring_t *str, const char *set);
+PSTR_API char *pstrrcpbrk(const pstring_t *str, const char *set);
+PSTR_API char *pstrstr(const pstring_t *str, const pstring_t *sub);
+PSTR_API int pstrtok(pstring_t *dst, const pstring_t *src, const char *set);
+PSTR_API int pstrsplit(
+    pstring_t *dst, const pstring_t *src, const pstring_t *sep
+);
+PSTR_INLINE int pstrsplits(
+    pstring_t *dst, const pstring_t *src, const char *sep, size_t length
+) 
+PSTR_API size_t pstrspn(const pstring_t *str, const char *set);
+PSTR_API size_t pstrcspn(const pstring_t *str, const char *set);
+PSTR_API size_t pstrrspn(const pstring_t *str, const char *set);
+PSTR_API size_t pstrrcspn(const pstring_t *str, const char *set);
+PSTR_API int pstrcat(pstring_t *dst, const pstring_t *src);
+PSTR_API int pstrcats(pstring_t *dst, const char *src, size_t length);
+PSTR_API int pstrcatc(pstring_t *dst, char chr);
+PSTR_API int pstrrcat(pstring_t *dst, const pstring_t *src);
+PSTR_INLINE int pstrrcats(pstring_t *dst, const char *src, size_t length) 
+PSTR_API int pstrinsert(pstring_t *dst, size_t at, pstring_t *src);
+PSTR_INLINE int pstrinserts(
+    pstring_t *dst, size_t at, const char *src, size_t length
+) 
+PSTR_API int pstrinsertc(pstring_t *dst, size_t at, size_t count, char chr);
+PSTR_API int pstrremove(pstring_t *str, size_t from, size_t to);
+PSTR_API int pstrcpy(pstring_t *dst, const pstring_t *src);
+PSTR_API int pstrjoin(pstring_t *dst, const pstring_t *srcs, size_t count);
+PSTR_API int pstrrepl(
+    pstring_t *str, const pstring_t *src, const pstring_t *dst, size_t max
+);
+PSTR_API int pstrrepls(
+    pstring_t *str, const char *src, const char *dst, size_t max
+);
+PSTR_API int pstrreplc(pstring_t *str, char src, char dst, size_t max);
+PSTR_API size_t pstrhash(const pstring_t *str);
+PSTR_API int pstrdistance(const pstring_t *left, const pstring_t *right);
+PSTR_API int pstrread(pstring_t *out, const char *path);
+PSTR_API int pstrwrite(const pstring_t *str, const char *path);
+PSTR_API int pstrftime(pstring_t *dst, const char *fmt, struct tm *src);
+PSTR_API int pstrfmt(pstring_t *dst, const char *fmt, ...);
+PSTR_API int pstrfmtv(pstring_t *dst, const char *fmt, va_list args);
+PSTR_API int pstrprintf(const char *fmt, ...);
+PSTR_API int pstrvprintf(const char *fmt, va_list args);
+PSTR_API int pstrerrorf(const char *fmt, ...);
+PSTR_API int pstrverrorf(const char *fmt, va_list args);
+PSTR_API int pstrstrip(pstring_t *str, const char *chars);
+PSTR_API int pstrlstrip(pstring_t *str, const char *chars);
+PSTR_API int pstrrstrip(pstring_t *str, const char *chars);
+PSTR_API int pstrdedent(pstring_t *str, int count, int tab);
+PSTR_API int pstrindent(pstring_t *str, int count, int tab);
+PSTR_API int pstrprefix(
+    const pstring_t *str, const char *prefix, size_t length
+);
+PSTR_API int pstrsuffix(
+    const pstring_t *str, const char *suffix, size_t length
+);
+PSTR_INLINE void pstr__setlen(pstring_t *str, size_t length) 
+.fi
+
+
+.SH REFERENCE
+
+.SS 
+
+.nf
+.RS
+enum pstring_error {
+    PSTRING_OK = 0,
+    PSTRING_ENOENT = -2,
+    PSTRING_EINTR = -4,
+    PSTRING_EIO = -5,
+    PSTRING_ENOMEM = -12,
+    PSTRING_EEXIST = -17,
+    PSTRING_EINVAL = -22,
+    PSTRING_EDOM = -33,
+    PSTRING_ERANGE = -34,
+    PSTRING_ENOSYS = -38,
+    PSTRING_ENODATA = -61,
+};
+.RE
+.fi
+
+.PP
+Error codes are negated versions of POSIX ones\&.
+
+.SS pstrbuf
+
+.nf
+.RS
+PSTR_INLINE char *pstrbuf(const pstring_t *str) {
+#ifndef PSTRING_SKIP_NULL_CHECKS
+    if (!str)
+        return NULL;
+#endif
+    return str->buffer ? str->buffer : (char *)str->sso\&.buffer;
+}
+.RE
+.fi
+
+.PP
+Returns the character buffer of \fBstr\fR\&. If \fBstr\fR is resized after calling this function, the returned pointer should be considered invalid\&.
+
+.SS pstrlen
+
+.nf
+.RS
+PSTR_INLINE size_t pstrlen(const pstring_t *str) {
+#ifndef PSTRING_SKIP_NULL_CHECKS
+    if (!str)
+        return 0;
+#endif
+    size_t mask = (str->buffer == NULL) - 1;
+    return PSTRING_BLEND(str->sso\&.length, str->base\&.length, mask);
+}
+.RE
+.fi
+
+.PP
+Returns the length, number of bytes, of \fBstr\fR\&.
+
+.SS pstrcap
+
+.nf
+.RS
+PSTR_INLINE size_t pstrcap(const pstring_t *str) {
+#ifndef PSTRING_SKIP_NULL_CHECKS
+    if (!str)
+        return 0;
+#endif
+    size_t mask = (str->buffer == NULL) - 1;
+    return PSTRING_BLEND(PSTRING_SSO_SIZE, str->base\&.capacity, mask);
+}
+.RE
+.fi
+
+.PP
+Returns the number of bytes allocated by \fBstr\fR\&.
+
+.SS pstrallocator
+
+.nf
+.RS
+PSTR_INLINE allocator_t *pstrallocator(const pstring_t *str) {
+    return str && str->buffer ? str->base\&.allocator : NULL;
+}
+.RE
+.fi
+
+.PP
+Returns the allocator used by \fBstr\fR or \fBNULL\fR if it's a slice\&.
+
+.SS pstrsso
+
+.nf
+.RS
+PSTR_INLINE int pstrsso(pstring_t *str) { return str && str->buffer == NULL; }
+.RE
+.fi
+
+.PP
+Checks if \fBstr\fR is stored on the stack\&.
+
+.SS pstrowned
+
+.nf
+.RS
+PSTR_INLINE int pstrowned(pstring_t *str) {
+    return pstrsso(str) || pstrallocator(str) != NULL;
+}
+.RE
+.fi
+
+.PP
+Checks if \fBstr\fR can be resized (not a slice)\&.
+
+.SS pstrend
+
+.nf
+.RS
+PSTR_INLINE char *pstrend(const pstring_t *str) {
+    return &pstrbuf(str)[pstrlen(str)];
+}
+.RE
+.fi
+
+.PP
+Returns the address pointing to the end of the character buffer, which, if \fBstr\fR is owned, points to a \fB\\0\fR character\&.
+
+.SS pstrget
+
+.nf
+.RS
+PSTR_INLINE char pstrget(const pstring_t *str, size_t i) {
+    return (i < pstrlen(str)) ? pstrbuf(str)[i] : '\\0';
+}
+.RE
+.fi
+
+.PP
+Returns the character at index \fBi\fR or \fB'\\0'\fR if out of bounds
+
+.SS pstrslot
+
+.nf
+.RS
+PSTR_INLINE char *pstrslot(const pstring_t *str, size_t i) {
+    return (i < pstrcap(str)) ? &pstrbuf(str)[i] : NULL;
+}
+.RE
+.fi
+
+.PP
+Returns the pointer to the slot \fBi\fR or \fBNULL\fR if out of bounds
+
+.SS pstrnew
+
+.nf
+.RS
+PSTR_API int pstrnew(
+    pstring_t *out, const char *str, size_t len, allocator_t *alloc
+);
+.RE
+.fi
+
+.PP
+Initializes \fBout\fR by copying the contents of \fBstr\fR\&. If \fBlen\fR is \fB0\fR and \fBstr\fR is not empty, \fBstrlen\fR is called\&. If \fBalloc\fR is \fBNULL\fR, the standard allocator is used\&. Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM\&.
+
+.SS pstrdup
+
+.nf
+.RS
+PSTR_API int pstrdup(
+    pstring_t *out, const pstring_t *str, allocator_t *allocator
+);
+.RE
+.fi
+
+.PP
+Copies the contents of \fBstr\fR into \fBout\fR, like \fBpstrnew\fR\&. You can use this function to turn slices into owned pstrings\&. Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM\&.
+
+.SS pstralloc
+
+.nf
+.RS
+PSTR_API int pstralloc(pstring_t *out, size_t capacity, allocator_t *alloc);
+.RE
+.fi
+
+.PP
+Initializes \fBout\fR and reserves \fBcapacity\fR bytes\&. Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM\&.
+
+.SS pstrdetect
+
+.nf
+.RS
+PSTR_API void pstrdetect(void);
+.RE
+.fi
+
+.PP
+Frees all resources used by \fBstr\fR, if it is owned\&. */ PSTR_API void pstrfree(pstring_t *str);
+
+.PP
+/** When \fBPSTRING_DETECT\fR is defined, this function detects the SIMD capabilities of the CPU at runtime\&. Otherwise, the function immediately exits, while the SIMD detection occurs at compile\-time\&.
+
+.SS pstrwrap
+
+.nf
+.RS
+PSTR_API int pstrwrap(
+    pstring_t *out, char *buffer, size_t length, size_t capacity
+);
+.RE
+.fi
+
+.PP
+Initializes \fBout\fR as a slice, using the \fBbuffer\fR for storage\&. If \fBlength\fR is \fB0\fR, \fBstrlen\fR is used to calculate it's length\&. If \fBlength\fR is \fB0\fR and capacity is not, \fBstrnlen\fR is used instead\&. If \fBcapacity\fR is \fB0\fR it is set to the computed length\&. Possible error codes: PSTRING_EINVAL\&.
+
+.SS pstrslice
+
+.nf
+.RS
+PSTR_API int pstrslice(
+    pstring_t *out, const pstring_t *str, size_t from, size_t to
+);
+.RE
+.fi
+
+.PP
+Initializes \fBout\fR as a slice of bytes from \fBstr\fR, starting at \fBfrom\fR (inclusive) and ending at \fBto\fR (exclusive)\&. Both indices are set to the length of \fBstr\fR if they are larger\&. If \fBto\fR is smaller than \fBfrom\fR, a zero\-length slice at \fBto\fR is taken\&. Possible error codes: PSTRING_EINVAL\&.
+
+.SS pstrcut
+
+.nf
+.RS
+PSTR_API int pstrcut(pstring_t *str, size_t from, size_t to);
+.RE
+.fi
+
+.PP
+Removes characters around the specified slice of bytes from \fBstr\fR, starting at \fBfrom\fR (inclusive) and ending at \fBto\fR (exclusive)\&. Both indices are set to the length of \fBstr\fR if they are larger\&. If \fBto\fR is smaller than \fBfrom\fR, the length of \fBstr\fR is set to zero\&.
+
+.PP
+If \fBstr\fR is a slice, it is repositioned instead\&.
+
+
+.PP
+Possible error codes: PSTRING_EINVAL\&.
+
+.SS pstrrange
+
+.nf
+.RS
+PSTR_API int pstrrange(
+    pstring_t *out, const pstring_t *str, const char *from, const char *to
+);
+.RE
+.fi
+
+.PP
+Initializes \fBout\fR as a range of bytes from \fBstr\fR, starting at \fBfrom\fR (inclusive) and ending at \fBto\fR (exclusive)\&. If \fBfrom\fR is \fBNULL\fR or invalid, it's set to the start of the pstring\&. If \fBto\fR is \fBNULL\fR or invalid, it's set to the end of the pstring\&. Possible error codes: PSTRING_EINVAL\&.
+
+.SS PSTRWRAP
+
+.nf
+.RS
+#define PSTRWRAP(str)                                  \\
+    ((pstring_t) { \&.buffer = (str),                    \\
+                   \&.base\&.length = sizeof((str)) - 1,   \\
+                   \&.base\&.capacity = sizeof((str)) - 1, \\
+                   \&.base\&.allocator = 0 })
+.RE
+.fi
+
+.PP
+Initializes a \fBpstring_t\fR as a slice of \fBstr\fR, which is assumed to be a null\-terminated statically allocated string/array\&.
+
+.SS PSTR
+
+.nf
+.RS
+#define PSTR(str) (&PSTRWRAP((str)))
+.RE
+.fi
+
+.PP
+Returns a reference to \fBpstring_t\fR that is initialized as a slice of \fBstr\fR, which is assumed to be a null\-terminated statically allocated string/array\&.
+
+.SS pstrreserve
+
+.nf
+.RS
+PSTR_API int pstrreserve(pstring_t *str, size_t count);
+.RE
+.fi
+
+.PP
+Reserves space to fit additional \fBcount\fR items in \fBstr\fR Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM\&.
+
+.SS pstrgrow
+
+.nf
+.RS
+PSTR_API int pstrgrow(pstring_t *str, size_t count);
+.RE
+.fi
+
+.PP
+Extends \fBstr\fR's buffer by at least \fBcount\fR bytes\&. Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM\&.
+
+.SS pstrshrink
+
+.nf
+.RS
+PSTR_API int pstrshrink(pstring_t *str);
+.RE
+.fi
+
+.PP
+Shrinks \fBstr\fR's buffer to use as little space as possible\&. Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM\&.
+
+.SS pstrclear
+
+.nf
+.RS
+#define pstrclear(str) pstr__setlen((str), 0)
+.RE
+.fi
+
+.PP
+Removes all characters from \fBstr\fR, setting it's length to 0\&.
+
+.SS pstrequal
+
+.nf
+.RS
+PSTR_API int pstrequal(const pstring_t *left, const pstring_t *right);
+.RE
+.fi
+
+.PP
+Checks if \fBleft\fR and \fBright\fR pstring are equal\&.
+
+.SS pstrequals
+
+.nf
+.RS
+PSTR_API int pstrequals(
+    const pstring_t *left, const char *right, size_t length
+);
+.RE
+.fi
+
+.PP
+Checks if \fBleft\fR pstring and \fBright\fR string are equal\&. If \fBlength\fR is zero, \fBright\fR is treated as a null\-terminated string\&.
+
+.SS pstrcmp
+
+.nf
+.RS
+PSTR_API int pstrcmp(const pstring_t *left, const pstring_t *right);
+.RE
+.fi
+
+.PP
+Compares \fBleft\fR and \fBright\fR lexicographically, returning:
+
+.IP \(bu 2
+a positive number if \fBleft\fR should appear before \fBright\fR\&.
+.IP \(bu 2
+a negative number if \fBleft\fR should appear after \fBright\fR\&.
+.IP \(bu 2
+\fB0\fR if they are equal\&.
+
+.SS pstrchr
+
+.nf
+.RS
+PSTR_API char *pstrchr(const pstring_t *str, int ch);
+PSTR_API char *pstrrchr(const pstring_t *str, int ch);
+.RE
+.fi
+
+.PP
+Searches for character \fBch\fR from the start of \fBstr\fR, returning it's address if found and \fBNULL\fR otherwise\&.
+
+.PP
+The \fBpstrrchr\fR variant searches from the end instead\&.
+
+.SS pstrpbrk
+
+.nf
+.RS
+PSTR_API char *pstrpbrk(const pstring_t *str, const char *set);
+PSTR_API char *pstrcpbrk(const pstring_t *str, const char *set);
+PSTR_API char *pstrrpbrk(const pstring_t *str, const char *set);
+PSTR_API char *pstrrcpbrk(const pstring_t *str, const char *set);
+.RE
+.fi
+
+.PP
+Searches for a character in \fBstr\fR that is also found in \fBset\fR, returning it's address if found and \fBNULL\fR otherwise\&.
+
+.PP
+The \fBpstrrpbrk\fR and \fBpstrrcpbrk\fR variants search from the end instead\&.
+
+.PP
+\fBpstrcpbrk\fR and \fBpstrrcpbrk\fR variants search for a character that is not found in \fBset\fR returning it's address if found and \fBNULL\fR otherwise\&.
+
+.SS pstrstr
+
+.nf
+.RS
+PSTR_API char *pstrstr(const pstring_t *str, const pstring_t *sub);
+.RE
+.fi
+
+.PP
+Searches for \fBsub\fR inside \fBstr\fR, returning the address of the first character of the first match, or \fBNULL\fR if not found\&.
+
+.SS pstrtok
+
+.nf
+.RS
+PSTR_API int pstrtok(pstring_t *dst, const pstring_t *src, const char *set);
+.RE
+.fi
+
+.PP
+Tokenizes input string \fBsrc\fR into a sequence of tokens separated by a character inside \fBset\fR\&. If not found, \fBPSTRING_ENOENT\fR is returned\&.
+
+.PP
+Tokens and state are stored in \fBdst\fR\&. To initialize \fBdst\fR, call this function with \fBNULL\fR passed for \fBset\fR\&.
+
+.PP
+The next token is started at the first character not found in \fBset\fR and ends in the first character that is found in \fBset\fR, or the end of \fBsrc\fR\&.
+
+.PP
+Possible error codes: PSTRING_EINVAL, PSTRING_ENOENT\&.
+
+.SS pstrsplit
+
+.nf
+.RS
+PSTR_API int pstrsplit(
+    pstring_t *dst, const pstring_t *src, const pstring_t *sep
+);
+PSTR_INLINE int pstrsplits(
+    pstring_t *dst, const pstring_t *src, const char *sep, size_t length
+) {
+    if (sep == NULL)
+        return pstrsplit(dst, src, NULL);
+    pstring_t tmp;
+    pstrwrap(&tmp, (char *)sep, length, length);
+    return pstrsplit(dst, src, &tmp);
+}
+.RE
+.fi
+
+.PP
+Tokenizes input string \fBsrc\fR into a sequence of tokens separated by a substring \fBsep\fR\&. If not found, \fBPSTRING_ENOENT\fR is returned\&.
+
+.PP
+Tokens and state are stored in \fBdst\fR\&. To initialize \fBdst\fR, call this function with \fBNULL\fR passed for \fBsep\fR\&.
+
+.PP
+If \fBsep\fR comes right after the end of \fBdst\fR, it is skipped before searching for the next token\&. This behaviour can be suprising when using  different separators between function calls\&.
+
+.PP
+Possible error codes: PSTRING_EINVAL, PSTRING_ENOENT\&.
+
+.SS pstrspn
+
+.nf
+.RS
+PSTR_API size_t pstrspn(const pstring_t *str, const char *set);
+PSTR_API size_t pstrcspn(const pstring_t *str, const char *set);
+PSTR_API size_t pstrrspn(const pstring_t *str, const char *set);
+PSTR_API size_t pstrrcspn(const pstring_t *str, const char *set);
+.RE
+.fi
+
+.PP
+Returns the number of consecutive characters that appear at the start of \fBstr\fR that are included in the \fBset\fR\&.
+
+.PP
+The \fBpstrrspn\fR and \fBpstrrcspn\fR variants count from the end instead\&.
+
+.PP
+\fBpstrcspn\fR and \fBpstrrcspn\fR variants count the number of consecutive characters that aren't included in \fBset\fR, from start and end respectively\&.
+
+.SS pstrcat
+
+.nf
+.RS
+PSTR_API int pstrcat(pstring_t *dst, const pstring_t *src);
+PSTR_API int pstrcats(pstring_t *dst, const char *src, size_t length);
+PSTR_API int pstrcatc(pstring_t *dst, char chr);
+.RE
+.fi
+
+.PP
+Concatenates \fBsrc\fR onto the end of \fBdst\fR\&. Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM\&.
+
+.SS pstrrcat
+
+.nf
+.RS
+PSTR_API int pstrrcat(pstring_t *dst, const pstring_t *src);
+PSTR_INLINE int pstrrcats(pstring_t *dst, const char *src, size_t length) {
+    pstring_t tmp;
+    pstrwrap(&tmp, (char *)src, length, length);
+    return pstrrcat(dst, &tmp);
+}
+PSTR_INLINE int pstrrcatc(pstring_t *dst, char chr) {
+    return pstrrcats(dst, &chr, 1);
+}
+.RE
+.fi
+
+.PP
+Concatenates \fBsrc\fR onto the start of \fBdst\fR\&. Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM\&.
+
+.SS pstrinsert
+
+.nf
+.RS
+PSTR_API int pstrinsert(pstring_t *dst, size_t at, pstring_t *src);
+PSTR_INLINE int pstrinserts(
+    pstring_t *dst, size_t at, const char *src, size_t length
+) {
+    pstring_t tmp;
+    pstrwrap(&tmp, (char *)src, length, length);
+    return pstrinsert(dst, at, &tmp);
+}
+.RE
+.fi
+
+.PP
+Inserts characters from \fBsrc\fR into \fBdst\fR at index \fBat\fR\&. Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM\&.
+
+.SS pstrinsertc
+
+.nf
+.RS
+PSTR_API int pstrinsertc(pstring_t *dst, size_t at, size_t count, char chr);
+.RE
+.fi
+
+.PP
+Inserts \fBchr\fR character \fBcount\fR times into \fBdst\fR at index \fBat\fR\&. Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM\&.
+
+.SS pstrremove
+
+.nf
+.RS
+PSTR_API int pstrremove(pstring_t *str, size_t from, size_t to);
+.RE
+.fi
+
+.PP
+Removes characters from \fBstr\fR in the specified range\&. Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM\&.
+
+.SS pstrcpy
+
+.nf
+.RS
+PSTR_API int pstrcpy(pstring_t *dst, const pstring_t *src);
+.RE
+.fi
+
+.PP
+Copies the contents of \fBsrc\fR into \fBdst\fR Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM\&.
+
+.SS pstrjoin
+
+.nf
+.RS
+PSTR_API int pstrjoin(pstring_t *dst, const pstring_t *srcs, size_t count);
+.RE
+.fi
+
+.PP
+Concatenates \fBcount\fR pstrings from \fBsrcs\fR onto \fBdst\fR\&. Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM\&.
+
+.SS pstrrepl
+
+.nf
+.RS
+PSTR_API int pstrrepl(
+    pstring_t *str, const pstring_t *src, const pstring_t *dst, size_t max
+);
+PSTR_API int pstrrepls(
+    pstring_t *str, const char *src, const char *dst, size_t max
+);
+PSTR_API int pstrreplc(pstring_t *str, char src, char dst, size_t max);
+.RE
+.fi
+
+.PP
+Replaces at most \fBmax\fR instances of substring \fBsrc\fR with \fBdst\fR\&. If \fBmax\fR is zero, all instances of \fBsrc\fR will be replaced\&. Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM\&.
+
+.SS pstrhash
+
+.nf
+.RS
+PSTR_API size_t pstrhash(const pstring_t *str);
+.RE
+.fi
+
+.PP
+Returns a non\-unique integer value representing the contents of \fBstr\fR\&. Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM\&.
+
+.SS pstrdistance
+
+.nf
+.RS
+PSTR_API int pstrdistance(const pstring_t *left, const pstring_t *right);
+.RE
+.fi
+
+.PP
+Returns Damerau–Levenshtein distance between \fBleft\fR and \fBright\fR\&. Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM\&.
+
+.SS pstrread
+
+.nf
+.RS
+PSTR_API int pstrread(pstring_t *out, const char *path);
+.RE
+.fi
+
+.PP
+Concatenates the contents of the file onto the end of \fBout\fR\&. Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM, PSTRING_EIO\&.
+
+.SS pstrwrite
+
+.nf
+.RS
+PSTR_API int pstrwrite(const pstring_t *str, const char *path);
+.RE
+.fi
+
+.PP
+Writes the entire string \fBout\fR to the file at \fBpath\fR\&. Possible error codes: PSTRING_EINVAL, PSTRING_EIO\&.
+
+.SS pstrftime
+
+.nf
+.RS
+PSTR_API int pstrftime(pstring_t *dst, const char *fmt, struct tm *src);
+.RE
+.fi
+
+.PP
+Concatenates a string formatted by \fBfmt\fR using date and time from \fBsrc\fR\&. Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM\&.
+
+.SS pstrfmt
+
+.nf
+.RS
+PSTR_API int pstrfmt(pstring_t *dst, const char *fmt, \&.\&.\&.);
+PSTR_API int pstrfmtv(pstring_t *dst, const char *fmt, va_list args);
+.RE
+.fi
+
+.PP
+Concatenates a string formatted according to \fBfmt\fR\&. Alongside standard formatting options, this function offers a couple of extensions:
+
+.IP \(bu 2
+\fB%P\fR \- prints the passed \fBpstring_t *\fR argument\&.
+.IP \(bu 2
+\fB%D\fR \- prints calendar time using the passed format\&.
+.IP \(bu 2
+\fB%?\fR \- serializes a pointer to a type indicated by the passed \fBint\fR id\&.
+.IP \(bu 2
+\fB%!\fR \- encodes the following format option using the specified encoding\&.
+.IP \(bu 2
+\fB%Ib\fR, \fB%Ub\fR \- prints \fBint8_t\fR and \fBuint8_t\fR respectively\&.
+.IP \(bu 2
+\fB%Iw\fR, \fB%Uw\fR \- prints \fBint16_t\fR and \fBuint16_t\fR respectively\&.
+.IP \(bu 2
+\fB%Id\fR, \fB%Ud\fR \- prints \fBint32_t\fR and \fBuint32_t\fR respectively\&.
+.IP \(bu 2
+\fB%Iq\fR, \fB%Uq\fR \- prints \fBint64_t\fR and \fBuint64_t\fR respectively\&.
+.IP \(bu 2
+\fB%Im\fR, \fB%Um\fR \- prints \fBintmax_t\fR and \fBuintmax_t\fR respectively\&.
+.IP \(bu 2
+\fB%Ip\fR, \fB%Up\fR \- prints \fBintptr_t\fR and \fBuintptr_t\fR respectively\&.
+.IP \(bu 2
+\fB%IP\fR, \fB%Us\fR \- prints \fBptrdiff_t\fR and \fBsize_t\fR respectively\&.
+
+.PP
+Example of extension formats:
+
+.nf
+.RS
+    pstring_t *str, *other;
+    pstrfmt(str, "%P", other);
+
+    int num;
+    pstrfmt(str, "%?", PF_TYPE_INT, &num);
+
+    struct tm date = { \&.tm_mday = 30 };
+    pstrfmt(str, "%D", "%A %c", &date);
+
+    pstrfmt(str, "%!html%P world!", PSTR("<Hello>"));
+
+    pstrfmt(str, "Bye %!*%s!", "hex", "world");
+.RE
+.fi
+
+.PP
+If you don't want to use extensions, use \fBpstrio_printf\fR instead\&.
+
+
+.PP
+Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM\&.
+
+.SS pstrprintf
+
+.nf
+.RS
+PSTR_API int pstrprintf(const char *fmt, \&.\&.\&.);
+PSTR_API int pstrvprintf(const char *fmt, va_list args);
+.RE
+.fi
+
+.PP
+Prints a formatted string to standard output
+
+.SS pstrerrorf
+
+.nf
+.RS
+PSTR_API int pstrerrorf(const char *fmt, \&.\&.\&.);
+PSTR_API int pstrverrorf(const char *fmt, va_list args);
+.RE
+.fi
+
+.PP
+Prints a formatted string to standard error output
+
+.SS pstrstrip
+
+.nf
+.RS
+PSTR_API int pstrstrip(pstring_t *str, const char *chars);
+PSTR_API int pstrlstrip(pstring_t *str, const char *chars);
+PSTR_API int pstrrstrip(pstring_t *str, const char *chars);
+.RE
+.fi
+
+.PP
+Removes leading and trailing characters from \fBstr\fR that are specified in \fBchars\fR\&. If \fBstr\fR is a slice, it will be resliced to omit them instead\&.
+
+.PP
+The \fBpstrlstrip\fR variant only removes leading, while \fBpstrrstrip\fR only removes trailing characters from \fBstr\fR that are specified in \fBchars\fR\&.
+
+.PP
+Possible error codes: PSTRING_EINVAL\&.
+
+.SS pstrdedent
+
+.nf
+.RS
+PSTR_API int pstrdedent(pstring_t *str, int count, int tab);
+.RE
+.fi
+
+.PP
+Removes leading whitespace up to \fBcount\fR, assuming that \fB\\t\fR character is equivalent to \fBtab\fR blank characters (defaults to 4 instead)\&. If \fBcount\fR is zero or less, all whitespace is removed\&.
+
+.PP
+Possible error codes: PSTRING_EINVAL\&.
+
+.SS pstrindent
+
+.nf
+.RS
+PSTR_API int pstrindent(pstring_t *str, int count, int tab);
+.RE
+.fi
+
+.PP
+Inserts leading whitespace up to \fBcount\fR, assuming that \fB\\t\fR character is equivalent to \fBtab\fR blank characters (defaults to 4 instead)\&. If \fBcount\fR is zero or less, the minimum indentation already present is returned\&.
+
+.PP
+Possible error codes: PSTRING_EINVAL\&.
+
+.SS pstrprefix
+
+.nf
+.RS
+PSTR_API int pstrprefix(
+    const pstring_t *str, const char *prefix, size_t length
+);
+.RE
+.fi
+
+.PP
+Checks if \fBstr\fR starts with a \fBprefix\fR\&.
+
+.SS pstrsuffix
+
+.nf
+.RS
+PSTR_API int pstrsuffix(
+    const pstring_t *str, const char *suffix, size_t length
+);
+.RE
+.fi
+
+.PP
+Checks if \fBstr\fR ends with a \fBsuffix\fR\&.
+
+.SS pstr__setlen
+
+.nf
+.RS
+PSTR_INLINE void pstr__setlen(pstring_t *str, size_t length) {
+    if (pstrsso(str))
+        str->sso\&.length = length;
+    else
+        str->base\&.length = length;
+.RE
+.fi
+
+.PP
+Naively sets the length of \fBstr\fR to \fBlength\fR
+
+
+.SH RETURN VALUE
+.PP
+For functions that return signed integers, a \fB0\fR indicates that the function exited successfully.
+If instead a negative number is returned, it indicates a specific error that occurred during function's execution.
+The returned error codes are made to resemble POSIX in both meaning and numeric value.
+
+.PP
+Some functions can also return boolean constants (\fIPSTRING_TRUE\fR and \fPSTRING_FALSE\fR) alongside negative error codes,
+which might require you to explicitly compare returned values in order to prevent bugs.
+
+.SH SEE ALSO
+.BR pstring (3),
+.BR pstring-dictionary (3),
+.BR pstring-encoding (3),
+.BR pstring-io (3),
+.BR pstring-pattern (3).
+.SH AUTHOR
+Copyright (C) 2026 Предраг Јовановић
