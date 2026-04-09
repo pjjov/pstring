@@ -45,19 +45,6 @@ pstring_dep = declare_dependency(
 
 meson.override_dependency('pstring', pstring_dep)
 
-tests = executable(
-    'pstring-test',
-    dependencies: [pstring_dep, cpolyfill_dep],
-    sources: [
-        'test/dictionary.c',
-        'test/encoding.c',
-        'test/io.c',
-        'test/main.c',
-        'test/pattern.c',
-        'test/pstring.c',
-    ]
-)
-
 install_headers(
     'include/pstring/dictionary.h',
     'include/pstring/encoding.h',
@@ -72,8 +59,24 @@ install_man(
     'docs/pstring-encoding.3'
 )
 
-test('pstring/pstring', tests, args: ['pstring'], protocol: 'tap')
-test('pstring/dictionary', tests, args: ['dictionary'], protocol: 'tap')
-test('pstring/encoding', tests, args: ['encoding'], protocol: 'tap')
-test('pstring/io', tests, args: ['io'], protocol: 'tap')
-test('pstring/pattern', tests, args: ['pattern'], protocol: 'tap')
+if not meson.is_subproject()
+    tests = executable(
+        'pstring-test',
+        install: false,
+        dependencies: [pstring_dep, cpolyfill_dep],
+        sources: [
+            'test/dictionary.c',
+            'test/encoding.c',
+            'test/io.c',
+            'test/main.c',
+            'test/pattern.c',
+            'test/pstring.c',
+        ]
+    )
+
+    test('pstring/pstring', tests, args: ['pstring'], protocol: 'tap')
+    test('pstring/dictionary', tests, args: ['dictionary'], protocol: 'tap')
+    test('pstring/encoding', tests, args: ['encoding'], protocol: 'tap')
+    test('pstring/io', tests, args: ['io'], protocol: 'tap')
+    test('pstring/pattern', tests, args: ['pattern'], protocol: 'tap')
+endif
