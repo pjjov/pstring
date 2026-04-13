@@ -513,6 +513,25 @@ PSTR_API int pstrstrip(pstring_t *str, const char *chars);
 PSTR_API int pstrlstrip(pstring_t *str, const char *chars);
 PSTR_API int pstrrstrip(pstring_t *str, const char *chars);
 
+/** This function slices `str` by moving the starting index by `right` and
+    the ending index by `left` number of characters. (`str` must be a slice)
+
+    Possible error codes: PSTRING_EINVAL.
+**/
+PSTR_INLINE int pstrshift(pstring_t *str, size_t left, size_t right) {
+    if (pstrowned(str))
+        return PSTRING_EINVAL;
+    if (left > pstrlen(str))
+        left = pstrlen(str);
+    return pstrslice(str, str, right, pstrlen(str) - left);
+}
+PSTR_INLINE int pstrlshift(pstring_t *str, size_t count) {
+    return pstrshift(str, count, 0);
+}
+PSTR_INLINE int pstrrshift(pstring_t *str, size_t count) {
+    return pstrshift(str, 0, count);
+}
+
 /** Removes leading whitespace up to `count`, assuming that `\t` character
     is equivalent to `tab` blank characters (defaults to 4 instead).
     If `count` is zero or less, all whitespace is removed.
