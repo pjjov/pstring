@@ -714,10 +714,27 @@ int pstream_string(pstream_t *out, pstring_t *str) {
 }
 
 #define JSON_STREAM(x) ((struct json_stream *)&(x)->state._size)
+#define JSON_BUFFER_SIZE 4096
+
+struct json_lexer {
+    pstream_t *stream;
+    size_t start;
+    size_t end;
+    int eof;
+
+    double numberValue;
+    struct {
+        const char *start;
+        const char *end;
+    } stringValue;
+
+    char buf[JSON_BUFFER_SIZE];
+};
 
 struct json_stream {
     pstream_t *base;
     int prev;
+    struct json_lexer *lexer;
 };
 
 static size_t json_tell(pstream_t *stream) {
@@ -805,6 +822,145 @@ static int json_serialize(pstream_t *stream, int type, const void *item) {
 
     json->prev = type;
     return res;
+}
+
+static int json_isblank(char c) {
+    return c == ' ' || c == '\n' || c == '\r' || c == '\t';
+}
+
+static int json_reserve(struct json_lexer *lex, size_t count) {
+    size_t diff = lex->end - lex->start;
+
+    if (lex->eof || diff >= count)
+        return PSTRING_OK;
+
+    if (diff > 0 && lex->start > 0) {
+        memmove(lex->buf, &lex->buf[lex->start], diff);
+        lex->start = 0;
+        lex->end = diff;
+    }
+
+    size_t read = pstream_read(
+        lex->stream, &lex->buf[lex->end], JSON_BUFFER_SIZE - diff
+    );
+
+    if (read == 0)
+        lex->eof = PSTRING_TRUE;
+    lex->end += read;
+
+    return diff + read < count ? PSTRING_ENOMEM : PSTRING_OK;
+}
+
+static int json_skip_blank(struct json_lexer *lex) {
+    while (json_reserve(lex, 1)) {
+        if (!json_isblank(lex->buf[lex->start]))
+            break;
+        lex->start++;
+    }
+
+    return lex->eof == 0 ? PSTRING_OK : PSTRING_EIO;
+}
+
+static int json_read_number(struct json_lexer *lex) {
+    int len = 1;
+
+    while (json_reserve(lex, len + 1)) {
+        char c = lex->buf[lex->start + len];
+
+        if (!((c >= 0 && c <= '9') || c == '-' || c == '+' || c == '.'
+              || c == 'e' || c == 'E'))
+            return len;
+
+        len++;
+    }
+
+    return lex->eof == 0 ? PSTRING_OK : PSTRING_EIO;
+}
+
+static int json_read_string(struct json_lexer *lex) {
+    int len = 1;
+    int escape = PSTRING_TRUE;
+    int quote = PSTRING_FALSE;
+
+    while (json_reserve(lex, len + 1)) {
+        char c = lex->buf[lex->start];
+
+        if (c == '"' && !escape) {
+            quote = PSTRING_TRUE;
+            break;
+        }
+
+        if (c == '\\' || escape)
+            escape = !escape;
+    }
+
+    /* todo: return string */
+    (void)quote;
+
+    return lex->eof == 0 ? PSTRING_OK : PSTRING_EIO;
+}
+
+static int json_read_keyword(
+    struct json_lexer *lex, const char *kw, size_t len
+) {
+    if (json_reserve(lex, len))
+        return PSTRING_EINVAL;
+
+    if (memcmp(kw, &lex->buf[lex->start], len))
+        return PSTRING_EINVAL;
+
+    lex->start += len;
+    return PSTRING_OK;
+}
+
+static int json_read_token(struct json_lexer *lex) {
+    json_skip_blank(lex);
+
+    if (json_reserve(lex, 1))
+        return PSTRING_EIO;
+
+    char c = lex->buf[lex->start];
+
+    switch (c) {
+    case '{':
+    case '}':
+    case '[':
+    case ']':
+    case ':':
+    case ',':
+        lex->start++;
+        return c;
+    case '"':
+        return json_read_string(lex);
+    case 't':
+        if (json_read_keyword(lex, "true", 4))
+            return PSTRING_EINVAL;
+        return 't';
+    case 'f':
+        if (json_read_keyword(lex, "false", 5))
+            return PSTRING_EINVAL;
+        return 'f';
+    case 'n':
+        if (json_read_keyword(lex, "null", 4))
+            return PSTRING_EINVAL;
+        return 'n';
+    default:
+        if (c == '-' || c == '+' || (c >= '0' && c <= '9')) {
+            int len = json_read_number(lex);
+            lex->buf[lex->start + len] = '\0';
+
+            char *end;
+            double value = strtod(&lex->buf[lex->start], &end);
+
+            if (end != &lex->buf[lex->start + len])
+                return PSTRING_EINVAL;
+
+            lex->numberValue = value;
+            return PSTRING_OK;
+        }
+
+        return PSTRING_EINVAL;
+    }
 }
 
 static int json_deserialize(pstream_t *stream, int type, void *item) {
