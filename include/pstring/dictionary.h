@@ -34,6 +34,23 @@
 typedef struct allocator_t allocator_t;
 typedef struct pstring_t pstring_t;
 
+/** ## NAME
+
+    **pstring-dictionary** - key-value dictionaries for **pstrings**.
+
+    ## DESCRIPTION
+
+    The **pstrdict_t** object is a container that stores key-value pairs,
+    where a key is a `pstring_t` pointer and a value is a void pointer.
+
+    Dictionaries allow fast lookups for string keys, while leaving
+    memory management of keys and values to the user.
+
+    [TOC]
+
+    ## REFERENCE
+**/
+
 /** `pstrdict_t` is a hashdict that stores key-value pairs, where the key is a
     `pstring` and the value is a `void` pointer. Since both keys and values are
     stored as pointers, no memory management is done for them.
