@@ -29,6 +29,25 @@
     #define PSTR_API
 #endif
 
+/** ## NAME
+
+    **pstring-io** - streaming and serialization functions for **pstrings**.
+
+    ## DESCRIPTION
+
+    The `pstream_t` object can be used as a generic interface for interacting
+    with byte streams. Unlike standard library `FILE`, `pstream_t` objects
+    can use user-defined stream implementations such as network sockets,
+    in-memory buffers, encoders and serializers.
+
+    This header also provides powerful serialization and deserialization
+    mechanisms through the `pstrmodel` and associated structures.
+
+    [TOC]
+
+    ## REFERENCE
+**/
+
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdio.h>
