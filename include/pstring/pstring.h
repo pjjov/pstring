@@ -287,6 +287,7 @@ PSTR_API int pstrequals(
     - `0` if they are equal.
 **/
 PSTR_API int pstrcmp(const pstring_t *left, const pstring_t *right);
+PSTR_API int pstrcmps(const pstring_t *left, const char *right, size_t length);
 
 /** Searches for character `ch` from the start of `str`,
     returning it's address if found and `NULL` otherwise.

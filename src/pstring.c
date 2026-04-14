@@ -430,12 +430,16 @@ int pstrequal(const pstring_t *left, const pstring_t *right) {
     return PSTRING_TRUE;
 }
 
-PSTR_API int pstrequals(
-    const pstring_t *left, const char *right, size_t length
-) {
+int pstrequals(const pstring_t *left, const char *right, size_t length) {
     pstring_t tmp;
     pstrwrap(&tmp, (char *)right, length, length);
     return pstrequal(left, &tmp);
+}
+
+int pstrcmps(const pstring_t *left, const char *right, size_t length) {
+    pstring_t tmp;
+    pstrwrap(&tmp, (char *)right, length, length);
+    return pstrcmp(left, &tmp);
 }
 
 int pstrcmp(const pstring_t *left, const pstring_t *right) {
