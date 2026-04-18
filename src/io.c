@@ -31,6 +31,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <wchar.h>
 
 #define PRINTF_BUFFER_SIZE 1024
 
@@ -230,6 +231,83 @@ static int format_encoded(pstring_t *dst, const char **esc, va_list args) {
     return result;
 }
 
+static int format_std(pstream_t *dst, const char *fmt, int len, va_list args) {
+    /*
+        Calling `vprintf` consumes the `va_list`, causing undefined behaviour.
+        To solve this, we call printf by manually passing arguments.
+    */
+
+    char *hasWidth = NULL;
+    char *hasPrec = NULL;
+
+    int width, prec;
+    int result = PSTRING_EINVAL;
+
+    if ((hasWidth = strchr(fmt, '*'))) {
+        width = va_arg(args, int);
+
+        if ((hasPrec = strchr(hasWidth + 1, '*')))
+            prec = va_arg(args, int);
+    }
+
+    char type = fmt[len - 1];
+    char mod = len >= 2 ? fmt[len - 2] : '\0';
+    pf_bool ll = (len >= 3 && fmt[len - 2] == 'l' && fmt[len - 3] == 'l');
+
+    /* clang-format off */
+
+#define PRINTF_2(TYPE) \
+    result = pstream__printf(dst, fmt, width, prec, va_arg(args, TYPE))
+#define PRINTF_1(TYPE) \
+    result = pstream__printf(dst, fmt, width, va_arg(args, TYPE))
+#define PRINTF_0(TYPE) \
+    result = pstream__printf(dst, fmt, va_arg(args, TYPE))
+
+#define SWITCH(X)                           \
+    switch (type) {                         \
+    case 'd': case 'i': case 'X':           \
+    case 'u': case 'o': case 'x':           \
+        if (mod == 'l' && ll) X(long long); \
+        else if (mod == 'l')  X(long);      \
+        else if (mod == 'j')  X(intmax_t);  \
+        else if (mod == 'z')  X(size_t);    \
+        else if (mod == 't')  X(ptrdiff_t); \
+        else                  X(int);       \
+        break;                              \
+    case 'f': case 'F':                     \
+    case 'e': case 'E':                     \
+    case 'g': case 'G':                     \
+    case 'a': case 'A':                     \
+        if (mod == 'L') X(long double);     \
+        else            X(double);          \
+        break;                              \
+    case 'c':                               \
+        if (mod == 'L') X(wint_t);          \
+        else            X(int);             \
+        break;                              \
+    case 's': case 'p': case 'n':           \
+        X(void *);                          \
+        break;                              \
+    }
+
+    /* clang-format on */
+
+    if (hasPrec) {
+        SWITCH(PRINTF_2);
+    } else if (hasWidth) {
+        SWITCH(PRINTF_1);
+    } else {
+        SWITCH(PRINTF_0);
+    }
+
+#undef PRINTF_0
+#undef PRINTF_1
+#undef PRINTF_2
+#undef SWITCH
+
+    return result;
+}
+
 static int format_next(pstream_t *dst, const char **esc, va_list args) {
     char format[32];
     int len = format_parse(esc, format);
@@ -300,8 +378,7 @@ static int format_next(pstream_t *dst, const char **esc, va_list args) {
     }
 
     default:
-        /* todo: passing args is UB */
-        return pstream__vprintf(dst, format, args);
+        return format_std(dst, format, len, args);
     }
 
     return PSTRING_OK;
