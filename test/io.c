@@ -91,30 +91,6 @@ int test_io_write(int seed, int rep) {
     return 0;
 }
 
-int test_io_serialize(int seed, int rep) {
-    pstring_t buffer;
-    pstream_t stream;
-
-    pf_assert_ok(pstralloc(&buffer, BUF_SIZE, NULL));
-    pf_assert_ok(pstream_string(&stream, &buffer));
-
-    for (int i = 1; i <= 5; i++) {
-        pf_assert_ok(pstream_serialize(&stream, PF_TYPE_INT, &i));
-        pf_assert_ok(pstream_putc(&stream, ' '));
-    }
-
-    pf_assert(pstrequal(&buffer, PSTR("1 2 3 4 5 ")));
-    pf_assert_ok(pstream_seek(&stream, 0, PSTR_SEEK_SET));
-
-    const char *str = "Hello!";
-    pf_assert_ok(pstream_serialize(&stream, PF_TYPE_CSTRING, &str));
-    pf_assert(pstrequal(&buffer, PSTR("Hello!4 5 ")));
-
-    pstream_close(&stream);
-    pstrfree(&buffer);
-    return 0;
-}
-
 int test_io_format(int seed, int rep) {
     pstring_t buf = { 0 };
     pstring_t str = PSTRWRAP("Hello");
@@ -157,12 +133,10 @@ int test_io_json(int seed, int rep) {
     struct example e = { 13, PSTRWRAP("Hello\n"), 5.5, "\"world\"" };
 
     pstring_t str = { 0 };
-    pstream_t base, json;
+    pstream_t base;
 
     pf_assert_ok(pstream_string(&base, &str));
-    pf_assert_ok(pstream_json(&json, &base));
-
-    pf_assert_ok(pstream_save(&json, &e, &model));
+    pf_assert_ok(pstream_save_json(&base, &e, &model));
 
     pf_assert_true(pstrequals(
         &str,
@@ -171,7 +145,6 @@ int test_io_json(int seed, int rep) {
         0
     ));
 
-    pstream_close(&json);
     pstream_close(&base);
     pstrfree(&str);
     return 0;
@@ -180,7 +153,6 @@ int test_io_json(int seed, int rep) {
 const struct pf_test suite_io[] = {
     { test_io_read, "/pstring/io/read", 1 },
     { test_io_write, "/pstring/io/write", 1 },
-    { test_io_serialize, "/pstring/io/serialize", 1 },
     { test_io_format, "/pstring/io/format", 1 },
     { test_io_json, "/pstring/io/json", 1 },
     { 0 },

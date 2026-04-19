@@ -237,8 +237,8 @@ static int format_std(pstream_t *dst, const char *fmt, int len, va_list args) {
         To solve this, we call printf by manually passing arguments.
     */
 
-    char *hasWidth = NULL;
-    char *hasPrec = NULL;
+    const char *hasWidth = NULL;
+    const char *hasPrec = NULL;
 
     int width, prec;
     int result = PSTRING_EINVAL;
@@ -320,9 +320,11 @@ static int format_next(pstream_t *dst, const char **esc, va_list args) {
     }
 
     case '?': {
-        int typeid = va_arg(args, int);
-        void *arg = va_arg(args, void *);
-        return pstream_serialize(dst, typeid, arg);
+        /* todo: use new serialization */
+        return PSTRING_ENOSYS;
+        // int typeid = va_arg(args, int);
+        // void *arg = va_arg(args, void *);
+        // return pstream_serialize(dst, typeid, arg);
     }
 
     case '!': {
@@ -615,8 +617,6 @@ int pstream_init(pstream_t *out, const struct pstream_vt *vtable) {
     fail |= !vtable->seek;
     fail |= !vtable->flush;
     fail |= !vtable->close;
-    fail |= !vtable->serialize;
-    fail |= !vtable->deserialize;
 
     out->vtable = vtable;
     return fail ? PSTRING_EINVAL : PSTRING_OK;
@@ -663,15 +663,6 @@ static void file_close(pstream_t *stream) {
     fclose(file);
 }
 
-static int file_serialize(pstream_t *stream, int type, const void *item) {
-    /* todo: binary mode serialization */
-    return srlz_text(stream, type, item);
-}
-
-static int file_deserialize(pstream_t *stream, int type, void *item) {
-    return PSTRING_ENOSYS;
-}
-
 int pstream_file(pstream_t *out, FILE *file) {
     if (!out || !file)
         return PSTRING_EINVAL;
@@ -683,8 +674,6 @@ int pstream_file(pstream_t *out, FILE *file) {
         .seek = file_seek,
         .flush = file_flush,
         .close = file_close,
-        .serialize = file_serialize,
-        .deserialize = file_deserialize,
     };
 
     out->vtable = &vtable;
@@ -765,10 +754,6 @@ static void str_flush(pstream_t *stream) {
     return;
 }
 
-static int str_deserialize(pstream_t *stream, int type, void *item) {
-    return PSTRING_ENOSYS;
-}
-
 int pstream_string(pstream_t *out, pstring_t *str) {
     if (!out || !str)
         return PSTRING_EINVAL;
@@ -780,8 +765,6 @@ int pstream_string(pstream_t *out, pstring_t *str) {
         .seek = str_seek,
         .flush = str_flush,
         .close = str_flush,
-        .serialize = srlz_text,
-        .deserialize = str_deserialize,
     };
 
     out->vtable = &vtable;
@@ -814,6 +797,12 @@ struct json_stream {
     struct json_lexer *lexer;
 };
 
+struct json_writer {
+    pstream_t *base;
+    int prev;
+    struct json_lexer *lexer;
+};
+
 static size_t json_tell(pstream_t *stream) {
     struct json_stream *json = JSON_STREAM(stream);
     return pstream_tell(json->base);
@@ -841,29 +830,13 @@ static size_t json_read(pstream_t *stream, void *buffer, size_t size) {
     return 0;
 }
 
-static int json_serialize(pstream_t *stream, int type, const void *item) {
-    struct json_stream *json = JSON_STREAM(stream);
+static int json_serialize(
+    struct json_writer *json, int type, const void *item
+) {
     pstring_t str;
     int res = PSTRING_OK;
 
-    if (type == PSTRMODEL__KEY && json->prev != PSTRMODEL__BEGIN)
-        res = pstream_putc(json->base, ',');
-
-    if (res != PSTRING_OK)
-        return res;
-
     switch (type) {
-    case PSTRMODEL__BEGIN:
-        res = pstream_putc(json->base, '{');
-        break;
-    case PSTRMODEL__END:
-        res = pstream_putc(json->base, '}');
-        break;
-    case PSTRMODEL__KEY:
-        pstrwrap(&str, (char *)item, 0, 0);
-        res = pstream_printf(json->base, "\"%!json%P\":", &str);
-        break;
-
     case PF_TYPE_BOOL: {
         pf_bool value = *(pf_bool *)item;
         res = pstream_puts(json->base, value ? "true" : "false");
@@ -899,6 +872,52 @@ static int json_serialize(pstream_t *stream, int type, const void *item) {
 
     json->prev = type;
     return res;
+}
+
+static int json_write_key(pstream_t *stream, const char *key) {
+    pstring_t str;
+    pstrwrap(&str, (char *)key, 0, 0);
+    return pstream_printf(stream, "\"%!json%P\":", &str);
+}
+
+static int json_save_member(
+    struct json_writer *json,
+    const void *obj,
+    const struct pstrmodel_member *member
+) {
+    const void *item = PF_OFFSET(obj, member->offset);
+
+    if (json->prev != PSTRMODEL__BEGIN && pstream_putc(json->base, ','))
+        return PSTRING_EIO;
+
+    if (json_write_key(json->base, member->name))
+        return PSTRING_EIO;
+
+    if (member->type == PSTRMODEL_TYPE)
+        return pstream_save_json(json->base, item, member->model);
+
+    return json_serialize(json, member->type, item);
+}
+
+PSTR_API int pstream_save_json(
+    pstream_t *stream, const void *obj, const struct pstrmodel *model
+) {
+    if (!stream || !obj || !model || !model->members)
+        return PSTRING_EINVAL;
+
+    int result = PSTRING_OK;
+    struct json_writer json;
+    json.base = stream;
+    json.prev = PSTRMODEL__BEGIN;
+
+    result |= pstream_putc(json.base, '{');
+
+    for (size_t i = 0; !result && model->members[i].type; i++)
+        result |= json_save_member(&json, obj, &model->members[i]);
+
+    result |= pstream_putc(json.base, '}');
+
+    return result;
 }
 
 static int json_isblank(char c) {
@@ -1040,69 +1059,52 @@ static int json_read_token(struct json_lexer *lex) {
     }
 }
 
-static int json_deserialize(pstream_t *stream, int type, void *item) {
+int pstream_load_json(
+    pstream_t *stream, void *obj, const struct pstrmodel *model
+) {
+    if (!stream || !obj || !model || !model->members)
+        return PSTRING_EINVAL;
     return PSTRING_ENOSYS;
 }
 
-int pstream_json(pstream_t *out, pstream_t *base) {
-    if (!out || !base)
-        return PSTRING_EINVAL;
+static struct {
+    const char *name;
+    pstream_save_fn *save;
+    pstream_load_fn *load;
+} formats[] = {
+    { "json", pstream_save_json, pstream_load_json },
+    { 0 },
+};
 
-    if (sizeof(struct json_stream) > PSTREAM_STATE_SIZE)
-        return PSTRING_ENOSYS;
-    if (_Alignof(struct json_stream) > _Alignof(void *))
-        return PSTRING_ENOSYS;
-
-    static const struct pstream_vt vtable = {
-        .read = json_read,
-        .write = json_write,
-        .tell = json_tell,
-        .seek = json_seek,
-        .flush = json_flush,
-        .close = json_close,
-        .serialize = json_serialize,
-        .deserialize = json_deserialize,
-    };
-
-    struct json_stream *json = JSON_STREAM(out);
-    out->vtable = &vtable;
-    json->base = base;
-    json->prev = PSTRMODEL__END;
-    return PSTRING_OK;
-}
-
-static int save_member(
-    pstream_t *stream, const void *obj, const struct pstrmodel_member *member
-) {
-    const void *item = PF_OFFSET(obj, member->offset);
-
-    if (member->type == PSTRMODEL_TYPE)
-        return pstream_save(stream, item, member->model);
-
-    return pstream_serialize(stream, PSTRMODEL__KEY, member->name)
-        || pstream_serialize(stream, member->type, item);
+static int find_format(const char *name) {
+    for (int i = 0; formats[i].name; i++)
+        if (0 == strcmp(name, formats[i].name))
+            return i;
+    return -1;
 }
 
 int pstream_save(
-    pstream_t *stream, const void *obj, const struct pstrmodel *model
+    const char *format,
+    pstream_t *stream,
+    const void *obj,
+    const struct pstrmodel *model
 ) {
     if (!stream || !obj || !model || !model->members)
         return PSTRING_EINVAL;
 
-    int result = PSTRING_OK;
-
-    result = pstream_serialize(stream, PSTRMODEL__BEGIN, model->name);
-
-    for (size_t i = 0; !result && model->members[i].type; i++)
-        result = save_member(stream, obj, &model->members[i]);
-
-    result = pstream_serialize(stream, PSTRMODEL__END, model->name);
-
-    return result;
+    int i = find_format(format);
+    return i != -1 ? formats[i].save(stream, obj, model) : PSTRING_ENOSYS;
 }
 
 int pstream_load(
-    pstream_t *stream, const void *obj, const struct pstrmodel *model
+    const char *format,
+    pstream_t *stream,
+    void *obj,
+    const struct pstrmodel *model
 ) {
-    return PSTRING_ENOSYS;
+    if (!stream || !obj || !model || !model->members)
+        return PSTRING_EINVAL;
+
+    int i = find_format(format);
+    return i != -1 ? formats[i].load(stream, obj, model) : PSTRING_ENOSYS;
 }

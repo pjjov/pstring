@@ -92,8 +92,6 @@ struct pstream_vt {
     int (*seek)(pstream_t *stream, long offset, int origin);
     void (*flush)(pstream_t *stream);
     void (*close)(pstream_t *stream);
-    int (*serialize)(pstream_t *stream, int type, const void *item);
-    int (*deserialize)(pstream_t *stream, int type, void *item);
 };
 
 struct pstream_t {
@@ -117,6 +115,14 @@ struct pstrmodel {
     struct pstrmodel_member *members;
 };
 
+typedef int(pstream_save_fn)(
+    pstream_t *stream, const void *obj, const struct pstrmodel *model
+);
+
+typedef int(pstream_load_fn)(
+    pstream_t *stream, void *obj, const struct pstrmodel *model
+);
+
 /** Opens the file located at `path` as a stream.
     Possible error codes: PSTRING_EINVAL, PSTRING_EIO.
 **/
@@ -135,11 +141,6 @@ PSTR_API int pstream_file(pstream_t *out, FILE *file);
     Possible error codes: PSTRING_EINVAL, PSTRING_EIO.
 **/
 PSTR_API int pstream_string(pstream_t *out, pstring_t *str);
-
-/** Initializes a stream that can serialize or deserialize JSON data.
-    Possible error codes: PSTRING_EINVAL, PSTRING_EIO.
-**/
-PSTR_API int pstream_json(pstream_t *out, pstream_t *base);
 
 /** Initializes `out` as a custom stream.
     `vtable` and it's members cannot be `NULL`.
@@ -249,24 +250,26 @@ PSTR_API int pstream__printf(pstream_t *stream, const char *fmt, ...);
 **/
 PSTR_API int pstream__vprintf(pstream_t *stream, const char *fmt, va_list args);
 
-PSTR_INLINE int pstream_serialize(
-    pstream_t *stream, int type, const void *item
-) {
-    PSTREAM_ASSERT(serialize, -22);
-    return stream->vtable->serialize(stream, type, item);
-}
-
-PSTR_INLINE int pstream_deserialize(pstream_t *stream, int type, void *item) {
-    PSTREAM_ASSERT(deserialize, -22);
-    return stream->vtable->deserialize(stream, type, item);
-}
-
 PSTR_API int pstream_save(
-    pstream_t *stream, const void *obj, const struct pstrmodel *model
+    const char *format,
+    pstream_t *stream,
+    const void *obj,
+    const struct pstrmodel *model
 );
 
 PSTR_API int pstream_load(
+    const char *format,
+    pstream_t *stream,
+    void *obj,
+    const struct pstrmodel *model
+);
+
+PSTR_API int pstream_save_json(
     pstream_t *stream, const void *obj, const struct pstrmodel *model
+);
+
+PSTR_API int pstream_load_json(
+    pstream_t *stream, void *obj, const struct pstrmodel *model
 );
 
 #endif
