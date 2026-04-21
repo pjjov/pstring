@@ -21,6 +21,7 @@
 #define PF_TYPE_HELPERS
 #include <pf_macro.h>
 #include <pf_typeid.h>
+#include <pstring/dictionary.h>
 #include <pstring/encoding.h>
 #include <pstring/io.h>
 #include <pstring/pstring.h>
@@ -815,13 +816,40 @@ static int json_serialize_llist(
     return res;
 }
 
+struct json_serialize_dict_state {
+    pstream_t *stream;
+    struct pstrmodel *model;
+};
+
+static int json_serialize_dict_each(void *user, pstring_t *key, void *value) {
+    struct json_serialize_dict_state *state = user;
+    return pstream_printf(state->stream, "\"%!json%P\":", key)
+        || pstream_save_json(state->stream, value, state->model);
+}
+
+static int json_serialize_dict(
+    pstream_t *stream, const void *obj, struct pstrmodel *model
+) {
+    pstream_putc(stream, '{');
+
+    pstrdict_t *dict = *(pstrdict_t **)obj;
+
+    struct json_serialize_dict_state state = { stream, model };
+    int res = pstrdict_each(dict, json_serialize_dict_each, &state);
+
+    pstream_putc(stream, '}');
+    return res;
+}
+
 static int json_serialize(
-    struct json_writer *json, int type, const void *item
+    struct json_writer *json,
+    const struct pstrmodel_member *member,
+    const void *item
 ) {
     pstring_t str;
     int res = PSTRING_OK;
 
-    switch (type) {
+    switch (member->type) {
     case PF_TYPE_BOOL: {
         pf_bool value = *(pf_bool *)item;
         res = pstream_puts(json->base, value ? "true" : "false");
@@ -846,16 +874,25 @@ static int json_serialize(
         res = pstream__printf(json->base, "\"%p\"", *(void **)item);
         break;
 
+    case PSTRMODEL_TYPE:
+        return pstream_save_json(json->base, item, member->model);
+    case PSTRMODEL_ARRAY:
+        return json_serialize_array(json->base, item, member->model);
+    case PSTRMODEL_LLIST:
+        return json_serialize_llist(json->base, item, member->model);
+    case PSTRDICT_TYPE:
+        return json_serialize_dict(json->base, item, member->model);
+
     default:
-        if (pf_type_is_integer(type))
-            res = srlz_text_int(json->base, type, item);
-        else if (pf_type_is_float(type))
-            res = srlz_text_float(json->base, type, item);
+        if (pf_type_is_integer(member->type))
+            res = srlz_text_int(json->base, member->type, item);
+        else if (pf_type_is_float(member->type))
+            res = srlz_text_float(json->base, member->type, item);
         else
             res = PSTRING_ENOSYS;
     }
 
-    json->prev = type;
+    json->prev = member->type;
     return res;
 }
 
@@ -878,16 +915,7 @@ static int json_save_member(
     if (json_write_key(json->base, member->name))
         return PSTRING_EIO;
 
-    switch (member->type) {
-    case PSTRMODEL_TYPE:
-        return pstream_save_json(json->base, item, member->model);
-    case PSTRMODEL_ARRAY:
-        return json_serialize_array(json->base, item, member->model);
-    case PSTRMODEL_LLIST:
-        return json_serialize_llist(json->base, item, member->model);
-    default:
-        return json_serialize(json, member->type, item);
-    }
+    return json_serialize(json, member, item);
 }
 
 PSTR_API int pstream_save_json(
