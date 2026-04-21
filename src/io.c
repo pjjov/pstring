@@ -585,27 +585,6 @@ static int srlz_text_float(pstream_t *stream, int type, const void *item) {
     return PSTRING_OK;
 }
 
-static int srlz_text(pstream_t *stream, int type, const void *item) {
-    if (pf_type_is_integer(type))
-        return srlz_text_int(stream, type, item);
-    if (pf_type_is_float(type))
-        return srlz_text_float(stream, type, item);
-    if (type == PF_TYPE_CHAR)
-        return pstream_putc(stream, *(const char *)item);
-    if (type == PF_TYPE_PTR)
-        return pstream__printf(stream, "%p", *(const void **)item);
-    if (type == PF_TYPE_CSTRING)
-        return pstream_puts(stream, *(const char **)item);
-
-    if (type == PSTRING_TYPE || type == PSTRING_PTR_TYPE) {
-        return pstream_putp(
-            stream, type == PSTRING_TYPE ? item : *(const pstring_t **)item
-        );
-    }
-
-    return PSTRING_EINVAL;
-}
-
 int pstream_init(pstream_t *out, const struct pstream_vt *vtable) {
     if (!out || !vtable)
         return PSTRING_EINVAL;
@@ -802,33 +781,6 @@ struct json_writer {
     int prev;
     struct json_lexer *lexer;
 };
-
-static size_t json_tell(pstream_t *stream) {
-    struct json_stream *json = JSON_STREAM(stream);
-    return pstream_tell(json->base);
-}
-
-static void json_flush(pstream_t *stream) {
-    struct json_stream *json = JSON_STREAM(stream);
-    return pstream_flush(json->base);
-}
-
-static void json_close(pstream_t *stream) {
-    struct json_stream *json = JSON_STREAM(stream);
-    return pstream_close(json->base);
-}
-
-static int json_seek(pstream_t *stream, long offset, int origin) {
-    return PSTRING_ENOSYS;
-}
-
-static size_t json_write(pstream_t *stream, const void *buffer, size_t size) {
-    return 0;
-}
-
-static size_t json_read(pstream_t *stream, void *buffer, size_t size) {
-    return 0;
-}
 
 static int json_serialize(
     struct json_writer *json, int type, const void *item
