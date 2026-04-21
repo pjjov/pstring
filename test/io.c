@@ -130,13 +130,14 @@ struct pstrmodel_member members[] = {
 struct pstrmodel model = { "struct example", members };
 
 int test_io_json(int seed, int rep) {
-    struct example e = { 13, PSTRWRAP("Hello\n"), 5.5, "\"world\"" };
+    struct example src = { 13, PSTRWRAP("Hello\n"), 5.5, "\"world\"" };
+    struct example dst = { 0 };
 
     pstring_t str = { 0 };
     pstream_t base;
 
     pf_assert_ok(pstream_string(&base, &str));
-    pf_assert_ok(pstream_save_json(&base, &e, &model));
+    pf_assert_ok(pstream_save_json(&base, &src, &model));
 
     pf_assert_true(pstrequals(
         &str,
@@ -144,6 +145,17 @@ int test_io_json(int seed, int rep) {
         "\"\\\"world\\\"\"}",
         0
     ));
+
+    pf_assert_ok(pstream_seek(&base, 0, SEEK_SET));
+    pf_assert_ok(pstream_load_json(&base, &dst, &model));
+
+    pf_assert(dst.i == 13);
+    pf_assert(pstrequals(&dst.pstr, "Hello\n", 0));
+    pf_assert_not_null(dst.str);
+    pf_assert(0 == strcmp(dst.str, "\"world\""));
+    pf_assert(dst.d == 5.5);
+
+    pstrfree(&dst.pstr);
 
     pstream_close(&base);
     pstrfree(&str);
