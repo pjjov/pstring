@@ -1028,6 +1028,15 @@ static void json_consume(struct json_reader *json, int kind) {
         json->failed = 1;
 }
 
+static pf_bool json_expect(struct json_reader *json, int kind) {
+    if (!json_match(json, kind)) {
+        json->failed = 1;
+        return PSTRING_FALSE;
+    }
+
+    return PSTRING_TRUE;
+}
+
 static struct pstrmodel_member *json_find_member(
     pstring_t *name, const struct pstrmodel *model
 ) {
@@ -1073,9 +1082,79 @@ static void json_skip_value(struct json_reader *json) {
     }
 }
 
+static long double json_consume_number(struct json_reader *json) {
+    json_consume(json, 'd');
+    return strtold(pstrbuf(&json->prevValue), NULL);
+}
+
+static int json_copy_string(struct json_reader *json, pstring_t *out) {
+    if (!json_expect(json, '"'))
+        return PSTRING_EINVAL;
+
+    if (pstrdec_json(out, &json->prevValue)) {
+        json->failed = PSTRING_TRUE;
+        return PSTRING_EINVAL;
+    }
+
+    return PSTRING_OK;
+}
+
 static void json_read_value(
     struct json_reader *json, void *obj, const struct pstrmodel_member *member
-) { }
+) {
+    if (json_match(json, 'n'))
+        return;
+
+    switch (member->type) {
+    case PF_TYPE_CSTRING: {
+        pstring_t out = { 0 };
+        if (!json_copy_string(json, &out))
+            *(char **)obj = pstrbuf(&out);
+        else
+            pstrfree(&out);
+        break;
+    }
+
+    case PSTRING_TYPE:
+        json_copy_string(json, obj);
+        break;
+    case PSTRING_PTR_TYPE:
+        json_copy_string(json, *(pstring_t **)obj);
+        break;
+
+    case PSTRMODEL_TYPE:
+        pstream_load_json(json->stream, obj, member->model);
+        break;
+
+    case PF_TYPE_FLOAT:
+        *(float *)obj = json_consume_number(json);
+        break;
+    case PF_TYPE_DOUBLE:
+        *(double *)obj = json_consume_number(json);
+        break;
+    case PF_TYPE_LDOUBLE:
+        *(long double *)obj = json_consume_number(json);
+        break;
+
+    case PF_TYPE_CHAR:
+    case PF_TYPE_BOOL:
+        if (json_match(json, 't') || json_match(json, 'f'))
+            *(pf_bool *)obj = (json->prev == 't');
+        else
+            json->failed = PSTRING_TRUE;
+        break;
+
+    default:
+        if (pf_type_is_integer(member->type)) {
+            uintmax_t value = json_consume_number(json);
+            pf_type_int_load(member->type, obj, &value);
+        }
+
+        json_advance(json);
+        json->failed = PSTRING_TRUE;
+        break;
+    }
+}
 
 static int json_read_model(
     struct json_reader *json, void *obj, const struct pstrmodel *model
@@ -1103,8 +1182,6 @@ static int json_read_model(
         } else {
             json_skip_value(json);
         }
-
-        /* read or skip value */
     }
 
     return PSTRING_OK;
