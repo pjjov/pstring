@@ -774,8 +774,46 @@ struct json_reader {
 struct json_writer {
     pstream_t *base;
     int prev;
-    struct json_lexer *lexer;
 };
+
+static int json_serialize_array(
+    pstream_t *stream, const void *obj, struct pstrmodel_array *model
+) {
+    pstream_putc(stream, '[');
+    int res = PSTRING_OK;
+
+    for (size_t i = 0; !res && i < model->count; i++) {
+        if (i > 0)
+            pstream_putc(stream, ',');
+
+        const void *item = PF_OFFSET(obj, model->stride * i);
+        res = pstream_save_json(stream, item, model->submodel);
+    }
+
+    pstream_putc(stream, ']');
+    return res;
+}
+
+static int json_serialize_llist(
+    pstream_t *stream, const void *obj, struct pstrmodel_llist *model
+) {
+    pstream_putc(stream, '[');
+    int res = PSTRING_OK;
+
+    const void *head = *(const void **)obj;
+    const void *item, **link;
+
+    for (item = head; item; item = *link) {
+        if (item != head)
+            pstream_putc(stream, ',');
+
+        link = PF_OFFSET(item, model->linkOffset);
+        res = pstream_save_json(stream, item, model->submodel);
+    }
+
+    pstream_putc(stream, ']');
+    return res;
+}
 
 static int json_serialize(
     struct json_writer *json, int type, const void *item
@@ -840,10 +878,16 @@ static int json_save_member(
     if (json_write_key(json->base, member->name))
         return PSTRING_EIO;
 
-    if (member->type == PSTRMODEL_TYPE)
+    switch (member->type) {
+    case PSTRMODEL_TYPE:
         return pstream_save_json(json->base, item, member->model);
-
-    return json_serialize(json, member->type, item);
+    case PSTRMODEL_ARRAY:
+        return json_serialize_array(json->base, item, member->model);
+    case PSTRMODEL_LLIST:
+        return json_serialize_llist(json->base, item, member->model);
+    default:
+        return json_serialize(json, member->type, item);
+    }
 }
 
 PSTR_API int pstream_save_json(

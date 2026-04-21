@@ -51,6 +51,7 @@
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdio.h>
+typedef struct allocator_t allocator_t;
 typedef struct pstring_t pstring_t;
 typedef struct pstream_t pstream_t;
 
@@ -68,6 +69,8 @@ enum pstring_typeid {
     PSTRDICT_TYPE,
     PSTREAM_TYPE,
     PSTRMODEL_TYPE,
+    PSTRMODEL_ARRAY,
+    PSTRMODEL_LLIST,
 
     PSTRMODEL__KEY,
     PSTRMODEL__BEGIN,
@@ -101,6 +104,18 @@ struct pstream_t {
         void *_align;
         void *ptr[PSTREAM_STATE_SIZE / sizeof(void *)];
     } state;
+};
+
+struct pstrmodel_array {
+    size_t stride;
+    size_t count;
+    struct pstrmodel *submodel;
+};
+
+struct pstrmodel_llist {
+    size_t linkOffset;
+    allocator_t *allocator;
+    struct pstrmodel *submodel;
 };
 
 struct pstrmodel_member {
