@@ -143,10 +143,12 @@ PSTR_INLINE allocator_t *pstrallocator(const pstring_t *str) {
 }
 
 /** Checks if `str` is stored on the stack. **/
-PSTR_INLINE int pstrsso(pstring_t *str) { return str && str->buffer == NULL; }
+PSTR_INLINE int pstrsso(const pstring_t *str) {
+    return str && str->buffer == NULL;
+}
 
 /** Checks if `str` can be resized (not a slice). **/
-PSTR_INLINE int pstrowned(pstring_t *str) {
+PSTR_INLINE int pstrowned(const pstring_t *str) {
     return pstrsso(str) || pstrallocator(str) != NULL;
 }
 
@@ -191,6 +193,11 @@ PSTR_API int pstralloc(pstring_t *out, size_t capacity, allocator_t *alloc);
 
 /** Frees all resources used by `str`, if it is owned. */
 PSTR_API void pstrfree(pstring_t *str);
+
+/** Returns the character buffer of `str`. If `str` is using SSO,
+    the contents of `str` will be copied to a brand new buffer.
+**/
+PSTR_API char *pstrunwrap(const pstring_t *str, allocator_t *allocator);
 
 /** When `PSTRING_DETECT` is defined, this function detects the
     SIMD capabilities of the CPU at runtime. Otherwise, the function

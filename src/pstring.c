@@ -276,7 +276,19 @@ int pstrdup(pstring_t *out, const pstring_t *str, allocator_t *allocator) {
     if (!out || !str)
         return PSTRING_EINVAL;
 
-    return pstrnew(out, pstrbuf(str), pstrlen(str), pstrallocator(str));
+    return pstrnew(out, pstrbuf(str), pstrlen(str), allocator);
+}
+
+char *pstrunwrap(const pstring_t *str, allocator_t *alloc) {
+    if (!str)
+        return NULL;
+
+    if (!pstrsso(str))
+        return pstrbuf(str);
+
+    pstring_t tmp;
+    int res = pstrdup(&tmp, str, alloc ? alloc : &standard_allocator);
+    return res == PSTRING_OK ? pstrbuf(&tmp) : NULL;
 }
 
 int pstrslice(pstring_t *out, const pstring_t *str, size_t from, size_t to) {
