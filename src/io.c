@@ -760,20 +760,15 @@ struct json_lexer {
     size_t start;
     size_t end;
     int eof;
-
-    double numberValue;
-    struct {
-        const char *start;
-        const char *end;
-    } stringValue;
-
     char buf[JSON_BUFFER_SIZE];
 };
 
-struct json_stream {
-    pstream_t *base;
-    int prev;
-    struct json_lexer *lexer;
+struct json_reader {
+    struct json_lexer lexer;
+    pstream_t *stream;
+    int prev, curr;
+    unsigned int failed : 1;
+    pstring_t prevValue, currValue;
 };
 
 struct json_writer {
@@ -925,13 +920,13 @@ static int json_read_number(struct json_lexer *lex) {
     return lex->eof == 0 ? PSTRING_OK : PSTRING_EIO;
 }
 
-static int json_read_string(struct json_lexer *lex) {
+static int json_read_string(struct json_lexer *lex, pstring_t *out) {
     int len = 1;
     int escape = PSTRING_TRUE;
     int quote = PSTRING_FALSE;
 
     while (json_reserve(lex, len + 1)) {
-        char c = lex->buf[lex->start];
+        char c = lex->buf[lex->start + len];
 
         if (c == '"' && !escape) {
             quote = PSTRING_TRUE;
@@ -942,8 +937,11 @@ static int json_read_string(struct json_lexer *lex) {
             escape = !escape;
     }
 
-    /* todo: return string */
-    (void)quote;
+    if (quote) {
+        pstrrange(
+            out, NULL, &lex->buf[lex->start], &lex->buf[lex->start + len]
+        );
+    }
 
     return lex->eof == 0 ? PSTRING_OK : PSTRING_EIO;
 }
@@ -961,7 +959,7 @@ static int json_read_keyword(
     return PSTRING_OK;
 }
 
-static int json_read_token(struct json_lexer *lex) {
+static int json_read_token(struct json_lexer *lex, pstring_t *out) {
     json_skip_blank(lex);
 
     if (json_reserve(lex, 1))
@@ -979,7 +977,9 @@ static int json_read_token(struct json_lexer *lex) {
         lex->start++;
         return c;
     case '"':
-        return json_read_string(lex);
+        if (json_read_string(lex, out))
+            return PSTRING_EINVAL;
+        return '"';
     case 't':
         if (json_read_keyword(lex, "true", 4))
             return PSTRING_EINVAL;
@@ -997,18 +997,117 @@ static int json_read_token(struct json_lexer *lex) {
             int len = json_read_number(lex);
             lex->buf[lex->start + len] = '\0';
 
-            char *end;
-            double value = strtod(&lex->buf[lex->start], &end);
+            pstrrange(
+                out, NULL, &lex->buf[lex->start], &lex->buf[lex->start + len]
+            );
 
-            if (end != &lex->buf[lex->start + len])
-                return PSTRING_EINVAL;
-
-            lex->numberValue = value;
-            return PSTRING_OK;
+            return 'd';
         }
 
         return PSTRING_EINVAL;
     }
+}
+
+static void json_advance(struct json_reader *json) {
+    json->prev = json->curr;
+    json->prevValue = json->currValue;
+    json->curr = json_read_token(&json->lexer, &json->currValue);
+}
+
+static int json_match(struct json_reader *json, int kind) {
+    if (json->curr == kind) {
+        json_advance(json);
+        return PSTRING_TRUE;
+    }
+
+    return PSTRING_FALSE;
+}
+
+static void json_consume(struct json_reader *json, int kind) {
+    if (!json_match(json, kind))
+        json->failed = 1;
+}
+
+static struct pstrmodel_member *json_find_member(
+    pstring_t *name, const struct pstrmodel *model
+) {
+    for (size_t i = 0; model->members[i].type; i++)
+        if (pstrcmps(name, model->members[i].name, 0))
+            return &model->members[i];
+    return NULL;
+}
+
+static void json_skip_value(struct json_reader *json) {
+    switch (json->curr) {
+    case 'd':
+    case 'n':
+    case 't':
+    case 'f':
+    case '"':
+        json_advance(json);
+        break;
+
+    case '{':
+    case '[': {
+        char open = json->curr;
+        char close = open == '{' ? '}' : ']';
+
+        json_advance(json);
+        size_t count = 1;
+
+        while (count > 0) {
+            if (json->curr == open)
+                count++;
+            if (json->curr == close)
+                count--;
+
+            json_advance(json);
+        }
+
+        break;
+    }
+
+    default:
+        json->failed = PSTRING_TRUE;
+        break;
+    }
+}
+
+static void json_read_value(
+    struct json_reader *json, void *obj, const struct pstrmodel_member *member
+) { }
+
+static int json_read_model(
+    struct json_reader *json, void *obj, const struct pstrmodel *model
+) {
+    if (!json_match(json, '{'))
+        return PSTRING_EINVAL;
+
+    struct pstrmodel_member *member;
+    void *slot;
+
+    while (!json->failed) {
+        if (json_match(json, '}'))
+            break;
+
+        if (json->prev != '{')
+            json_consume(json, ',');
+
+        json_consume(json, '"');
+        member = json_find_member(&json->prevValue, model);
+        json_consume(json, ':');
+
+        if (member) {
+            slot = PF_OFFSET(obj, member->offset);
+            json_read_value(json, slot, member);
+        } else {
+            json_skip_value(json);
+        }
+
+        /* read or skip value */
+    }
+
+    return PSTRING_OK;
 }
 
 int pstream_load_json(
@@ -1016,7 +1115,16 @@ int pstream_load_json(
 ) {
     if (!stream || !obj || !model || !model->members)
         return PSTRING_EINVAL;
-    return PSTRING_ENOSYS;
+
+    struct json_reader json;
+    json.lexer.stream = stream;
+    json.lexer.start = 0;
+    json.lexer.end = 0;
+
+    json_advance(&json);
+    int result = json_read_model(&json, obj, model);
+    /* seek back */
+    return result;
 }
 
 static struct {
