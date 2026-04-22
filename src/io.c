@@ -775,7 +775,15 @@ struct json_reader {
 struct json_writer {
     pstream_t *base;
     int prev;
+
+    const struct pstrmodel_member *member;
 };
+
+static int json_serialize(
+    struct json_writer *json,
+    const struct pstrmodel_member *member,
+    const void *item
+);
 
 static int json_serialize_array(
     pstream_t *stream, const void *obj, struct pstrmodel_array *model
@@ -818,26 +826,25 @@ static int json_serialize_llist(
 
 struct json_serialize_dict_state {
     pstream_t *stream;
-    struct pstrmodel *model;
+    struct pstrmodel_member *member;
 };
 
 static int json_serialize_dict_each(void *user, pstring_t *key, void *value) {
-    struct json_serialize_dict_state *state = user;
-    return pstream_printf(state->stream, "\"%!json%P\":", key)
-        || pstream_save_json(state->stream, value, state->model);
+    struct json_writer *json = user;
+    return pstream_printf(json->base, "\"%!json%P\":", key)
+        || json_serialize(json, value, json->member);
 }
 
 static int json_serialize_dict(
-    pstream_t *stream, const void *obj, struct pstrmodel *model
+    struct json_writer *json, const void *obj, struct pstrmodel_member *member
 ) {
-    pstream_putc(stream, '{');
+    pstream_putc(json->base, '{');
+    json->member = member;
 
     pstrdict_t *dict = *(pstrdict_t **)obj;
+    int res = pstrdict_each(dict, json_serialize_dict_each, json);
 
-    struct json_serialize_dict_state state = { stream, model };
-    int res = pstrdict_each(dict, json_serialize_dict_each, &state);
-
-    pstream_putc(stream, '}');
+    pstream_putc(json->base, '}');
     return res;
 }
 
@@ -881,7 +888,7 @@ static int json_serialize(
     case PSTRMODEL_LLIST:
         return json_serialize_llist(json->base, item, member->model);
     case PSTRDICT_TYPE:
-        return json_serialize_dict(json->base, item, member->model);
+        return json_serialize_dict(json, item, member->model);
 
     default:
         if (pf_type_is_integer(member->type))
