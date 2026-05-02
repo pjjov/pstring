@@ -8,6 +8,7 @@ src = [
     'src/dictionary.c',
     'src/encoding.c',
     'src/io.c',
+    'src/object.c',
     'src/pattern.c',
     'src/pstring.c',
 ]
@@ -49,6 +50,7 @@ install_headers(
     'include/pstring/dictionary.h',
     'include/pstring/encoding.h',
     'include/pstring/io.h',
+    'include/pstring/object.h',
     'include/pstring/pattern.h',
     'include/pstring/pstring.h',
     subdir: 'pstring'
