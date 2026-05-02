@@ -261,7 +261,7 @@ int pstrobj_list_insert(pstrobj_t *list, pstrobj_t *item, size_t i) {
 
     pstrobj_t *prev;
 
-    if (!(prev = list_get_index(list->child, i)))
+    if (!(prev = list_get_index(list->child, i - 1)))
         return PSTRING_EINVAL;
 
     list_insert_item(list, prev, item);
@@ -280,5 +280,41 @@ pstrobj_t *pstrobj_list_remove(pstrobj_t *list, size_t i) {
         return NULL;
 
     list_remove_item(list, node);
+    return node;
+}
+
+int pstrobj_dict_insert(pstrobj_t *dict, pstrobj_t *item) {
+    if (!dict || dict->type != PSTROBJ_DICT)
+        return PSTRING_EINVAL;
+    if (item->key == NULL)
+        return PSTRING_EINVAL;
+
+    pstrobj_t *node;
+    for (node = dict->child; node; node = node->next)
+        if (pstrequal(node->key, item->key))
+            return PSTRING_EEXIST;
+
+    if (dict->child)
+        dict->child->prev = item;
+
+    item->next = dict->child;
+    dict->child = item;
+    return PSTRING_OK;
+}
+
+pstrobj_t *pstrobj_dict_remove(
+    pstrobj_t *dict, const char *key, size_t length
+) {
+    if (!dict || !key || dict->type != PSTROBJ_DICT)
+        return NULL;
+
+    pstrobj_t *node;
+    for (node = dict->child; node; node = node->next) {
+        if (pstrequals(node->key, key, length)) {
+            list_remove_item(dict, node);
+            break;
+        }
+    }
+
     return node;
 }

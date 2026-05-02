@@ -152,4 +152,25 @@ PSTR_INLINE int pstrobj_list_free(pstrobj_t *list, size_t i) {
     return obj ? PSTROBJ_OK : PSTROBJ_EINVAL;
 }
 
+/** Inserts `item` into `dict` with a previously set key.
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
+**/
+PSTR_API int pstrobj_dict_insert(pstrobj_t *dict, pstrobj_t *item);
+
+/** Removes item with specified key in `dict` and returns it. **/
+PSTR_API pstrobj_t *pstrobj_dict_remove(
+    pstrobj_t *dict, const char *key, size_t length
+);
+
+/** Removes item with specified key in `dict` and frees it.
+    Possible error codes: PSTRING_EINVAL.
+**/
+PSTR_INLINE int pstrobj_dict_free(
+    pstrobj_t *dict, const char *key, size_t length
+) {
+    pstrobj_t *obj = pstrobj_dict_remove(dict, key, length);
+    pstrobj_free(obj);
+    return obj ? PSTROBJ_OK : PSTROBJ_EINVAL;
+}
+
 #endif
