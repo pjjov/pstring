@@ -107,6 +107,10 @@ PSTR_API pstrobj_t *pstrobj_from_stream(
 /** Frees object and it's children if it's detached. **/
 PSTR_API void pstrobj_free(pstrobj_t *obj);
 
+/** Finds an object using the JSON Pointer format. **/
+PSTR_API pstrobj_t *pstrobj_query(pstrobj_t *obj, const char *query);
+PSTR_API void *pstrobj_query_value(pstrobj_t *obj, const char *query);
+
 /** Following functions set the object's value and type.
     Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
 **/
@@ -151,6 +155,12 @@ PSTR_INLINE int pstrobj_list_free(pstrobj_t *list, size_t i) {
     pstrobj_free(obj);
     return obj ? PSTROBJ_OK : PSTROBJ_EINVAL;
 }
+
+/** Finds an item in `dict` with specified `key`. **/
+PSTR_API pstrobj_t *pstrobj_dict_get(pstrobj_t *dict, const pstring_t *key);
+PSTR_API pstrobj_t *pstrobj_dict_gets(
+    pstrobj_t *dict, const char *key, size_t length
+);
 
 /** Inserts `item` into `dict` with a previously set key.
     Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.

@@ -318,3 +318,133 @@ pstrobj_t *pstrobj_dict_remove(
 
     return node;
 }
+
+pstrobj_t *pstrobj_dict_get(pstrobj_t *dict, const pstring_t *key) {
+    if (!dict || !key)
+        return NULL;
+
+    pstrobj_t *node;
+    for (node = dict->child; node; node = node->next)
+        if (pstrequal(node->key, key))
+            return node;
+
+    return NULL;
+}
+
+pstrobj_t *pstrobj_dict_gets(pstrobj_t *dict, const char *key, size_t length) {
+    pstring_t tmp;
+    pstrwrap(&tmp, (char *)key, length, 0);
+    return pstrobj_dict_get(dict, &tmp);
+}
+
+static const pstring_t *query_escape(pstring_t *dst, pstring_t *src) {
+    char *esc;
+
+    if (!(esc = pstrchr(src, '~')))
+        return src;
+
+    pstrclear(dst);
+
+    do {
+        if (esc + 1 == pstrend(src))
+            return NULL;
+
+        pstrcats(dst, pstrbuf(src), esc - pstrbuf(src));
+
+        switch (esc[1]) {
+        case '0':
+            pstrcatc(dst, '~');
+            break;
+        case '1':
+            pstrcatc(dst, '/');
+            break;
+        default:
+            return NULL;
+        }
+
+        pstrrshift(src, esc - pstrbuf(src) + 2);
+    } while ((esc = pstrchr(src, '~')));
+
+    pstrcat(dst, src);
+    return dst;
+}
+
+static pstrobj_t *query_next(pstrobj_t *curr, const pstring_t *chunk) {
+    if (curr->type == PSTROBJ_DICT)
+        return pstrobj_dict_get(curr, chunk);
+
+    if (curr->type != PSTROBJ_LIST || !curr->child)
+        return NULL;
+
+    pstrobj_t *node = curr->child;
+
+    if (pstrequals(chunk, "-", 1)) {
+        while (node->next)
+            node = node->next;
+        return node;
+    }
+
+    char *end;
+    size_t index = strtol(pstrbuf(chunk), &end, 10);
+
+    if (end != pstrend(chunk))
+        return NULL;
+
+    for (size_t i = 0; node && i != index; i++)
+        node = node->next;
+
+    return node;
+}
+
+pstrobj_t *pstrobj_query(pstrobj_t *obj, const char *query) {
+    pstring_t search;
+    pstrwrap(&search, (char *)query, 0, 0);
+
+    if (pstrlen(&search) == 0)
+        return obj;
+
+    pstring_t unescaped, escaped = { 0 };
+    char *sep, *end = pstrend(&search);
+
+    const pstring_t *chunk;
+    pstrobj_t *curr = obj;
+
+    do {
+        sep = pstrchr(&search, '/');
+        pstrrange(&unescaped, NULL, pstrbuf(&search), sep ? sep : end);
+        if (!(chunk = query_escape(&escaped, &unescaped)))
+            break;
+
+        curr = query_next(curr, chunk);
+        pstrrshift(&search, (sep ? sep + 1 : end) - pstrbuf(&search));
+    } while (sep && curr);
+
+    pstrfree(&escaped);
+    return curr;
+}
+
+void *pstrobj_query_value(pstrobj_t *obj, const char *query) {
+    pstrobj_t *res;
+
+    if (!(res = pstrobj_query(obj, query)))
+        return NULL;
+
+    switch (res->type) {
+    case PSTROBJ_NULL:
+        return res;
+    case PSTROBJ_BOOL:
+        return &res->as.bool_;
+    case PSTROBJ_LONG:
+        return &res->as.long_;
+    case PSTROBJ_DOUBLE:
+        return &res->as.double_;
+    case PSTROBJ_STRING:
+        return &res->as.string;
+    case PSTROBJ_LIST:
+        return res->child;
+    case PSTROBJ_DICT:
+        return res->child;
+    default:
+        return NULL;
+    }
+}
