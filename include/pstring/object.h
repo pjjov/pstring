@@ -46,13 +46,23 @@ typedef struct pstring_t pstring_t;
 typedef struct pstream_t pstream_t;
 typedef struct pstrobj_t pstrobj_t;
 
+/* Copied to avoid header inclusion for inline functions */
+enum pstrobj_error {
+    PSTROBJ_OK = 0,
+    PSTROBJ_ENOENT = -2,
+    PSTROBJ_EINTR = -4,
+    PSTROBJ_ENOMEM = -12,
+    PSTROBJ_EEXIST = -17,
+    PSTROBJ_EINVAL = -22,
+};
+
 enum pstrobj_type {
     PSTROBJ_NULL,
     PSTROBJ_BOOL,
     PSTROBJ_LONG,
     PSTROBJ_DOUBLE,
     PSTROBJ_STRING,
-    PSTROBJ_ARRAY,
+    PSTROBJ_LIST,
     PSTROBJ_DICT,
 };
 
@@ -106,6 +116,8 @@ PSTR_API int pstrobj_set_int(pstrobj_t *obj, int value);
 PSTR_API int pstrobj_set_long(pstrobj_t *obj, long value);
 PSTR_API int pstrobj_set_float(pstrobj_t *obj, float value);
 PSTR_API int pstrobj_set_double(pstrobj_t *obj, double value);
+PSTR_API int pstrobj_set_list(pstrobj_t *obj);
+PSTR_API int pstrobj_set_dict(pstrobj_t *obj);
 
 /** Copies the contents of `str` as the value of `obj`.
     Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
@@ -122,5 +134,22 @@ PSTR_API int pstrobj_wrap_string(pstrobj_t *obj, const char *str, size_t len);
 PSTR_API int pstrobj_wrap_pstring(pstrobj_t *obj, const pstring_t *str);
 PSTR_API int pstrobj_wrap_key(pstrobj_t *obj, const pstring_t *str);
 PSTR_API int pstrobj_wrap_keys(pstrobj_t *obj, const char *str, size_t len);
+
+/** Inserts `item` at index `i` inside `list`.
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
+**/
+PSTR_API int pstrobj_list_insert(pstrobj_t *list, pstrobj_t *item, size_t i);
+
+/** Removes item at index `i` in `list` and returns it. **/
+PSTR_API pstrobj_t *pstrobj_list_remove(pstrobj_t *list, size_t i);
+
+/** Removes item at index `i` in `list` and frees it.
+    Possible error codes: PSTRING_EINVAL.
+**/
+PSTR_INLINE int pstrobj_list_free(pstrobj_t *list, size_t i) {
+    pstrobj_t *obj = pstrobj_list_remove(list, i);
+    pstrobj_free(obj);
+    return obj ? PSTROBJ_OK : PSTROBJ_EINVAL;
+}
 
 #endif

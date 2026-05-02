@@ -128,6 +128,24 @@ int pstrobj_set_double(pstrobj_t *obj, double value) {
     return PSTRING_OK;
 }
 
+int pstrobj_set_list(pstrobj_t *obj) {
+    if (!obj)
+        return PSTRING_EINVAL;
+
+    free_string(obj);
+    obj->type = PSTROBJ_LIST;
+    return PSTRING_OK;
+}
+
+int pstrobj_set_dict(pstrobj_t *obj) {
+    if (!obj)
+        return PSTRING_EINVAL;
+
+    free_string(obj);
+    obj->type = PSTROBJ_DICT;
+    return PSTRING_OK;
+}
+
 int pstrobj_copy_string(pstrobj_t *obj, const char *str, size_t len) {
     if (!obj || (!str && len > 0))
         return PSTRING_EINVAL;
@@ -192,4 +210,75 @@ int pstrobj_wrap_keys(pstrobj_t *obj, const char *str, size_t len) {
     obj->key = PSTROBJ_BUFFER(obj, key);
     pstrwrap(obj->key, (char *)str, len, 0);
     return PSTRING_OK;
+}
+
+pstrobj_t *list_get_index(pstrobj_t *head, size_t index) {
+    pstrobj_t *curr = head;
+    for (size_t i = 0; i < index && curr != NULL; i++)
+        curr = curr->next;
+    return curr;
+}
+
+static void list_remove_item(pstrobj_t *list, pstrobj_t *node) {
+    pstrobj_t *prev = node->prev;
+    pstrobj_t *next = node->next;
+
+    if (prev)
+        prev->next = next;
+    if (next)
+        next->prev = prev;
+    if (node == list->child)
+        list->child = next;
+}
+
+static void list_insert_item(
+    pstrobj_t *list, pstrobj_t *prev, pstrobj_t *item
+) {
+    pstrobj_t *next = prev->next;
+    item->prev = prev;
+    item->next = next;
+    prev->next = item;
+    if (next)
+        next->prev = item;
+}
+
+int pstrobj_list_insert(pstrobj_t *list, pstrobj_t *item, size_t i) {
+    if (!list || !item)
+        return PSTRING_EINVAL;
+    if (list->type != PSTROBJ_LIST && list->type != PSTROBJ_DICT)
+        return PSTRING_EINVAL;
+    if (item->next || item->prev)
+        return PSTRING_EINVAL;
+
+    if (i == 0) {
+        if (list->child)
+            list->child->prev = item;
+
+        item->next = list->child;
+        list->child = item;
+        return PSTRING_OK;
+    }
+
+    pstrobj_t *prev;
+
+    if (!(prev = list_get_index(list->child, i)))
+        return PSTRING_EINVAL;
+
+    list_insert_item(list, prev, item);
+    return PSTRING_OK;
+}
+
+pstrobj_t *pstrobj_list_remove(pstrobj_t *list, size_t i) {
+    if (!list)
+        return NULL;
+    if (list->type != PSTROBJ_LIST && list->type != PSTROBJ_DICT)
+        return NULL;
+
+    pstrobj_t *node;
+
+    if (!(node = list_get_index(list->child, i)))
+        return NULL;
+
+    list_remove_item(list, node);
+    return node;
 }
