@@ -60,6 +60,7 @@ enum pstrobj_flag {
     PSTROBJ_FLAG_ROOT = 1,
     PSTROBJ_FLAG_ARENA = 2,
     PSTROBJ_FLAG_WRAP = 3,
+    PSTROBJ_FLAG_WRAP_KEY = 4,
 };
 
 struct pstrobj_t {
@@ -68,6 +69,7 @@ struct pstrobj_t {
     pstrobj_t *child;
     allocator_t *allocator;
 
+    pstring_t *key;
     int type;
     int flags;
 
@@ -110,11 +112,15 @@ PSTR_API int pstrobj_set_double(pstrobj_t *obj, double value);
 **/
 PSTR_API int pstrobj_copy_string(pstrobj_t *obj, const char *str, size_t len);
 PSTR_API int pstrobj_copy_pstring(pstrobj_t *obj, const pstring_t *str);
+PSTR_API int pstrobj_copy_key(pstrobj_t *obj, const pstring_t *str);
+PSTR_API int pstrobj_copy_keys(pstrobj_t *obj, const char *str, size_t len);
 
 /** Wraps the contents of `str` as the value of `obj`.
     Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
 **/
 PSTR_API int pstrobj_wrap_string(pstrobj_t *obj, const char *str, size_t len);
 PSTR_API int pstrobj_wrap_pstring(pstrobj_t *obj, const pstring_t *str);
+PSTR_API int pstrobj_wrap_key(pstrobj_t *obj, const pstring_t *str);
+PSTR_API int pstrobj_wrap_keys(pstrobj_t *obj, const char *str, size_t len);
 
 #endif

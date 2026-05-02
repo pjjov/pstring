@@ -25,10 +25,12 @@
 #include <allocator_std.h>
 #include <pf_macro.h>
 
-#define PSTROBJ_BUFFER(x) (&pf_container_of((x), struct pstrobj_str, obj)->str)
+#define PSTROBJ_BUFFER(x, NAME)                            \
+    (&pf_container_of((x), struct pstrobj_str, obj)->NAME)
 
 struct pstrobj_str {
     pstrobj_t obj;
+    pstring_t key;
     pstring_t str;
 };
 
@@ -44,6 +46,7 @@ pstrobj_t *pstrobj_new(allocator_t *alloc) {
     obj->next = NULL;
     obj->prev = NULL;
     obj->child = NULL;
+    obj->key = NULL;
     obj->allocator = alloc;
     obj->type = PSTROBJ_NULL;
     obj->flags = PSTROBJ_FLAG_ROOT;
@@ -131,7 +134,7 @@ int pstrobj_copy_string(pstrobj_t *obj, const char *str, size_t len) {
 
     obj->type = PSTROBJ_STRING;
     obj->flags = PF_FLAG_CLEAR(obj->flags, PSTROBJ_FLAG_WRAP);
-    obj->as.string = PSTROBJ_BUFFER(obj);
+    obj->as.string = PSTROBJ_BUFFER(obj, str);
     pstrnew(obj->as.string, str, len, obj->allocator);
     return PSTRING_OK;
 }
@@ -148,7 +151,7 @@ int pstrobj_wrap_string(pstrobj_t *obj, const char *str, size_t len) {
 
     obj->type = PSTROBJ_STRING;
     obj->flags = PF_FLAG_SET(obj->flags, PSTROBJ_FLAG_WRAP);
-    obj->as.string = PSTROBJ_BUFFER(obj);
+    obj->as.string = PSTROBJ_BUFFER(obj, str);
     pstrwrap(obj->as.string, (char *)str, len, 0);
     return PSTRING_OK;
 }
@@ -157,4 +160,36 @@ int pstrobj_wrap_pstring(pstrobj_t *obj, const pstring_t *str) {
     if (!obj || !str)
         return PSTRING_EINVAL;
     return pstrobj_wrap_string(obj, pstrbuf(str), pstrlen(str));
+}
+
+int pstrobj_copy_key(pstrobj_t *obj, const pstring_t *str) {
+    if (!obj || !str)
+        return NULL;
+    return pstrobj_copy_keys(obj, pstrbuf(str), pstrlen(str));
+}
+
+int pstrobj_copy_keys(pstrobj_t *obj, const char *str, size_t len) {
+    if (!obj || (!str && len > 0))
+        return PSTRING_EINVAL;
+
+    obj->flags = PF_FLAG_CLEAR(obj->flags, PSTROBJ_FLAG_WRAP_KEY);
+    obj->key = PSTROBJ_BUFFER(obj, key);
+    pstrnew(obj->key, str, len, obj->allocator);
+    return PSTRING_OK;
+}
+
+int pstrobj_wrap_key(pstrobj_t *obj, const pstring_t *str) {
+    if (!obj || !str)
+        return PSTRING_EINVAL;
+    return pstrobj_wrap_string(obj, pstrbuf(str), pstrlen(str));
+}
+
+int pstrobj_wrap_keys(pstrobj_t *obj, const char *str, size_t len) {
+    if (!obj || (!str && len > 0))
+        return PSTRING_EINVAL;
+
+    obj->flags = PF_FLAG_SET(obj->flags, PSTROBJ_FLAG_WRAP_KEY);
+    obj->key = PSTROBJ_BUFFER(obj, key);
+    pstrwrap(obj->key, (char *)str, len, 0);
+    return PSTRING_OK;
 }
