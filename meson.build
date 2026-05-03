@@ -5,6 +5,7 @@
 project('pstring', 'c')
 
 src = [
+    'src/format/json.c',
     'src/dictionary.c',
     'src/encoding.c',
     'src/io.c',
