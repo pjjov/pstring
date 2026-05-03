@@ -91,6 +91,8 @@ struct pstrobj_t {
     } as;
 };
 
+typedef pstrobj_t *(pstrobj_load_fn)(pstream_t * stream, allocator_t *alloc);
+
 /** Allocates a new object with NULL type. **/
 PSTR_API pstrobj_t *pstrobj_new(allocator_t *allocator);
 
@@ -102,6 +104,9 @@ PSTR_API pstrobj_t *pstrobj_from_buffer(
 /** Loads an object in `format` by reading from `stream`. **/
 PSTR_API pstrobj_t *pstrobj_from_stream(
     const char *format, pstream_t *stream, allocator_t *allocator
+);
+PSTR_API pstrobj_t *pstrobj_load_json(
+    pstream_t *stream, allocator_t *allocator
 );
 
 /** Frees object and it's children if it's detached. **/

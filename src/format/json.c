@@ -21,6 +21,7 @@
 #include <pstring/dictionary.h>
 #include <pstring/encoding.h>
 #include <pstring/io.h>
+#include <pstring/object.h>
 #include <pstring/pstring.h>
 
 #include <stdlib.h>
@@ -612,4 +613,134 @@ int pstream_load_json(
     int result = json_read_model(&json, obj, model);
     /* seek back */
     return result;
+}
+
+static int json_read_obj(struct json_reader *json, pstrobj_t *out);
+
+static int json_read_obj_pair(
+    struct json_reader *json, pstrobj_t *out, pstrobj_t *child
+) {
+    int result;
+
+    if (!json_expect(json, '"')) /* key */
+        return PSTRING_EINVAL;
+
+    json_consume(json, ':');
+
+    if (pstrobj_copy_key(out, &json->prevValue))
+        return PSTRING_ENOMEM;
+
+    if ((result = json_read_obj(json, out)))
+        return result;
+
+    if ((result = pstrobj_dict_insert(out, child)))
+        return result;
+
+    return PSTRING_OK;
+}
+
+static int json_read_obj_index(
+    struct json_reader *json, pstrobj_t *out, pstrobj_t *child, size_t index
+) {
+    int result;
+
+    if ((result = json_read_obj(json, out)))
+        return result;
+
+    if ((result = pstrobj_list_insert(out, child, index)))
+        return result;
+
+    return PSTRING_OK;
+}
+
+static int json_read_obj(struct json_reader *json, pstrobj_t *out) {
+    int result;
+
+    json_advance(json);
+
+    switch (json->prev) {
+    case '{': {
+        pstrobj_t *child;
+        pstrobj_set_dict(out);
+
+        while (!json_match(json, '}')) {
+            if (out->child != NULL)
+                json_consume(json, ',');
+
+            if (!(child = pstrobj_new(out->allocator)))
+                return PSTRING_ENOMEM;
+
+            if ((result = json_read_obj_pair(json, out, child))) {
+                pstrobj_free(child);
+                return result;
+            }
+        }
+
+        return PSTRING_OK;
+    }
+
+    case '[': {
+        pstrobj_t *child;
+        size_t count = 0;
+        pstrobj_set_list(out);
+
+        while (!json_match(json, ']')) {
+            if (out->child != NULL)
+                json_consume(json, ',');
+
+            if (!(child = pstrobj_new(out->allocator)))
+                return PSTRING_ENOMEM;
+
+            if ((result = json_read_obj_index(json, out, child, count++))) {
+                pstrobj_free(child);
+                return result;
+            }
+        }
+
+        return PSTRING_OK;
+    }
+
+    case '"':
+        return pstrobj_copy_pstring(out, &json->prevValue);
+
+    case 't':
+    case 'f':
+        return pstrobj_set_bool(out, json->prev == 't');
+    case 'n':
+        return pstrobj_set_null(out);
+
+    case 'd': {
+        double value = strtold(pstrbuf(&json->prevValue), NULL);
+        return pstrobj_set_double(out, value);
+    }
+
+    default:
+        break;
+    }
+
+    return PSTRING_EINVAL;
+}
+
+pstrobj_t *pstrobj_load_json(pstream_t *stream, allocator_t *allocator) {
+    if (!stream)
+        return NULL;
+
+    pstrobj_t *obj;
+    struct json_reader json;
+    json.failed = 0;
+    json.lexer.stream = stream;
+    json.lexer.eof = 0;
+    json.lexer.start = 0;
+    json.lexer.end = 0;
+
+    if (!(obj = pstrobj_new(allocator)))
+        return NULL;
+
+    json_advance(&json);
+    if (json_read_obj(&json, obj)) {
+        pstrobj_free(obj);
+        return NULL;
+    }
+
+    return obj;
 }

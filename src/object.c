@@ -18,6 +18,7 @@
     limitations under the License.
 */
 
+#include <pstring/io.h>
 #include <pstring/object.h>
 #include <pstring/pstring.h>
 
@@ -72,6 +73,48 @@ void pstrobj_free(pstrobj_t *obj) {
     if (!obj || !PF_FLAG_TEST(obj->flags, PSTROBJ_FLAG_ROOT))
         return;
     pstrobj__free(obj);
+}
+
+pstrobj_t *pstrobj_from_buffer(
+    const char *format, pstring_t *source, allocator_t *allocator
+) {
+    if (!format || !source)
+        return NULL;
+
+    pstream_t stream;
+    if (pstream_string(&stream, source))
+        return NULL;
+
+    pstream_seek(&stream, PSTR_SEEK_SET, 0);
+    pstrobj_t *res = pstrobj_from_stream(format, &stream, allocator);
+    pstream_close(&stream);
+
+    return res;
+}
+
+static struct {
+    const char *name;
+    pstrobj_load_fn *load;
+} formats[] = {
+    { "json", pstrobj_load_json },
+    { 0 },
+};
+
+static int find_format(const char *name) {
+    for (int i = 0; formats[i].name; i++)
+        if (0 == strcmp(name, formats[i].name))
+            return i;
+    return -1;
+}
+
+pstrobj_t *pstrobj_from_stream(
+    const char *format, pstream_t *stream, allocator_t *allocator
+) {
+    if (!format || !stream)
+        return NULL;
+
+    int i = find_format(format);
+    return i != -1 ? formats[i].load(stream, allocator) : NULL;
 }
 
 static void free_string(pstrobj_t *obj) {
@@ -159,7 +202,7 @@ int pstrobj_copy_string(pstrobj_t *obj, const char *str, size_t len) {
 
 int pstrobj_copy_pstring(pstrobj_t *obj, const pstring_t *str) {
     if (!obj || !str)
-        return NULL;
+        return PSTRING_EINVAL;
     return pstrobj_copy_string(obj, pstrbuf(str), pstrlen(str));
 }
 
@@ -182,7 +225,7 @@ int pstrobj_wrap_pstring(pstrobj_t *obj, const pstring_t *str) {
 
 int pstrobj_copy_key(pstrobj_t *obj, const pstring_t *str) {
     if (!obj || !str)
-        return NULL;
+        return PSTRING_EINVAL;
     return pstrobj_copy_keys(obj, pstrbuf(str), pstrlen(str));
 }
 
