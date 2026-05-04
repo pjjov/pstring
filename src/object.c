@@ -60,7 +60,7 @@ static void pstrobj__free(pstrobj_t *obj) {
         pstrobj__free(obj->child);
 
     if (obj->next)
-        pstrobj__free(obj->child);
+        pstrobj__free(obj->next);
 
     if (!PF_FLAG_TEST(obj->flags, PSTROBJ_FLAG_WRAP))
         pstrfree(obj->as.string);
@@ -92,11 +92,26 @@ pstrobj_t *pstrobj_from_buffer(
     return res;
 }
 
+int pstrobj_to_buffer(pstrobj_t *obj, const char *format, pstring_t *source) {
+    if (!obj || !format || !source)
+        return PSTRING_EINVAL;
+
+    pstream_t stream;
+    if (pstream_string(&stream, source))
+        return PSTRING_EINVAL;
+
+    int res = pstrobj_to_stream(obj, format, &stream);
+    pstream_close(&stream);
+
+    return res;
+}
+
 static struct {
     const char *name;
     pstrobj_load_fn *load;
+    pstrobj_save_fn *save;
 } formats[] = {
-    { "json", pstrobj_load_json },
+    { "json", pstrobj_load_json, pstrobj_save_json },
     { 0 },
 };
 
@@ -115,6 +130,14 @@ pstrobj_t *pstrobj_from_stream(
 
     int i = find_format(format);
     return i != -1 ? formats[i].load(stream, allocator) : NULL;
+}
+
+int pstrobj_to_stream(pstrobj_t *obj, const char *format, pstream_t *stream) {
+    if (!format || !obj || !stream)
+        return PSTRING_EINVAL;
+
+    int i = find_format(format);
+    return i != -1 ? formats[i].save(obj, stream) : PSTRING_ENOSYS;
 }
 
 static void free_string(pstrobj_t *obj) {
@@ -196,8 +219,7 @@ int pstrobj_copy_string(pstrobj_t *obj, const char *str, size_t len) {
     obj->type = PSTROBJ_STRING;
     obj->flags = PF_FLAG_CLEAR(obj->flags, PSTROBJ_FLAG_WRAP);
     obj->as.string = PSTROBJ_BUFFER(obj, str);
-    pstrnew(obj->as.string, str, len, obj->allocator);
-    return PSTRING_OK;
+    return pstrnew(obj->as.string, str, len, obj->allocator);
 }
 
 int pstrobj_copy_pstring(pstrobj_t *obj, const pstring_t *str) {
@@ -235,8 +257,7 @@ int pstrobj_copy_keys(pstrobj_t *obj, const char *str, size_t len) {
 
     obj->flags = PF_FLAG_CLEAR(obj->flags, PSTROBJ_FLAG_WRAP_KEY);
     obj->key = PSTROBJ_BUFFER(obj, key);
-    pstrnew(obj->key, str, len, obj->allocator);
-    return PSTRING_OK;
+    return pstrnew(obj->key, str, len, obj->allocator);
 }
 
 int pstrobj_wrap_key(pstrobj_t *obj, const pstring_t *str) {

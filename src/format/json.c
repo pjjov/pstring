@@ -627,10 +627,10 @@ static int json_read_obj_pair(
 
     json_consume(json, ':');
 
-    if (pstrobj_copy_key(out, &json->prevValue))
+    if (pstrobj_copy_key(child, &json->prevValue))
         return PSTRING_ENOMEM;
 
-    if ((result = json_read_obj(json, out)))
+    if ((result = json_read_obj(json, child)))
         return result;
 
     if ((result = pstrobj_dict_insert(out, child)))
@@ -644,7 +644,7 @@ static int json_read_obj_index(
 ) {
     int result;
 
-    if ((result = json_read_obj(json, out)))
+    if ((result = json_read_obj(json, child)))
         return result;
 
     if ((result = pstrobj_list_insert(out, child, index)))
@@ -663,7 +663,7 @@ static int json_read_obj(struct json_reader *json, pstrobj_t *out) {
         pstrobj_t *child;
         pstrobj_set_dict(out);
 
-        while (!json_match(json, '}')) {
+        while (!json->failed && !json_match(json, '}')) {
             if (out->child != NULL)
                 json_consume(json, ',');
 
@@ -684,7 +684,7 @@ static int json_read_obj(struct json_reader *json, pstrobj_t *out) {
         size_t count = 0;
         pstrobj_set_list(out);
 
-        while (!json_match(json, ']')) {
+        while (!json->failed && !json_match(json, ']')) {
             if (out->child != NULL)
                 json_consume(json, ',');
 
@@ -737,10 +737,63 @@ pstrobj_t *pstrobj_load_json(pstream_t *stream, allocator_t *allocator) {
         return NULL;
 
     json_advance(&json);
-    if (json_read_obj(&json, obj)) {
+    if (json_read_obj(&json, obj) || json.failed) {
         pstrobj_free(obj);
         return NULL;
     }
 
     return obj;
+}
+
+static int json_write_obj(pstrobj_t *o, pstream_t *s) {
+    switch (o->type) {
+        /* clang-format off */
+    case PSTROBJ_NULL: return pstream_puts(s, "null");
+    case PSTROBJ_BOOL: return pstream_puts(s, o->as.bool_ ? "true" : "false");
+    case PSTROBJ_LONG: return pstream_printf(s, "%ld", o->as.long_);
+    case PSTROBJ_DOUBLE: return pstream_printf(s, "%f", o->as.double_);
+    case PSTROBJ_STRING: return pstream_printf(s, "\"%!json%P\"", o->as.string);
+        /* clang-format on */
+
+    case PSTROBJ_LIST: {
+        pstrobj_t *child;
+        int result = PSTRING_OK;
+        pstream_putc(s, '[');
+
+        for (child = o->child; !result && child; child = child->next) {
+            if (child != o->child)
+                pstream_putc(s, ',');
+            result = json_write_obj(child, s);
+        }
+
+        pstream_putc(s, ']');
+        return result;
+    }
+    case PSTROBJ_DICT: {
+        pstrobj_t *ch;
+        int result = PSTRING_OK;
+        pstream_putc(s, '{');
+
+        for (ch = o->child; !result && ch; ch = ch->next) {
+            if (ch != o->child)
+                pstream_putc(s, ',');
+
+            result = pstream_printf(s, "\"%!json%P\":", o->key)
+                || json_write_obj(ch, s);
+        }
+
+        pstream_putc(s, '}');
+        return result;
+    }
+
+    default:
+        return PSTRING_EINVAL;
+    }
+}
+
+int pstrobj_save_json(pstrobj_t *obj, pstream_t *stream) {
+    if (!obj || !stream)
+        return PSTRING_EINVAL;
+
+    return json_write_obj(obj, stream);
 }
