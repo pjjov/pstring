@@ -276,6 +276,8 @@ int pstrdup(pstring_t *out, const pstring_t *str, allocator_t *allocator) {
     if (!out || !str)
         return PSTRING_EINVAL;
 
+    if (pstrlen(str) == 0)
+        return pstralloc(out, 0, allocator);
     return pstrnew(out, pstrbuf(str), pstrlen(str), allocator);
 }
 

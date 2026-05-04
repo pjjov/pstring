@@ -216,64 +216,92 @@ int pstrobj_copy_string(pstrobj_t *obj, const char *str, size_t len) {
     if (!obj || (!str && len > 0))
         return PSTRING_EINVAL;
 
-    obj->type = PSTROBJ_STRING;
-    obj->flags = PF_FLAG_CLEAR(obj->flags, PSTROBJ_FLAG_WRAP);
-    obj->as.string = PSTROBJ_BUFFER(obj, str);
-    return pstrnew(obj->as.string, str, len, obj->allocator);
+    pstring_t tmp;
+    pstrwrap(&tmp, (char *)str, len, 0);
+    return pstrobj_copy_pstring(obj, &tmp);
 }
 
 int pstrobj_copy_pstring(pstrobj_t *obj, const pstring_t *str) {
     if (!obj || !str)
         return PSTRING_EINVAL;
-    return pstrobj_copy_string(obj, pstrbuf(str), pstrlen(str));
+
+    obj->type = PSTROBJ_STRING;
+    obj->flags = PF_FLAG_CLEAR(obj->flags, PSTROBJ_FLAG_WRAP);
+    obj->as.string = PSTROBJ_BUFFER(obj, str);
+    return pstrdup(obj->as.string, str, obj->allocator);
 }
 
 int pstrobj_wrap_string(pstrobj_t *obj, const char *str, size_t len) {
     if (!obj || (!str && len > 0))
         return PSTRING_EINVAL;
 
-    obj->type = PSTROBJ_STRING;
-    obj->flags = PF_FLAG_SET(obj->flags, PSTROBJ_FLAG_WRAP);
-    obj->as.string = PSTROBJ_BUFFER(obj, str);
-    pstrwrap(obj->as.string, (char *)str, len, 0);
-    return PSTRING_OK;
+    pstring_t tmp;
+    pstrwrap(&tmp, (char *)str, len, 0);
+    return pstrobj_copy_pstring(obj, &tmp);
 }
 
 int pstrobj_wrap_pstring(pstrobj_t *obj, const pstring_t *str) {
     if (!obj || !str)
         return PSTRING_EINVAL;
-    return pstrobj_wrap_string(obj, pstrbuf(str), pstrlen(str));
+
+    obj->type = PSTROBJ_STRING;
+    obj->flags = PF_FLAG_SET(obj->flags, PSTROBJ_FLAG_WRAP);
+    obj->as.string = PSTROBJ_BUFFER(obj, str);
+    return pstrslice(obj->as.string, str, 0, pstrlen(str));
 }
 
 int pstrobj_copy_key(pstrobj_t *obj, const pstring_t *str) {
     if (!obj || !str)
         return PSTRING_EINVAL;
-    return pstrobj_copy_keys(obj, pstrbuf(str), pstrlen(str));
+
+    obj->type = PSTROBJ_STRING;
+    obj->flags = PF_FLAG_CLEAR(obj->flags, PSTROBJ_FLAG_WRAP_KEY);
+    obj->key = PSTROBJ_BUFFER(obj, key);
+    return pstrdup(obj->key, str, obj->allocator);
 }
 
 int pstrobj_copy_keys(pstrobj_t *obj, const char *str, size_t len) {
     if (!obj || (!str && len > 0))
         return PSTRING_EINVAL;
 
-    obj->flags = PF_FLAG_CLEAR(obj->flags, PSTROBJ_FLAG_WRAP_KEY);
-    obj->key = PSTROBJ_BUFFER(obj, key);
-    return pstrnew(obj->key, str, len, obj->allocator);
+    pstring_t tmp;
+    pstrwrap(&tmp, (char *)str, len, 0);
+    return pstrobj_copy_key(obj, &tmp);
 }
 
 int pstrobj_wrap_key(pstrobj_t *obj, const pstring_t *str) {
     if (!obj || !str)
         return PSTRING_EINVAL;
-    return pstrobj_wrap_string(obj, pstrbuf(str), pstrlen(str));
+
+    obj->type = PSTROBJ_STRING;
+    obj->flags = PF_FLAG_SET(obj->flags, PSTROBJ_FLAG_WRAP_KEY);
+    obj->key = PSTROBJ_BUFFER(obj, key);
+    return pstrslice(obj->key, str, 0, pstrlen(str));
 }
 
 int pstrobj_wrap_keys(pstrobj_t *obj, const char *str, size_t len) {
     if (!obj || (!str && len > 0))
         return PSTRING_EINVAL;
 
-    obj->flags = PF_FLAG_SET(obj->flags, PSTROBJ_FLAG_WRAP_KEY);
+    pstring_t tmp;
+    pstrwrap(&tmp, (char *)str, len, 0);
+    return pstrobj_wrap_key(obj, &tmp);
+}
+
+void pstrobj__set_string(pstrobj_t *obj, pstring_t *str) {
+    if (!obj || !str)
+        return;
+
+    obj->as.string = PSTROBJ_BUFFER(obj, str);
+    *obj->as.string = *str;
+}
+
+void pstrobj__set_key(pstrobj_t *obj, pstring_t *key) {
+    if (!obj || !key)
+        return;
+
     obj->key = PSTROBJ_BUFFER(obj, key);
-    pstrwrap(obj->key, (char *)str, len, 0);
-    return PSTRING_OK;
+    *obj->key = *key;
 }
 
 pstrobj_t *list_get_index(pstrobj_t *head, size_t index) {
@@ -466,6 +494,10 @@ pstrobj_t *pstrobj_query(pstrobj_t *obj, const char *query) {
 
     if (pstrlen(&search) == 0)
         return obj;
+
+    if (pstrget(&search, 0) != '/')
+        return NULL;
+    pstrrshift(&search, 1);
 
     pstring_t unescaped, escaped = { 0 };
     char *sep, *end = pstrend(&search);

@@ -280,8 +280,9 @@ static int json_reserve(struct json_lexer *lex, size_t count) {
     if (lex->eof || diff >= count)
         return PSTRING_OK;
 
-    if (diff > 0 && lex->start > 0) {
-        memmove(lex->buf, &lex->buf[lex->start], diff);
+    if (lex->start > 0) {
+        if (diff > 0)
+            memmove(lex->buf, &lex->buf[lex->start], diff);
         lex->start = 0;
         lex->end = diff;
     }
@@ -617,18 +618,38 @@ int pstream_load_json(
 
 static int json_read_obj(struct json_reader *json, pstrobj_t *out);
 
+static int obj_copy_string(pstrobj_t *obj, pstring_t *dst, pstring_t *src) {
+    if (pstralloc(dst, pstrlen(src), obj->allocator))
+        return PSTRING_ENOMEM;
+
+    if (pstrlen(src) == 0)
+        return PSTRING_OK;
+
+    if (pstrdec_json(dst, src)) {
+        pstrfree(dst);
+        return PSTRING_EINVAL;
+    }
+
+    return PSTRING_OK;
+}
+
 static int json_read_obj_pair(
     struct json_reader *json, pstrobj_t *out, pstrobj_t *child
 ) {
+    pstring_t tmp;
     int result;
 
     if (!json_expect(json, '"')) /* key */
         return PSTRING_EINVAL;
 
-    json_consume(json, ':');
+    if ((result = obj_copy_string(child, &tmp, &json->prevValue)))
+        return result;
+    pstrobj__set_key(child, &tmp);
 
     if (pstrobj_copy_key(child, &json->prevValue))
         return PSTRING_ENOMEM;
+
+    json_consume(json, ':');
 
     if ((result = json_read_obj(json, child)))
         return result;
@@ -655,7 +676,6 @@ static int json_read_obj_index(
 
 static int json_read_obj(struct json_reader *json, pstrobj_t *out) {
     int result;
-
     json_advance(json);
 
     switch (json->prev) {
@@ -700,8 +720,15 @@ static int json_read_obj(struct json_reader *json, pstrobj_t *out) {
         return PSTRING_OK;
     }
 
-    case '"':
-        return pstrobj_copy_pstring(out, &json->prevValue);
+    case '"': {
+        pstring_t tmp;
+
+        if ((result = obj_copy_string(out, &tmp, &json->prevValue)))
+            return result;
+
+        pstrobj__set_string(out, &tmp);
+        return PSTRING_OK;
+    }
 
     case 't':
     case 'f':
@@ -752,8 +779,13 @@ static int json_write_obj(pstrobj_t *o, pstream_t *s) {
     case PSTROBJ_BOOL: return pstream_puts(s, o->as.bool_ ? "true" : "false");
     case PSTROBJ_LONG: return pstream_printf(s, "%ld", o->as.long_);
     case PSTROBJ_DOUBLE: return pstream_printf(s, "%f", o->as.double_);
-    case PSTROBJ_STRING: return pstream_printf(s, "\"%!json%P\"", o->as.string);
         /* clang-format on */
+
+    case PSTROBJ_STRING:
+        if (pstrlen(o->as.string) > 0)
+            return pstream_printf(s, "\"%!json%P\"", o->as.string);
+        else
+            return pstream_puts(s, "\"\"");
 
     case PSTROBJ_LIST: {
         pstrobj_t *child;
@@ -778,7 +810,7 @@ static int json_write_obj(pstrobj_t *o, pstream_t *s) {
             if (ch != o->child)
                 pstream_putc(s, ',');
 
-            result = pstream_printf(s, "\"%!json%P\":", o->key)
+            result = pstream_printf(s, "\"%!json%P\":", ch->key)
                 || json_write_obj(ch, s);
         }
 

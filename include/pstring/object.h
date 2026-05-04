@@ -200,4 +200,8 @@ PSTR_INLINE int pstrobj_dict_free(
     return obj ? PSTROBJ_OK : PSTROBJ_EINVAL;
 }
 
+/* Forcefully sets the string or key by dereferencing `str`. */
+void pstrobj__set_string(pstrobj_t *obj, pstring_t *str);
+void pstrobj__set_key(pstrobj_t *obj, pstring_t *key);
+
 #endif
