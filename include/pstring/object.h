@@ -128,6 +128,10 @@ PSTR_API void pstrobj_free(pstrobj_t *obj);
 PSTR_API pstrobj_t *pstrobj_query(pstrobj_t *obj, const char *query);
 PSTR_API void *pstrobj_query_value(pstrobj_t *obj, const char *query);
 
+#define PSTROBJ_FOREACH(OBJ, CHILD)                                    \
+    for (CHILD = ((OBJ) != NULL ? (OBJ)->child : NULL); CHILD != NULL; \
+         CHILD = (CHILD)->next)
+
 /** Following functions set the object's value and type.
     Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
 **/
