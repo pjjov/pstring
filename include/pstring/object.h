@@ -144,6 +144,29 @@ PSTR_API int pstrobj_set_double(pstrobj_t *obj, double value);
 PSTR_API int pstrobj_set_list(pstrobj_t *obj);
 PSTR_API int pstrobj_set_dict(pstrobj_t *obj);
 
+/** Following functions return the object's value if `obj` has a matching type.
+    Otherwise a default value is returned and `status` is set to an error code.
+**/
+PSTR_API void pstrobj_expect_null(pstrobj_t *obj, int *status);
+PSTR_API int pstrobj_expect_bool(pstrobj_t *obj, int *status);
+PSTR_API int pstrobj_expect_int(pstrobj_t *obj, int *status);
+PSTR_API long pstrobj_expect_long(pstrobj_t *obj, int *status);
+PSTR_API float pstrobj_expect_float(pstrobj_t *obj, int *status);
+PSTR_API double pstrobj_expect_double(pstrobj_t *obj, int *status);
+PSTR_API const char *pstrobj_expect_string(pstrobj_t *obj, int *status);
+PSTR_API pstring_t *pstrobj_expect_pstring(pstrobj_t *obj, int *status);
+PSTR_API pstrobj_t *pstrobj_expect_list(pstrobj_t *obj, int *status);
+PSTR_API pstrobj_t *pstrobj_expect_dict(pstrobj_t *obj, int *status);
+
+/** Following functions return the object's value or the default value `def`,
+    depending on the type of `obj`, converting between types if necessary.
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
+**/
+PSTR_API int pstrobj_get_int(pstrobj_t *obj, int def);
+PSTR_API long pstrobj_get_long(pstrobj_t *obj, long def);
+PSTR_API float pstrobj_get_float(pstrobj_t *obj, float def);
+PSTR_API double pstrobj_get_double(pstrobj_t *obj, double def);
+
 /** Copies the contents of `str` as the value of `obj`.
     Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
 **/

@@ -304,6 +304,47 @@ void pstrobj__set_key(pstrobj_t *obj, pstring_t *key) {
     *obj->key = *key;
 }
 
+void pstrobj_expect_null(pstrobj_t *obj, int *status) {
+    if (!status)
+        return;
+
+    *status = !obj || obj->type == PSTROBJ_NULL ? PSTRING_OK : PSTRING_EINVAL;
+}
+
+#define IMPL_EXPECT(TYPE, ENUM, NAME, MEMBER)                 \
+    TYPE pstrobj_expect_##NAME(pstrobj_t *obj, int *status) { \
+        if (!obj) {                                           \
+            if (status)                                       \
+                *status = PSTRING_EINVAL;                     \
+            return 0;                                         \
+        }                                                     \
+        int res = obj && obj->type == ENUM;                   \
+        if (status)                                           \
+            *status = res;                                    \
+        return res ? obj->as.MEMBER : 0;                      \
+    }
+
+#define IMPL_DEFAULT(TYPE)                                \
+    TYPE pstrobj_get_##TYPE(pstrobj_t *obj, TYPE def) {   \
+        int status;                                       \
+        TYPE value = pstrobj_expect_##TYPE(obj, &status); \
+        return status ? def : value;                      \
+    }
+
+IMPL_EXPECT(int, PSTROBJ_BOOL, bool, bool_);
+IMPL_EXPECT(int, PSTROBJ_LONG, int, long_);
+IMPL_EXPECT(long, PSTROBJ_LONG, long, long_);
+IMPL_EXPECT(float, PSTROBJ_DOUBLE, float, double_);
+IMPL_EXPECT(double, PSTROBJ_DOUBLE, double, double_);
+
+IMPL_DEFAULT(int);
+IMPL_DEFAULT(long);
+IMPL_DEFAULT(float);
+IMPL_DEFAULT(double);
+
+#undef IMPL_EXPECT
+#undef IMPL_DEFAULT
+
 pstrobj_t *list_get_index(pstrobj_t *head, size_t index) {
     pstrobj_t *curr = head;
     for (size_t i = 0; i < index && curr != NULL; i++)
