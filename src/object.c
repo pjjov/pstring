@@ -92,6 +92,18 @@ pstrobj_t *pstrobj_from_buffer(
     return res;
 }
 
+pstrobj_t *pstrobj_from_path(
+    const char *format, const char *path, allocator_t *allocator
+) {
+    pstream_t stream;
+    if (pstream_open(&stream, path, "rb"))
+        return NULL;
+
+    pstrobj_t *res = pstrobj_from_stream(format, &stream, allocator);
+    pstream_close(&stream);
+    return res;
+}
+
 int pstrobj_to_buffer(pstrobj_t *obj, const char *format, pstring_t *source) {
     if (!obj || !format || !source)
         return PSTRING_EINVAL;

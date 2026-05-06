@@ -110,6 +110,11 @@ PSTR_API pstrobj_t *pstrobj_load_json(
     pstream_t *stream, allocator_t *allocator
 );
 
+/** Loads an object in `format` by reading from the file at `path`. **/
+PSTR_API pstrobj_t *pstrobj_from_path(
+    const char *format, const char *path, allocator_t *allocator
+);
+
 /** Saves an object to `source` in specified `format`. **/
 PSTR_API int pstrobj_to_buffer(
     pstrobj_t *obj, const char *format, pstring_t *source
