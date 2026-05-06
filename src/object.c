@@ -319,8 +319,8 @@ void pstrobj__set_key(pstrobj_t *obj, pstring_t *key) {
 void pstrobj_expect_null(pstrobj_t *obj, int *status) {
     if (!status)
         return;
-
-    *status = !obj || obj->type == PSTROBJ_NULL ? PSTRING_OK : PSTRING_EINVAL;
+    if (obj && obj->type == PSTROBJ_NULL)
+        *status = PSTRING_EINVAL;
 }
 
 #define IMPL_EXPECT(TYPE, ENUM, NAME, MEMBER)                 \
@@ -331,14 +331,14 @@ void pstrobj_expect_null(pstrobj_t *obj, int *status) {
             return 0;                                         \
         }                                                     \
         int res = obj && obj->type == ENUM;                   \
-        if (status)                                           \
-            *status = res;                                    \
+        if (status && !res)                                   \
+            *status = PSTRING_EINVAL;                         \
         return res ? obj->as.MEMBER : 0;                      \
     }
 
 #define IMPL_DEFAULT(TYPE)                                \
     TYPE pstrobj_get_##TYPE(pstrobj_t *obj, TYPE def) {   \
-        int status;                                       \
+        int status = 0;                                   \
         TYPE value = pstrobj_expect_##TYPE(obj, &status); \
         return status ? def : value;                      \
     }
