@@ -163,6 +163,27 @@ PSTR_API pstring_t *pstrobj_expect_pstring(pstrobj_t *obj, int *status);
 PSTR_API pstrobj_t *pstrobj_expect_list(pstrobj_t *obj, int *status);
 PSTR_API pstrobj_t *pstrobj_expect_dict(pstrobj_t *obj, int *status);
 
+/** Following functions query `obj` for a child and return the child's value
+    if `obj` has a matching type. Otherwise a default value is returned and
+    `status` is set to an error code.
+**/
+#define PSTROBJ__IMPL_QUERY(NAME, TYPE)                                  \
+    PSTR_INLINE TYPE pstrobj_query_##NAME(                               \
+        pstrobj_t *obj, const char *query, int *status                   \
+    ) {                                                                  \
+        return pstrobj_expect_##NAME(pstrobj_query(obj, query), status); \
+    }
+PSTROBJ__IMPL_QUERY(bool, int);
+PSTROBJ__IMPL_QUERY(int, int);
+PSTROBJ__IMPL_QUERY(long, long);
+PSTROBJ__IMPL_QUERY(float, float);
+PSTROBJ__IMPL_QUERY(double, double);
+PSTROBJ__IMPL_QUERY(string, const char *);
+PSTROBJ__IMPL_QUERY(pstring, pstring_t *);
+PSTROBJ__IMPL_QUERY(list, pstrobj_t *);
+PSTROBJ__IMPL_QUERY(dict, pstrobj_t *);
+#undef PSTROBJ__IMPL_QUERY
+
 /** Following functions return the object's value or the default value `def`,
     depending on the type of `obj`, converting between types if necessary.
     Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
