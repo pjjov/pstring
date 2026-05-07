@@ -323,18 +323,50 @@ void pstrobj_expect_null(pstrobj_t *obj, int *status) {
         *status = PSTRING_EINVAL;
 }
 
-#define IMPL_EXPECT(TYPE, ENUM, NAME, MEMBER)                 \
-    TYPE pstrobj_expect_##NAME(pstrobj_t *obj, int *status) { \
-        if (!obj) {                                           \
-            if (status)                                       \
-                *status = PSTRING_EINVAL;                     \
-            return 0;                                         \
-        }                                                     \
-        int res = obj && obj->type == ENUM;                   \
-        if (status && !res)                                   \
-            *status = PSTRING_EINVAL;                         \
-        return res ? obj->as.MEMBER : 0;                      \
+#define EXPECT_NULL_CHECK             \
+    if (!obj) {                       \
+        if (status)                   \
+            *status = PSTRING_EINVAL; \
+        return 0;                     \
     }
+
+int pstrobj_expect_bool(pstrobj_t *obj, int *status) {
+    EXPECT_NULL_CHECK;
+    int res = obj && obj->type == PSTROBJ_BOOL;
+    if (status && !res)
+        *status = PSTRING_EINVAL;
+    return res ? obj->as.bool_ : 0;
+}
+
+int pstrobj_expect_int(pstrobj_t *obj, int *status) {
+    return pstrobj_expect_long(obj, status);
+}
+
+long pstrobj_expect_long(pstrobj_t *obj, int *status) {
+    EXPECT_NULL_CHECK;
+
+    int res = obj && (obj->type == PSTROBJ_LONG || obj->type == PSTROBJ_DOUBLE);
+    if (status && !res)
+        *status = PSTRING_EINVAL;
+
+    if (!res && obj->type == PSTROBJ_DOUBLE)
+        return obj->as.double_;
+
+    return res ? obj->as.long_ : 0;
+}
+
+double pstrobj_expect_double(pstrobj_t *obj, int *status) {
+    EXPECT_NULL_CHECK;
+
+    int res = obj && (obj->type == PSTROBJ_LONG || obj->type == PSTROBJ_DOUBLE);
+    if (status && !res)
+        *status = PSTRING_EINVAL;
+
+    if (!res && obj->type == PSTROBJ_LONG)
+        return obj->as.long_;
+
+    return res ? obj->as.double_ : 0;
+}
 
 #define IMPL_DEFAULT(TYPE)                                \
     TYPE pstrobj_get_##TYPE(pstrobj_t *obj, TYPE def) {   \
@@ -343,18 +375,11 @@ void pstrobj_expect_null(pstrobj_t *obj, int *status) {
         return status ? def : value;                      \
     }
 
-IMPL_EXPECT(int, PSTROBJ_BOOL, bool, bool_);
-IMPL_EXPECT(int, PSTROBJ_LONG, int, long_);
-IMPL_EXPECT(long, PSTROBJ_LONG, long, long_);
-IMPL_EXPECT(float, PSTROBJ_DOUBLE, float, double_);
-IMPL_EXPECT(double, PSTROBJ_DOUBLE, double, double_);
-
 IMPL_DEFAULT(int);
 IMPL_DEFAULT(long);
 IMPL_DEFAULT(float);
 IMPL_DEFAULT(double);
 
-#undef IMPL_EXPECT
 #undef IMPL_DEFAULT
 
 pstrobj_t *list_get_index(pstrobj_t *head, size_t index) {
