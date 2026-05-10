@@ -35,6 +35,10 @@
 
     ## DESCRIPTION
 
+    `pstrobj_t` represents a dynamically typed object which can be saved to and
+    loaded from various formats. Unlike `struct pstrmodel` which maps objects
+    directly to C structures, `pstrobj` maintains the whole object in memory.
+
     [TOC]
 
     ## REFERENCE

@@ -51,7 +51,7 @@ typedef struct pstring_t pstring_t;
     ## REFERENCE
 **/
 
-/** `pstrdict_t` is a hashdict that stores key-value pairs, where the key is a
+/** `pstrdict_t` is a hashmap that stores key-value pairs, where the key is a
     `pstring` and the value is a `void` pointer. Since both keys and values are
     stored as pointers, no memory management is done for them.
 **/

@@ -59,6 +59,7 @@ install_headers(
 
 install_man(
     'docs/pstring.3',
+    'docs/pstring-dictionary.3',
     'docs/pstring-encoding.3'
 )
 

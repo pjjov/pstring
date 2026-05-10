@@ -1,0 +1,277 @@
+.\" pstring - String library for C with SIMD acceleration
+.\"
+.\" SPDX-FileCopyrightText: 2025-2026 Предраг Јовановић
+.\" SPDX-License-Identifier: Apache-2.0
+.TH pstring-dictionary 3 "May 10, 2026" pstring 
+.SH NAME
+
+.PP
+\fBpstring\-dictionary\fR \- key\-value dictionaries for \fBpstrings\fR\&.
+
+.SH DESCRIPTION
+
+.PP
+The \fBpstrdict_t\fR object is a container that stores key\-value pairs, where a key is a \fBpstring_t\fR pointer and a value is a void pointer\&.
+
+.PP
+Dictionaries allow fast lookups for string keys, while leaving memory management of keys and values to the user\&.
+
+.PP
+.SH SYNOPSIS
+.P
+.nf
+typedef struct pstrdict_t pstrdict_t;
+typedef size_t(pstrhash_fn)(const pstring_t *str);
+PSTR_API pstrdict_t *pstrdict_new(pstrhash_fn *hash, allocator_t *allocator);
+PSTR_API int pstrdict_reserve(pstrdict_t *dict, size_t count);
+PSTR_API void pstrdict_free(pstrdict_t *dict);
+PSTR_API size_t pstrdict_capacity(const pstrdict_t *dict);
+PSTR_API size_t pstrdict_count(const pstrdict_t *dict);
+PSTR_API allocator_t *pstrdict_allocator(const pstrdict_t *dict);
+PSTR_API void pstrdict_clear(pstrdict_t *dict);
+PSTR_API void *pstrdict_get(const pstrdict_t *dict, const pstring_t *key);
+PSTR_API void *pstrdict_gets(
+    const pstrdict_t *dict, const char *key, size_t length
+);
+PSTR_API int pstrdict_set(
+    pstrdict_t *dict, const pstring_t *key, const void *value
+);
+PSTR_API int pstrdict_insert(
+    pstrdict_t *dict, const pstring_t *key, const void *value
+);
+PSTR_API int pstrdict_remove(pstrdict_t *dict, const pstring_t *key);
+PSTR_API int pstrdict_finsert(
+    pstrdict_t *dict, const pstring_t *key, const void *value
+);
+typedef int(pstrdict_fn)(void *user, pstring_t *key, void *value);
+PSTR_API int pstrdict_each(pstrdict_t *dict, pstrdict_fn *fn, void *user);
+PSTR_API int pstrdict_filter(pstrdict_t *dict, pstrdict_fn *fn, void *user);
+.fi
+
+
+.SH REFERENCE
+
+.SS pstrhash_fn
+
+.nf
+.RS
+typedef struct pstrdict_t pstrdict_t;
+typedef size_t(pstrhash_fn)(const pstring_t *str);
+.RE
+.fi
+
+.PP
+\fBpstrdict_t\fR is a hashmap that stores key\-value pairs, where the key is a \fBpstring\fR and the value is a \fBvoid\fR pointer\&. Since both keys and values are stored as pointers, no memory management is done for them\&.
+
+.SS pstrdict_new
+
+.nf
+.RS
+PSTR_API pstrdict_t *pstrdict_new(pstrhash_fn *hash, allocator_t *allocator);
+.RE
+.fi
+
+.PP
+Allocates a new \fBpstrdict\fR using the \fBallocator\fR that will produce key hashes using the provided \fBhash\fR function\&. For each of the parameters that are \fBNULL\fR, the default ones will be used\&.
+
+.SS pstrdict_reserve
+
+.nf
+.RS
+PSTR_API int pstrdict_reserve(pstrdict_t *dict, size_t count);
+.RE
+.fi
+
+.PP
+Reserves space to fit at least \fBcount\fR more key\-value pairs inside \fBdict\fR\&. Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM\&.
+
+.SS pstrdict_free
+
+.nf
+.RS
+PSTR_API void pstrdict_free(pstrdict_t *dict);
+.RE
+.fi
+
+.PP
+Frees all memory resources used by \fBdict\fR\&.
+
+.SS pstrdict_capacity
+
+.nf
+.RS
+PSTR_API size_t pstrdict_capacity(const pstrdict_t *dict);
+.RE
+.fi
+
+.PP
+Returns the number of slots reserved in \fBdict\fR
+
+.SS pstrdict_count
+
+.nf
+.RS
+PSTR_API size_t pstrdict_count(const pstrdict_t *dict);
+.RE
+.fi
+
+.PP
+Returns the number of key\-value pairs in \fBdict\fR
+
+.SS pstrdict_allocator
+
+.nf
+.RS
+PSTR_API allocator_t *pstrdict_allocator(const pstrdict_t *dict);
+.RE
+.fi
+
+.PP
+Returns the allocator used by \fBdict\fR
+
+.SS pstrdict_clear
+
+.nf
+.RS
+PSTR_API void pstrdict_clear(pstrdict_t *dict);
+.RE
+.fi
+
+.PP
+Removes all key\-value pairs from \fBdict\fR
+
+.SS pstrdict_get
+
+.nf
+.RS
+PSTR_API void *pstrdict_get(const pstrdict_t *dict, const pstring_t *key);
+.RE
+.fi
+
+.PP
+Retrieves the value associated with \fBkey\fR or \fBNULL\fR if not found\&.
+
+.SS pstrdict_gets
+
+.nf
+.RS
+PSTR_API void *pstrdict_gets(
+    const pstrdict_t *dict, const char *key, size_t length
+);
+.RE
+.fi
+
+.PP
+Retrieves the value associated with \fBkey\fR or \fBNULL\fR if not found\&.
+
+.SS pstrdict_set
+
+.nf
+.RS
+PSTR_API int pstrdict_set(
+    pstrdict_t *dict, const pstring_t *key, const void *value
+);
+.RE
+.fi
+
+.PP
+Sets the value associated with \fBkey\fR to \fBvalue\fR, inserting them if \fBkey\fR is not already present in \fBdict\fR\&. Both pointers, the initial key and current value, must remain valid until they are removed or \fBdict\fR is destroyed\&.
+
+.PP
+Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM\&.
+
+.SS pstrdict_insert
+
+.nf
+.RS
+PSTR_API int pstrdict_insert(
+    pstrdict_t *dict, const pstring_t *key, const void *value
+);
+.RE
+.fi
+
+.PP
+Inserts the key\-value pair if it's not already present in \fBdict\fR\&. Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM, PSTRING_EEXIST\&.
+
+.SS pstrdict_remove
+
+.nf
+.RS
+PSTR_API int pstrdict_remove(pstrdict_t *dict, const pstring_t *key);
+.RE
+.fi
+
+.PP
+Removes the key\-value pair from \fBdict\fR, if it's found\&. Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM, PSTRING_ENOENT\&.
+
+.SS pstrdict_finsert
+
+.nf
+.RS
+PSTR_API int pstrdict_finsert(
+    pstrdict_t *dict, const pstring_t *key, const void *value
+);
+.RE
+.fi
+
+.PP
+Forcefully inserts the key\-value pair, without checking for it's presence\&. Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM\&.
+
+.SS pstrdict_fn
+
+.nf
+.RS
+typedef int(pstrdict_fn)(void *user, pstring_t *key, void *value);
+.RE
+.fi
+
+.PP
+Callback that traverses the key\-value pairs of a dictionary\&.
+
+.SS pstrdict_each
+
+.nf
+.RS
+PSTR_API int pstrdict_each(pstrdict_t *dict, pstrdict_fn *fn, void *user);
+.RE
+.fi
+
+.PP
+Calls \fBfn\fR for each key\-value pair inside \fBdict\fR\&. If a non\-zero value is returned by \fBfn\fR, the iteration is interrupted\&.
+
+.PP
+Possible error codes: PSTRING_EINVAL, PSTRING_EINTR\&.
+
+.SS pstrdict_filter
+
+.nf
+.RS
+PSTR_API int pstrdict_filter(pstrdict_t *dict, pstrdict_fn *fn, void *user);
+.RE
+.fi
+
+.PP
+Calls \fBfn\fR for each key\-value pair inside \fBdict\fR, removing them if \fBPSTRING_FALSE\fR is returned\&.
+
+.PP
+Possible error codes: PSTRING_EINVAL, PSTRING_EINTR\&.
+
+
+.SH RETURN VALUE
+.PP
+For functions that return signed integers, a \fB0\fR indicates that the function exited successfully.
+If instead a negative number is returned, it indicates a specific error that occurred during function's execution.
+The returned error codes are made to resemble POSIX in both meaning and numeric value.
+
+.PP
+Some functions can also return boolean constants (\fIPSTRING_TRUE\fR and \fPSTRING_FALSE\fR) alongside negative error codes,
+which might require you to explicitly compare returned values in order to prevent bugs.
+
+.SH SEE ALSO
+.BR pstring (3),
+.BR pstring-dictionary (3),
+.BR pstring-encoding (3),
+.BR pstring-io (3),
+.BR pstring-pattern (3).
+.SH AUTHOR
+Copyright (C) 2025-2026 Предраг Јовановић
