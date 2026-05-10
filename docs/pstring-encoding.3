@@ -1,8 +1,8 @@
 .\" pstring - String library for C with SIMD acceleration
 .\"
-.\" SPDX-FileCopyrightText: 2026 Предраг Јовановић
+.\" SPDX-FileCopyrightText: 2025-2026 Предраг Јовановић
 .\" SPDX-License-Identifier: Apache-2.0
-.TH pstring-encoding 3 "February 19, 2026" pstring 
+.TH pstring-encoding 3 "May 10, 2026" pstring 
 .SH NAME
 
 .PP
@@ -149,6 +149,8 @@ PSTR_API int pstrenc_base64(pstring_t *dst, const pstring_t *src);
 .PP
 Encodes \fBsrc\fR into a Base64\-encoded string\&. Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM\&.
 
+.SS pstrenc_base64url
+
 .nf
 .RS
 PSTR_API int pstrenc_base64url(pstring_t *dst, const pstring_t *src);
@@ -181,6 +183,8 @@ PSTR_API int pstrdec_base64(pstring_t *dst, const pstring_t *src);
 
 .PP
 Decodes a Base64\-encoded string from \fBsrc\fR\&. Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM\&.
+
+.SS pstrdec_base64url
 
 .nf
 .RS
@@ -360,4 +364,4 @@ which might require you to explicitly compare returned values in order to preven
 .BR pstring-io (3),
 .BR pstring-pattern (3).
 .SH AUTHOR
-Copyright (C) 2026 Предраг Јовановић
+Copyright (C) 2025-2026 Предраг Јовановић

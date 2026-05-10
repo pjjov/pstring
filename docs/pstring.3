@@ -1,8 +1,8 @@
 .\" pstring - String library for C with SIMD acceleration
 .\"
-.\" SPDX-FileCopyrightText: 2026 Предраг Јовановић
+.\" SPDX-FileCopyrightText: 2025-2026 Предраг Јовановић
 .\" SPDX-License-Identifier: Apache-2.0
-.TH pstring 3 "February 19, 2026" pstring 
+.TH pstring-pstring 3 "May 10, 2026" pstring 
 .SH NAME
 
 .PP
@@ -40,8 +40,8 @@ PSTR_INLINE char *pstrbuf(const pstring_t *str)
 PSTR_INLINE size_t pstrlen(const pstring_t *str) 
 PSTR_INLINE size_t pstrcap(const pstring_t *str) 
 PSTR_INLINE allocator_t *pstrallocator(const pstring_t *str) 
-PSTR_INLINE int pstrsso(pstring_t *str) 
-PSTR_INLINE int pstrowned(pstring_t *str) 
+PSTR_INLINE int pstrsso(const pstring_t *str) 
+PSTR_INLINE int pstrowned(const pstring_t *str) 
 PSTR_INLINE char *pstrend(const pstring_t *str) 
 PSTR_INLINE char pstrget(const pstring_t *str, size_t i) 
 PSTR_INLINE char *pstrslot(const pstring_t *str, size_t i) 
@@ -52,6 +52,7 @@ PSTR_API int pstrdup(
     pstring_t *out, const pstring_t *str, allocator_t *allocator
 );
 PSTR_API int pstralloc(pstring_t *out, size_t capacity, allocator_t *alloc);
+PSTR_API char *pstrunwrap(const pstring_t *str, allocator_t *allocator);
 PSTR_API void pstrdetect(void);
 PSTR_API int pstrwrap(
     pstring_t *out, char *buffer, size_t length, size_t capacity
@@ -71,6 +72,7 @@ PSTR_API int pstrequals(
     const pstring_t *left, const char *right, size_t length
 );
 PSTR_API int pstrcmp(const pstring_t *left, const pstring_t *right);
+PSTR_API int pstrcmps(const pstring_t *left, const char *right, size_t length);
 PSTR_API char *pstrchr(const pstring_t *str, int ch);
 PSTR_API char *pstrrchr(const pstring_t *str, int ch);
 PSTR_API char *pstrpbrk(const pstring_t *str, const char *set);
@@ -123,6 +125,7 @@ PSTR_API int pstrverrorf(const char *fmt, va_list args);
 PSTR_API int pstrstrip(pstring_t *str, const char *chars);
 PSTR_API int pstrlstrip(pstring_t *str, const char *chars);
 PSTR_API int pstrrstrip(pstring_t *str, const char *chars);
+PSTR_INLINE int pstrshift(pstring_t *str, size_t left, size_t right) 
 PSTR_API int pstrdedent(pstring_t *str, int count, int tab);
 PSTR_API int pstrindent(pstring_t *str, int count, int tab);
 PSTR_API int pstrprefix(
@@ -230,7 +233,9 @@ Returns the allocator used by \fBstr\fR or \fBNULL\fR if it's a slice\&.
 
 .nf
 .RS
-PSTR_INLINE int pstrsso(pstring_t *str) { return str && str->buffer == NULL; }
+PSTR_INLINE int pstrsso(const pstring_t *str) {
+    return str && str->buffer == NULL;
+}
 .RE
 .fi
 
@@ -241,7 +246,7 @@ Checks if \fBstr\fR is stored on the stack\&.
 
 .nf
 .RS
-PSTR_INLINE int pstrowned(pstring_t *str) {
+PSTR_INLINE int pstrowned(const pstring_t *str) {
     return pstrsso(str) || pstrallocator(str) != NULL;
 }
 .RE
@@ -326,6 +331,20 @@ PSTR_API int pstralloc(pstring_t *out, size_t capacity, allocator_t *alloc);
 .PP
 Initializes \fBout\fR and reserves \fBcapacity\fR bytes\&. Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM\&.
 
+.SS pstrunwrap
+
+.nf
+.RS
+PSTR_API char *pstrunwrap(const pstring_t *str, allocator_t *allocator);
+.RE
+.fi
+
+.PP
+Frees all resources used by \fBstr\fR, if it is owned\&. */ PSTR_API void pstrfree(pstring_t *str);
+
+.PP
+/** Returns the character buffer of \fBstr\fR\&. If \fBstr\fR is using SSO, the contents of \fBstr\fR will be copied to a brand new buffer\&.
+
 .SS pstrdetect
 
 .nf
@@ -335,10 +354,7 @@ PSTR_API void pstrdetect(void);
 .fi
 
 .PP
-Frees all resources used by \fBstr\fR, if it is owned\&. */ PSTR_API void pstrfree(pstring_t *str);
-
-.PP
-/** When \fBPSTRING_DETECT\fR is defined, this function detects the SIMD capabilities of the CPU at runtime\&. Otherwise, the function immediately exits, while the SIMD detection occurs at compile\-time\&.
+When \fBPSTRING_DETECT\fR is defined, this function detects the SIMD capabilities of the CPU at runtime\&. Otherwise, the function immediately exits, while the SIMD detection occurs at compile\-time\&.
 
 .SS pstrwrap
 
@@ -496,6 +512,7 @@ Checks if \fBleft\fR pstring and \fBright\fR string are equal\&. If \fBlength\fR
 .nf
 .RS
 PSTR_API int pstrcmp(const pstring_t *left, const pstring_t *right);
+PSTR_API int pstrcmps(const pstring_t *left, const char *right, size_t length);
 .RE
 .fi
 
@@ -897,6 +914,32 @@ The \fBpstrlstrip\fR variant only removes leading, while \fBpstrrstrip\fR only r
 .PP
 Possible error codes: PSTRING_EINVAL\&.
 
+.SS pstrshift
+
+.nf
+.RS
+PSTR_INLINE int pstrshift(pstring_t *str, size_t left, size_t right) {
+    if (pstrowned(str))
+        return PSTRING_EINVAL;
+    if (left > pstrlen(str))
+        left = pstrlen(str);
+    return pstrslice(str, str, right, pstrlen(str) - left);
+}
+PSTR_INLINE int pstrlshift(pstring_t *str, size_t count) {
+    return pstrshift(str, count, 0);
+}
+PSTR_INLINE int pstrrshift(pstring_t *str, size_t count) {
+    return pstrshift(str, 0, count);
+}
+.RE
+.fi
+
+.PP
+This function slices \fBstr\fR by moving the starting index by \fBright\fR and the ending index by \fBleft\fR number of characters\&. (\fBstr\fR must be a slice)
+
+.PP
+Possible error codes: PSTRING_EINVAL\&.
+
 .SS pstrdedent
 
 .nf
@@ -984,4 +1027,4 @@ which might require you to explicitly compare returned values in order to preven
 .BR pstring-io (3),
 .BR pstring-pattern (3).
 .SH AUTHOR
-Copyright (C) 2026 Предраг Јовановић
+Copyright (C) 2025-2026 Предраг Јовановић
