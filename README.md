@@ -56,7 +56,8 @@ String functions are grouped in separate header files:
 - `pstring.h` - common string operations.
 - `encoding.h` - encoding and decoding functions.
 - `io.h` - file, memory and custom streams.
-- `pstrdict.h` - hash map that stores key-value pairs.
+- `dictionary.h` - hash map that stores key-value pairs.
+- `object.h` - dynamically typed serializable objects.
 
 ## Building
 
@@ -64,7 +65,7 @@ String functions are grouped in separate header files:
 
 ```sh
 meson setup build && cd build
-meson compile
+meson install
 ```
 
 ## License
