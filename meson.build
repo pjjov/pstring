@@ -60,7 +60,8 @@ install_headers(
 install_man(
     'docs/pstring.3',
     'docs/pstring-dictionary.3',
-    'docs/pstring-encoding.3'
+    'docs/pstring-encoding.3',
+    'docs/pstring-object.3'
 )
 
 if not meson.is_subproject()

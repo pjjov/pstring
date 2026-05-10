@@ -141,7 +141,11 @@ PSTR_API void *pstrobj_query_value(pstrobj_t *obj, const char *query);
     for (CHILD = ((OBJ) != NULL ? (OBJ)->child : NULL); CHILD != NULL; \
          CHILD = (CHILD)->next)
 
-/** Following functions set the object's value and type.
+/** nanodoc.inline-decl on **/
+
+/** ### pstrobj_set_*
+
+    Following functions set the object's value and type.
     Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
 **/
 PSTR_API int pstrobj_set_null(pstrobj_t *obj);
@@ -153,7 +157,9 @@ PSTR_API int pstrobj_set_double(pstrobj_t *obj, double value);
 PSTR_API int pstrobj_set_list(pstrobj_t *obj);
 PSTR_API int pstrobj_set_dict(pstrobj_t *obj);
 
-/** Following functions return the object's value if `obj` has a matching type.
+/** ### pstrobj_expect_*
+
+    Following functions return the object's value if `obj` has a matching type.
     Otherwise a default value is returned and `status` is set to an error code.
 **/
 PSTR_API void pstrobj_expect_null(pstrobj_t *obj, int *status);
@@ -167,7 +173,9 @@ PSTR_API pstring_t *pstrobj_expect_pstring(pstrobj_t *obj, int *status);
 PSTR_API pstrobj_t *pstrobj_expect_list(pstrobj_t *obj, int *status);
 PSTR_API pstrobj_t *pstrobj_expect_dict(pstrobj_t *obj, int *status);
 
-/** Following functions query `obj` for a child and return the child's value
+/** ### pstrobj_query_*
+
+    Following functions query `obj` for a child and return the child's value
     if `obj` has a matching type. Otherwise a default value is returned and
     `status` is set to an error code.
 **/
@@ -188,7 +196,9 @@ PSTROBJ__IMPL_QUERY(list, pstrobj_t *);
 PSTROBJ__IMPL_QUERY(dict, pstrobj_t *);
 #undef PSTROBJ__IMPL_QUERY
 
-/** Following functions return the object's value or the default value `def`,
+/** ### pstrobj_set_*
+
+    Following functions return the object's value or the default value `def`,
     depending on the type of `obj`, converting between types if necessary.
     Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
 **/
@@ -196,6 +206,8 @@ PSTR_API int pstrobj_get_int(pstrobj_t *obj, int def);
 PSTR_API long pstrobj_get_long(pstrobj_t *obj, long def);
 PSTR_API float pstrobj_get_float(pstrobj_t *obj, float def);
 PSTR_API double pstrobj_get_double(pstrobj_t *obj, double def);
+
+/** nanodoc.inline-decl off **/
 
 /** Copies the contents of `str` as the value of `obj`.
     Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.

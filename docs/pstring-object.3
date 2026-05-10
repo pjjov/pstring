@@ -1,0 +1,331 @@
+.\" pstring - String library for C with SIMD acceleration
+.\"
+.\" SPDX-FileCopyrightText: 2025-2026 Предраг Јовановић
+.\" SPDX-License-Identifier: Apache-2.0
+.TH pstring-object 3 "May 10, 2026" pstring 
+.SH NAME
+
+.PP
+\fBpstring\-object\fR \- dynamic object handling and serialization\&.
+
+.SH DESCRIPTION
+
+.PP
+\fBpstrobj_t\fR represents a dynamically typed object which can be saved to and loaded from various formats\&. Unlike \fBstruct pstrmodel\fR which maps objects directly to C structures, \fBpstrobj\fR maintains the whole object in memory\&.
+
+.PP
+.SH SYNOPSIS
+.P
+.nf
+PSTR_API pstrobj_t *pstrobj_new(allocator_t *allocator);
+PSTR_API pstrobj_t *pstrobj_from_buffer(
+    const char *format, pstring_t *source, allocator_t *allocator
+);
+PSTR_API pstrobj_t *pstrobj_from_stream(
+    const char *format, pstream_t *stream, allocator_t *allocator
+);
+PSTR_API pstrobj_t *pstrobj_load_json(
+    pstream_t *stream, allocator_t *allocator
+);
+PSTR_API pstrobj_t *pstrobj_from_path(
+    const char *format, const char *path, allocator_t *allocator
+);
+PSTR_API int pstrobj_to_buffer(
+    pstrobj_t *obj, const char *format, pstring_t *source
+);
+PSTR_API int pstrobj_to_stream(
+    pstrobj_t *obj, const char *format, pstream_t *stream
+);
+PSTR_API int pstrobj_save_json(pstrobj_t *obj, pstream_t *stream);
+PSTR_API void pstrobj_free(pstrobj_t *obj);
+PSTR_API pstrobj_t *pstrobj_query(pstrobj_t *obj, const char *query);
+PSTR_API void *pstrobj_query_value(pstrobj_t *obj, const char *query);
+PSTR_API int pstrobj_copy_string(pstrobj_t *obj, const char *str, size_t len);
+PSTR_API int pstrobj_copy_pstring(pstrobj_t *obj, const pstring_t *str);
+PSTR_API int pstrobj_copy_key(pstrobj_t *obj, const pstring_t *str);
+PSTR_API int pstrobj_copy_keys(pstrobj_t *obj, const char *str, size_t len);
+PSTR_API int pstrobj_wrap_string(pstrobj_t *obj, const char *str, size_t len);
+PSTR_API int pstrobj_wrap_pstring(pstrobj_t *obj, const pstring_t *str);
+PSTR_API int pstrobj_wrap_key(pstrobj_t *obj, const pstring_t *str);
+PSTR_API int pstrobj_wrap_keys(pstrobj_t *obj, const char *str, size_t len);
+PSTR_API int pstrobj_list_insert(pstrobj_t *list, pstrobj_t *item, size_t i);
+PSTR_API pstrobj_t *pstrobj_list_remove(pstrobj_t *list, size_t i);
+PSTR_INLINE int pstrobj_list_free(pstrobj_t *list, size_t i) 
+PSTR_API pstrobj_t *pstrobj_dict_get(pstrobj_t *dict, const pstring_t *key);
+PSTR_API pstrobj_t *pstrobj_dict_gets(
+    pstrobj_t *dict, const char *key, size_t length
+);
+PSTR_API int pstrobj_dict_insert(pstrobj_t *dict, pstrobj_t *item);
+PSTR_API pstrobj_t *pstrobj_dict_remove(
+    pstrobj_t *dict, const char *key, size_t length
+);
+PSTR_INLINE int pstrobj_dict_free(
+    pstrobj_t *dict, const char *key, size_t length
+) 
+.fi
+
+
+.SH REFERENCE
+
+.SS pstrobj_new
+
+.nf
+.RS
+PSTR_API pstrobj_t *pstrobj_new(allocator_t *allocator);
+.RE
+.fi
+
+.PP
+Allocates a new object with NULL type\&.
+
+.SS pstrobj_from_buffer
+
+.nf
+.RS
+PSTR_API pstrobj_t *pstrobj_from_buffer(
+    const char *format, pstring_t *source, allocator_t *allocator
+);
+.RE
+.fi
+
+.PP
+Loads an object from \fBsource\fR that is in specified \fBformat\fR\&.
+
+.SS pstrobj_from_stream
+
+.nf
+.RS
+PSTR_API pstrobj_t *pstrobj_from_stream(
+    const char *format, pstream_t *stream, allocator_t *allocator
+);
+PSTR_API pstrobj_t *pstrobj_load_json(
+    pstream_t *stream, allocator_t *allocator
+);
+.RE
+.fi
+
+.PP
+Loads an object in \fBformat\fR by reading from \fBstream\fR\&.
+
+.SS pstrobj_from_path
+
+.nf
+.RS
+PSTR_API pstrobj_t *pstrobj_from_path(
+    const char *format, const char *path, allocator_t *allocator
+);
+.RE
+.fi
+
+.PP
+Loads an object in \fBformat\fR by reading from the file at \fBpath\fR\&.
+
+.SS pstrobj_to_buffer
+
+.nf
+.RS
+PSTR_API int pstrobj_to_buffer(
+    pstrobj_t *obj, const char *format, pstring_t *source
+);
+.RE
+.fi
+
+.PP
+Saves an object to \fBsource\fR in specified \fBformat\fR\&.
+
+.SS pstrobj_to_stream
+
+.nf
+.RS
+PSTR_API int pstrobj_to_stream(
+    pstrobj_t *obj, const char *format, pstream_t *stream
+);
+PSTR_API int pstrobj_save_json(pstrobj_t *obj, pstream_t *stream);
+.RE
+.fi
+
+.PP
+Saves an object in \fBformat\fR by writing to \fBstream\fR\&.
+
+.SS pstrobj_free
+
+.nf
+.RS
+PSTR_API void pstrobj_free(pstrobj_t *obj);
+.RE
+.fi
+
+.PP
+Frees object and it's children if it's detached\&.
+
+.SS pstrobj_query
+
+.nf
+.RS
+PSTR_API pstrobj_t *pstrobj_query(pstrobj_t *obj, const char *query);
+PSTR_API void *pstrobj_query_value(pstrobj_t *obj, const char *query);
+.RE
+.fi
+
+.PP
+Finds an object using the JSON Pointer format\&.
+
+.SS pstrobj_set_*
+
+.PP
+Following functions set the object's value and type\&. Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM\&.
+
+.SS pstrobj_expect_*
+
+.PP
+Following functions return the object's value if \fBobj\fR has a matching type\&. Otherwise a default value is returned and \fBstatus\fR is set to an error code\&.
+
+.SS pstrobj_query_*
+
+.PP
+Following functions query \fBobj\fR for a child and return the child's value if \fBobj\fR has a matching type\&. Otherwise a default value is returned and \fBstatus\fR is set to an error code\&.
+
+.SS pstrobj_set_*
+
+.PP
+Following functions return the object's value or the default value \fBdef\fR, depending on the type of \fBobj\fR, converting between types if necessary\&. Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM\&.
+
+.SS pstrobj_copy_string
+
+.nf
+.RS
+PSTR_API int pstrobj_copy_string(pstrobj_t *obj, const char *str, size_t len);
+PSTR_API int pstrobj_copy_pstring(pstrobj_t *obj, const pstring_t *str);
+PSTR_API int pstrobj_copy_key(pstrobj_t *obj, const pstring_t *str);
+PSTR_API int pstrobj_copy_keys(pstrobj_t *obj, const char *str, size_t len);
+.RE
+.fi
+
+.PP
+Copies the contents of \fBstr\fR as the value of \fBobj\fR\&. Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM\&.
+
+.SS pstrobj_wrap_string
+
+.nf
+.RS
+PSTR_API int pstrobj_wrap_string(pstrobj_t *obj, const char *str, size_t len);
+PSTR_API int pstrobj_wrap_pstring(pstrobj_t *obj, const pstring_t *str);
+PSTR_API int pstrobj_wrap_key(pstrobj_t *obj, const pstring_t *str);
+PSTR_API int pstrobj_wrap_keys(pstrobj_t *obj, const char *str, size_t len);
+.RE
+.fi
+
+.PP
+Wraps the contents of \fBstr\fR as the value of \fBobj\fR\&. Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM\&.
+
+.SS pstrobj_list_insert
+
+.nf
+.RS
+PSTR_API int pstrobj_list_insert(pstrobj_t *list, pstrobj_t *item, size_t i);
+.RE
+.fi
+
+.PP
+Inserts \fBitem\fR at index \fBi\fR inside \fBlist\fR\&. Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM\&.
+
+.SS pstrobj_list_remove
+
+.nf
+.RS
+PSTR_API pstrobj_t *pstrobj_list_remove(pstrobj_t *list, size_t i);
+.RE
+.fi
+
+.PP
+Removes item at index \fBi\fR in \fBlist\fR and returns it\&.
+
+.SS pstrobj_list_free
+
+.nf
+.RS
+PSTR_INLINE int pstrobj_list_free(pstrobj_t *list, size_t i) {
+    pstrobj_t *obj = pstrobj_list_remove(list, i);
+    pstrobj_free(obj);
+    return obj ? PSTROBJ_OK : PSTROBJ_EINVAL;
+}
+.RE
+.fi
+
+.PP
+Removes item at index \fBi\fR in \fBlist\fR and frees it\&. Possible error codes: PSTRING_EINVAL\&.
+
+.SS pstrobj_dict_get
+
+.nf
+.RS
+PSTR_API pstrobj_t *pstrobj_dict_get(pstrobj_t *dict, const pstring_t *key);
+PSTR_API pstrobj_t *pstrobj_dict_gets(
+    pstrobj_t *dict, const char *key, size_t length
+);
+.RE
+.fi
+
+.PP
+Finds an item in \fBdict\fR with specified \fBkey\fR\&.
+
+.SS pstrobj_dict_insert
+
+.nf
+.RS
+PSTR_API int pstrobj_dict_insert(pstrobj_t *dict, pstrobj_t *item);
+.RE
+.fi
+
+.PP
+Inserts \fBitem\fR into \fBdict\fR with a previously set key\&. Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM\&.
+
+.SS pstrobj_dict_remove
+
+.nf
+.RS
+PSTR_API pstrobj_t *pstrobj_dict_remove(
+    pstrobj_t *dict, const char *key, size_t length
+);
+.RE
+.fi
+
+.PP
+Removes item with specified key in \fBdict\fR and returns it\&.
+
+.SS pstrobj_dict_free
+
+.nf
+.RS
+PSTR_INLINE int pstrobj_dict_free(
+    pstrobj_t *dict, const char *key, size_t length
+) {
+    pstrobj_t *obj = pstrobj_dict_remove(dict, key, length);
+    pstrobj_free(obj);
+    return obj ? PSTROBJ_OK : PSTROBJ_EINVAL;
+}
+.RE
+.fi
+
+.PP
+Removes item with specified key in \fBdict\fR and frees it\&. Possible error codes: PSTRING_EINVAL\&.
+
+
+.SH RETURN VALUE
+.PP
+For functions that return signed integers, a \fB0\fR indicates that the function exited successfully.
+If instead a negative number is returned, it indicates a specific error that occurred during function's execution.
+The returned error codes are made to resemble POSIX in both meaning and numeric value.
+
+.PP
+Some functions can also return boolean constants (\fIPSTRING_TRUE\fR and \fPSTRING_FALSE\fR) alongside negative error codes,
+which might require you to explicitly compare returned values in order to prevent bugs.
+
+.SH SEE ALSO
+.BR pstring (3),
+.BR pstring-dictionary (3),
+.BR pstring-encoding (3),
+.BR pstring-io (3),
+.BR pstring-pattern (3).
+.SH AUTHOR
+Copyright (C) 2025-2026 Предраг Јовановић
