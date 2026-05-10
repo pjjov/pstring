@@ -1,0 +1,308 @@
+.\" pstring - String library for C with SIMD acceleration
+.\"
+.\" SPDX-FileCopyrightText: 2025-2026 Предраг Јовановић
+.\" SPDX-License-Identifier: Apache-2.0
+.TH pstring-io 3 "May 10, 2026" pstring 
+.SH NAME
+
+.PP
+\fBpstring\-io\fR \- streaming and serialization functions for \fBpstrings\fR\&.
+
+.SH DESCRIPTION
+
+.PP
+The \fBpstream_t\fR object can be used as a generic interface for interacting with byte streams\&. Unlike standard library \fBFILE\fR, \fBpstream_t\fR objects can use user\-defined stream implementations such as network sockets, in\-memory buffers, encoders and serializers\&.
+
+.PP
+This header also provides powerful serialization and deserialization mechanisms through the \fBpstrmodel\fR and associated structures\&.
+
+.PP
+.SH SYNOPSIS
+.P
+.nf
+PSTR_API int pstrio_printf(pstring_t *dst, const char *fmt, ...);
+PSTR_API int pstrio_vprintf(pstring_t *dst, const char *fmt, va_list args);
+PSTR_API int pstream_open(pstream_t *out, const char *path, const char *mode);
+PSTR_API int pstream_file(pstream_t *out, FILE *file);
+PSTR_API int pstream_string(pstream_t *out, pstring_t *str);
+PSTR_API int pstream_init(pstream_t *out, const struct pstream_vt *vtable);
+PSTR_INLINE int pstream_seek(pstream_t *stream, long offset, int origin) 
+PSTR_INLINE size_t pstream_tell(pstream_t *stream) 
+PSTR_INLINE size_t pstream_read(pstream_t *stream, void *buffer, size_t size) 
+PSTR_INLINE size_t
+pstream_write(pstream_t *stream, const void *buffer, size_t size) 
+PSTR_INLINE void pstream_flush(pstream_t *stream) 
+PSTR_INLINE void pstream_close(pstream_t *stream) 
+PSTR_INLINE int pstream_putc(pstream_t *stream, char chr) 
+PSTR_API int pstream_puts(pstream_t *stream, const char *str);
+PSTR_API int pstream_putp(pstream_t *stream, const pstring_t *str);
+PSTR_API int pstream_printf(pstream_t *stream, const char *fmt, ...);
+PSTR_API int pstream_vprintf(pstream_t *stream, const char *fmt, va_list args);
+PSTR_API int pstream__printf(pstream_t *stream, const char *fmt, ...);
+PSTR_API int pstream__vprintf(pstream_t *stream, const char *fmt, va_list args);
+.fi
+
+
+.SH REFERENCE
+
+.SS pstrio_printf
+
+.nf
+.RS
+PSTR_API int pstrio_printf(pstring_t *dst, const char *fmt, \&.\&.\&.);
+.RE
+.fi
+
+.PP
+Concatenates string formated by standard library functions to \fBdst\fR\&. Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM, PSTRING_EIO\&.
+
+.SS pstrio_vprintf
+
+.nf
+.RS
+PSTR_API int pstrio_vprintf(pstring_t *dst, const char *fmt, va_list args);
+.RE
+.fi
+
+.PP
+Concatenates string formated by standard library functions to \fBdst\fR\&. Arguments are passed as a variable arguments list from \fB<stdarg\&.h>\fR\&. Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM, PSTRING_EIO\&.
+
+.SS pstream_open
+
+.nf
+.RS
+PSTR_API int pstream_open(pstream_t *out, const char *path, const char *mode);
+.RE
+.fi
+
+.PP
+Opens the file located at \fBpath\fR as a stream\&. Possible error codes: PSTRING_EINVAL, PSTRING_EIO\&.
+
+.SS pstream_file
+
+.nf
+.RS
+PSTR_API int pstream_file(pstream_t *out, FILE *file);
+.RE
+.fi
+
+.PP
+Wraps provided \fBfile\fR handle into a stream\&. Possible error codes: PSTRING_EINVAL, PSTRING_EIO\&.
+
+.SS pstream_string
+
+.nf
+.RS
+PSTR_API int pstream_string(pstream_t *out, pstring_t *str);
+.RE
+.fi
+
+.PP
+Initializes a stream that will read and write to the buffer of \fBstr\fR, expanding it if needed\&. \fBstr\fR will NOT be freed by the stream when closing\&.
+
+.PP
+Stream cursor will be at the end of the string\&. Possible error codes: PSTRING_EINVAL, PSTRING_EIO\&.
+
+.SS pstream_init
+
+.nf
+.RS
+PSTR_API int pstream_init(pstream_t *out, const struct pstream_vt *vtable);
+.RE
+.fi
+
+.PP
+Initializes \fBout\fR as a custom stream\&. \fBvtable\fR and it's members cannot be \fBNULL\fR\&.
+
+.PP
+Possible error codes: PSTRING_EINVAL\&.
+
+.SS pstream_seek
+
+.nf
+.RS
+PSTR_INLINE int pstream_seek(pstream_t *stream, long offset, int origin) {
+    PSTREAM_ASSERT(seek, 0);
+    return stream->vtable->seek(stream, offset, origin);
+}
+.RE
+.fi
+
+.PP
+Sets the position of the stream to an offset of the specified origin\&. Possible error codes: PSTRING_EINVAL, PSTRING_EIO\&.
+
+.SS pstream_tell
+
+.nf
+.RS
+PSTR_INLINE size_t pstream_tell(pstream_t *stream) {
+    PSTREAM_ASSERT(tell, 0);
+    return stream->vtable->tell(stream);
+}
+.RE
+.fi
+
+.PP
+Returns the current position of the stream\&.
+
+.SS pstream_read
+
+.nf
+.RS
+PSTR_INLINE size_t pstream_read(pstream_t *stream, void *buffer, size_t size) {
+    PSTREAM_ASSERT(tell, 0);
+    return stream->vtable->read(stream, buffer, size);
+}
+.RE
+.fi
+
+.PP
+Reads up to \fBsize\fR bytes from \fBstream\fR and returns number of bytes read\&. Possible error codes: PSTRING_EINVAL, PSTRING_EIO\&.
+
+.SS pstream_write
+
+.nf
+.RS
+PSTR_INLINE size_t
+pstream_write(pstream_t *stream, const void *buffer, size_t size) {
+    PSTREAM_ASSERT(write, 0);
+    return stream->vtable->write(stream, buffer, size);
+}
+.RE
+.fi
+
+.PP
+Attempts to write \fBsize\fR bytes from \fBbuffer\fR to \fBstream\fR\&. The number of bytes actually written is returned\&. Possible error codes: PSTRING_EINVAL, PSTRING_EIO\&.
+
+.SS pstream_flush
+
+.nf
+.RS
+PSTR_INLINE void pstream_flush(pstream_t *stream) {
+    PSTREAM_ASSERT(flush, (void)0);
+    stream->vtable->flush(stream);
+}
+.RE
+.fi
+
+.PP
+Flushes internal buffers of a stream\&.
+
+.SS pstream_close
+
+.nf
+.RS
+PSTR_INLINE void pstream_close(pstream_t *stream) {
+    PSTREAM_ASSERT(close, (void)0);
+    return stream->vtable->close(stream);
+}
+.RE
+.fi
+
+.PP
+Closes the stream and frees it's resources\&.
+
+.SS pstream_putc
+
+.nf
+.RS
+PSTR_INLINE int pstream_putc(pstream_t *stream, char chr) {
+    return 1 != pstream_write(stream, &chr, 1);
+}
+.RE
+.fi
+
+.PP
+Writes a single character to \fBstream\fR\&. Possible error codes: PSTRING_EINVAL, PSTRING_EIO\&.
+
+.SS pstream_puts
+
+.nf
+.RS
+PSTR_API int pstream_puts(pstream_t *stream, const char *str);
+.RE
+.fi
+
+.PP
+Writes a null\-terminated string to \fBstream\fR\&. Possible error codes: PSTRING_EINVAL, PSTRING_EIO\&.
+
+.SS pstream_putp
+
+.nf
+.RS
+PSTR_API int pstream_putp(pstream_t *stream, const pstring_t *str);
+.RE
+.fi
+
+.PP
+Writes a \fBpstring_t\fR to \fBstream\fR\&. Possible error codes: PSTRING_EINVAL, PSTRING_EIO\&.
+
+.SS pstream_printf
+
+.nf
+.RS
+PSTR_API int pstream_printf(pstream_t *stream, const char *fmt, \&.\&.\&.);
+.RE
+.fi
+
+.PP
+Writes to stream a string formatted as \fBfmt\fR using variable arguments\&. Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM\&.
+
+.SS pstream_vprintf
+
+.nf
+.RS
+PSTR_API int pstream_vprintf(pstream_t *stream, const char *fmt, va_list args);
+.RE
+.fi
+
+.PP
+Writes to stream a string formatted as \fBfmt\fR using variable arguments\&. Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM\&.
+
+.SS pstream__printf
+
+.nf
+.RS
+PSTR_API int pstream__printf(pstream_t *stream, const char *fmt, \&.\&.\&.);
+.RE
+.fi
+
+.PP
+Writes to stream a string formatted as \fBfmt\fR using variable arguments and only standard library formatting options\&.
+
+.PP
+Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM\&.
+
+.SS pstream__vprintf
+
+.nf
+.RS
+PSTR_API int pstream__vprintf(pstream_t *stream, const char *fmt, va_list args);
+.RE
+.fi
+
+.PP
+Writes to stream a string formatted as \fBfmt\fR using variable arguments and only standard library formatting options\&.
+
+.PP
+Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM\&.
+
+
+.SH RETURN VALUE
+.PP
+For functions that return signed integers, a \fB0\fR indicates that the function exited successfully.
+If instead a negative number is returned, it indicates a specific error that occurred during function's execution.
+The returned error codes are made to resemble POSIX in both meaning and numeric value.
+
+.PP
+Some functions can also return boolean constants (\fIPSTRING_TRUE\fR and \fPSTRING_FALSE\fR) alongside negative error codes,
+which might require you to explicitly compare returned values in order to prevent bugs.
+
+.SH SEE ALSO
+.BR pstring (3),
+.BR pstring-dictionary (3),
+.BR pstring-encoding (3),
+.BR pstring-io (3),
+.BR pstring-pattern (3).
+.SH AUTHOR
+Copyright (C) 2025-2026 Предраг Јовановић

@@ -2,7 +2,7 @@
 .\"
 .\" SPDX-FileCopyrightText: 2025-2026 Предраг Јовановић
 .\" SPDX-License-Identifier: Apache-2.0
-.TH pstring-pstring 3 "May 10, 2026" pstring 
+.TH pstring 3 "May 10, 2026" pstring
 .SH NAME
 
 .PP
@@ -35,16 +35,16 @@ Shorter strings can be stored directly in the \fBpstring_t\fR using SSO, provide
 .SH SYNOPSIS
 .P
 .nf
-enum pstring_error 
-PSTR_INLINE char *pstrbuf(const pstring_t *str) 
-PSTR_INLINE size_t pstrlen(const pstring_t *str) 
-PSTR_INLINE size_t pstrcap(const pstring_t *str) 
-PSTR_INLINE allocator_t *pstrallocator(const pstring_t *str) 
-PSTR_INLINE int pstrsso(const pstring_t *str) 
-PSTR_INLINE int pstrowned(const pstring_t *str) 
-PSTR_INLINE char *pstrend(const pstring_t *str) 
-PSTR_INLINE char pstrget(const pstring_t *str, size_t i) 
-PSTR_INLINE char *pstrslot(const pstring_t *str, size_t i) 
+enum pstring_error
+PSTR_INLINE char *pstrbuf(const pstring_t *str)
+PSTR_INLINE size_t pstrlen(const pstring_t *str)
+PSTR_INLINE size_t pstrcap(const pstring_t *str)
+PSTR_INLINE allocator_t *pstrallocator(const pstring_t *str)
+PSTR_INLINE int pstrsso(const pstring_t *str)
+PSTR_INLINE int pstrowned(const pstring_t *str)
+PSTR_INLINE char *pstrend(const pstring_t *str)
+PSTR_INLINE char pstrget(const pstring_t *str, size_t i)
+PSTR_INLINE char *pstrslot(const pstring_t *str, size_t i)
 PSTR_API int pstrnew(
     pstring_t *out, const char *str, size_t len, allocator_t *alloc
 );
@@ -86,7 +86,7 @@ PSTR_API int pstrsplit(
 );
 PSTR_INLINE int pstrsplits(
     pstring_t *dst, const pstring_t *src, const char *sep, size_t length
-) 
+)
 PSTR_API size_t pstrspn(const pstring_t *str, const char *set);
 PSTR_API size_t pstrcspn(const pstring_t *str, const char *set);
 PSTR_API size_t pstrrspn(const pstring_t *str, const char *set);
@@ -95,11 +95,11 @@ PSTR_API int pstrcat(pstring_t *dst, const pstring_t *src);
 PSTR_API int pstrcats(pstring_t *dst, const char *src, size_t length);
 PSTR_API int pstrcatc(pstring_t *dst, char chr);
 PSTR_API int pstrrcat(pstring_t *dst, const pstring_t *src);
-PSTR_INLINE int pstrrcats(pstring_t *dst, const char *src, size_t length) 
+PSTR_INLINE int pstrrcats(pstring_t *dst, const char *src, size_t length)
 PSTR_API int pstrinsert(pstring_t *dst, size_t at, pstring_t *src);
 PSTR_INLINE int pstrinserts(
     pstring_t *dst, size_t at, const char *src, size_t length
-) 
+)
 PSTR_API int pstrinsertc(pstring_t *dst, size_t at, size_t count, char chr);
 PSTR_API int pstrremove(pstring_t *str, size_t from, size_t to);
 PSTR_API int pstrcpy(pstring_t *dst, const pstring_t *src);
@@ -125,7 +125,7 @@ PSTR_API int pstrverrorf(const char *fmt, va_list args);
 PSTR_API int pstrstrip(pstring_t *str, const char *chars);
 PSTR_API int pstrlstrip(pstring_t *str, const char *chars);
 PSTR_API int pstrrstrip(pstring_t *str, const char *chars);
-PSTR_INLINE int pstrshift(pstring_t *str, size_t left, size_t right) 
+PSTR_INLINE int pstrshift(pstring_t *str, size_t left, size_t right)
 PSTR_API int pstrdedent(pstring_t *str, int count, int tab);
 PSTR_API int pstrindent(pstring_t *str, int count, int tab);
 PSTR_API int pstrprefix(
@@ -134,13 +134,13 @@ PSTR_API int pstrprefix(
 PSTR_API int pstrsuffix(
     const pstring_t *str, const char *suffix, size_t length
 );
-PSTR_INLINE void pstr__setlen(pstring_t *str, size_t length) 
+PSTR_INLINE void pstr__setlen(pstring_t *str, size_t length)
 .fi
 
 
 .SH REFERENCE
 
-.SS 
+.SS
 
 .nf
 .RS
