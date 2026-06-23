@@ -1,10 +1,10 @@
 [wrap-file]
-directory = cpolyfill-1.2.1
+  directory = cpolyfill-1.3.1
 
-source_url      = https://github.com/pjjov/cpolyfill/archive/refs/tags/v1.2.1.zip
-source_filename = cpolyfill-v1.2.1.zip
-source_hash     = 402db1650bb658c885ab6f6f615509f6e247506924eed4d8bee231a7e965df8b
-
-[provide]
-dependency_names = cpolyfill
-
+  source_url      = https://github.com/pjjov/cpolyfill/archive/refs/tags/v1.3.1.zip
+  source_filename = cpolyfill-v1.3.1.zip
+  source_hash     = 468c94c6bef9134af12f724d0a99edff3a5a17b9edf9f32031dd96651fa78d4b
+  
+  [provide]
+  dependency_names = cpolyfill
+  
