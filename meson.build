@@ -8,6 +8,7 @@ src = [
     'src/format/json.c',
     'src/dictionary.c',
     'src/encoding.c',
+    'src/global.c',
     'src/io.c',
     'src/object.c',
     'src/pattern.c',

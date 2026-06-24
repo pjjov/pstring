@@ -29,10 +29,15 @@
     #define PSTR_API
 #endif
 
+#ifndef PSTR_NO_RETURN
+    #define PSTR_NO_RETURN
+#endif
+
 #include <stdarg.h>
 #include <stddef.h>
 
 typedef struct allocator_t allocator_t;
+typedef struct pf_exception_t pf_exception_t;
 struct tm; /* <time.h> */
 
 /** ## NAME
@@ -91,6 +96,8 @@ enum pstring_bool {
     PSTRING_FALSE = 0,
 };
 
+#define PSTRING_EXCEPTION (('P' << 8) | 'S')
+
 /** Error codes are negated versions of POSIX ones. **/
 enum pstring_error {
     PSTRING_OK = 0,
@@ -105,6 +112,46 @@ enum pstring_error {
     PSTRING_ENOSYS = -38,
     PSTRING_ENODATA = -61,
 };
+
+/** This function set's up the exception handler for the `<pf_exception.h>`
+    exception handling interface. The first call will return `NULL`, after
+    which exception-throwing code can be executed.
+
+    The second return value will represent the emitted exception.
+
+    > The global exception stack is thread local.
+**/
+PSTR_API pf_exception_t *pstrcatch(int error);
+
+#define PSTRTHROW(code, msg) pstrthrow((code), __func__, (msg))
+#define PSTRTHROWF(code, fmt, ...)                   \
+    pstrthrowf((code), __func__, (fmt), __VA_ARGS__)
+#define PSTRVTHROWF(code, fmt, args)             \
+    pstrvthrowf((code), __func__, (fmt), (args))
+
+/** Emits an exception with given message. **/
+PSTR_NO_RETURN PSTR_API int pstrthrow(
+    int code, const char *func, const char *msg
+);
+
+/** Emits an exception with given formatting. **/
+PSTR_NO_RETURN PSTR_API int pstrthrowf(
+    int code, const char *func, const char *fmt, ...
+);
+
+/** Emits an exception with given formatting. **/
+PSTR_NO_RETURN PSTR_API int pstrvthrowf(
+    int code, const char *func, const char *fmt, va_list args
+);
+
+/** Emits the exception `e` for the next catcher. **/
+PSTR_NO_RETURN PSTR_API int pstrrethrow(pf_exception_t *e);
+
+/** When `PSTRING_DETECT` is defined, this function detects the
+    SIMD capabilities of the CPU at runtime. Otherwise, the function
+    immediately exits, while the SIMD detection occurs at compile-time.
+**/
+PSTR_API void pstrdetect(void);
 
 /** Returns the character buffer of `str`. If `str` is resized after calling
     this function, the returned pointer should be considered invalid.
@@ -199,12 +246,6 @@ PSTR_API void pstrfree(pstring_t *str);
 **/
 PSTR_API char *pstrunwrap(const pstring_t *str, allocator_t *allocator);
 
-/** When `PSTRING_DETECT` is defined, this function detects the
-    SIMD capabilities of the CPU at runtime. Otherwise, the function
-    immediately exits, while the SIMD detection occurs at compile-time.
-**/
-PSTR_API void pstrdetect(void);
-
 /** Initializes `out` as a slice, using the `buffer` for storage.
     If `length` is `0`, `strlen` is used to calculate it's length.
     If `length` is `0` and capacity is not, `strnlen` is used instead.
@@ -222,7 +263,6 @@ PSTR_API int pstrwrap(
 PSTR_API int pstrwrapb(
     pstring_t *out, char *buffer, size_t length, size_t capacity
 );
-
 
 /** Initializes `out` as a slice of bytes from `str`, starting at `from`
     (inclusive) and ending at `to` (exclusive). Both indices are set to
