@@ -265,6 +265,15 @@ int pstrwrap(pstring_t *out, char *buffer, size_t length, size_t capacity) {
     if (capacity == 0)
         capacity = length;
 
+    return pstrwrapb(out, buffer, length, capacity);
+}
+
+PSTR_API int pstrwrapb(
+    pstring_t *out, char *buffer, size_t length, size_t capacity
+) {
+    if (!out || !buffer || length > capacity)
+        return PSTRING_EINVAL;
+
     out->buffer = buffer;
     out->base.allocator = NULL;
     out->base.capacity = capacity;

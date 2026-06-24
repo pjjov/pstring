@@ -342,6 +342,10 @@ int pstrobj_expect_int(pstrobj_t *obj, int *status) {
     return pstrobj_expect_long(obj, status);
 }
 
+float pstrobj_expect_float(pstrobj_t *obj, int *status) {
+    return pstrobj_expect_double(obj, status);
+}
+
 long pstrobj_expect_long(pstrobj_t *obj, int *status) {
     EXPECT_NULL_CHECK;
 

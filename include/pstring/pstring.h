@@ -215,6 +215,15 @@ PSTR_API int pstrwrap(
     pstring_t *out, char *buffer, size_t length, size_t capacity
 );
 
+/** Initializes `out` as a slice, using the `buffer` for storage.
+    No `strlen` is performed by this variant.
+    Possible error codes: PSTRING_EINVAL.
+**/
+PSTR_API int pstrwrapb(
+    pstring_t *out, char *buffer, size_t length, size_t capacity
+);
+
+
 /** Initializes `out` as a slice of bytes from `str`, starting at `from`
     (inclusive) and ending at `to` (exclusive). Both indices are set to
     the length of `str` if they are larger. If `to` is smaller than
@@ -379,6 +388,9 @@ PSTR_API size_t pstrrcspn(const pstring_t *str, const char *set);
 PSTR_API int pstrcat(pstring_t *dst, const pstring_t *src);
 PSTR_API int pstrcats(pstring_t *dst, const char *src, size_t length);
 PSTR_API int pstrcatc(pstring_t *dst, char chr);
+PSTR_INLINE int pstrcatb(pstring_t *dst, const char *src, size_t length) {
+    return length > 0 ? pstrcats(dst, src, length) : PSTRING_OK;
+}
 
 /** Concatenates `src` onto the start of `dst`.
     Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
