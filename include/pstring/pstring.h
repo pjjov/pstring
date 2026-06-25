@@ -91,6 +91,13 @@ typedef struct pstring_t {
     };
 } pstring_t;
 
+typedef struct pstrarray_t {
+    size_t capacity;
+    size_t length;
+    pstring_t *items;
+    allocator_t *allocator;
+} pstrarray_t;
+
 enum pstring_bool {
     PSTRING_TRUE = 1,
     PSTRING_FALSE = 0,
@@ -114,6 +121,21 @@ enum pstring_error {
     PSTRING_EENCODE = -192,
     PSTRING_EDECODE = -193,
     PSTRING_EOBJECT = -194,
+};
+
+/* Hook identifiers for the `pstrexpand_with` function */
+enum pstrexpand_hook {
+    PSTREXPAND_NONE,
+    PSTREXPAND_NAMED,
+    PSTREXPAND_BRACE,
+    PSTREXPAND_CMD_PAREN,
+    PSTREXPAND_CMD_TICK,
+    PSTREXPAND_ARITHMETIC,
+    PSTREXPAND_TILDE,
+    PSTREXPAND_STATUS,
+    PSTREXPAND_PID,
+    PSTREXPAND_IFS,
+    PSTREXPAND_GLOB,
 };
 
 /** This function set's up the exception handler for the `<pf_exception.h>`
