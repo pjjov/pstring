@@ -23,7 +23,7 @@
 
 #ifndef NO_THREAD_LOCAL
 
-static thread_local pf_exception_stack_t pstring_exception_stack;
+static thread_local pf_exception_stack_t pstring_exception_stack = { 0 };
 
 static inline pf_exception_stack_t *get_stack(void) {
     return &pstring_exception_stack;
