@@ -50,26 +50,26 @@ static int find_encoding(const char *name) {
 
 int pstrenc(pstring_t *dst, const pstring_t *src, const char *enc) {
     if (!dst || !src || !enc)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     int i = find_encoding(enc);
-    return i != -1 ? encodings[i].enc(dst, src) : PSTRING_ENOSYS;
+    return i != -1 ? encodings[i].enc(dst, src) : PSTRTHROW_ENOSYS;
 }
 
 int pstrdec(pstring_t *dst, const pstring_t *src, const char *enc) {
     if (!dst || !src || !enc)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     int i = find_encoding(enc);
-    return i != -1 ? encodings[i].dec(dst, src) : PSTRING_ENOSYS;
+    return i != -1 ? encodings[i].dec(dst, src) : PSTRTHROW_ENOSYS;
 }
 
 int pstrenc_hex(pstring_t *dst, const pstring_t *src) {
     if (!dst || !src)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     if (pstrreserve(dst, pstrlen(src) * 2))
-        return PSTRING_ENOMEM;
+        return PSTRTHROW_ENOMEM;
 
     char *in = pstrbuf(src);
     char *end = pstrend(src);
@@ -102,11 +102,14 @@ static inline char hex2num(char c) {
 }
 
 int pstrdec_hex(pstring_t *dst, const pstring_t *src) {
-    if (!dst || !src || pstrlen(src) % 2 != 0)
-        return PSTRING_EINVAL;
+    if (!dst || !src)
+        return PSTRTHROW_EINVAL;
+
+    if (pstrlen(src) % 2 != 0)
+        return PSTRTHROW_EDECODE;
 
     if (pstrreserve(dst, pstrlen(src) / 2))
-        return PSTRING_ENOMEM;
+        return PSTRTHROW_ENOMEM;
 
     char *in = pstrbuf(src);
     char *end = pstrend(src);
@@ -116,7 +119,7 @@ int pstrdec_hex(pstring_t *dst, const pstring_t *src) {
         char hi = hex2num(*in++);
         char lo = hex2num(*in++);
         if (hi > 16 || lo > 16)
-            return PSTRING_EINVAL;
+            return PSTRTHROW_EDECODE;
 
         *out++ = hi * 16 + lo;
     }
@@ -127,10 +130,10 @@ int pstrdec_hex(pstring_t *dst, const pstring_t *src) {
 
 int pstrenc_url(pstring_t *dst, const pstring_t *src) {
     if (!dst || !src)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     if (pstrreserve(dst, pstrlen(src)))
-        return PSTRING_ENOMEM;
+        return PSTRTHROW_ENOMEM;
 
     static pstring_t safe_chars = PSTRWRAP(
         "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -147,7 +150,7 @@ int pstrenc_url(pstring_t *dst, const pstring_t *src) {
     for (size_t i = 0; i < length; i++) {
         if (!pstrchr(&safe_chars, in[i])) {
             if (pstrreserve(dst, j + 2))
-                return PSTRING_ENOMEM;
+                return PSTRTHROW_ENOMEM;
 
             out = pstrbuf(dst);
             out[j++] = '%';
@@ -164,10 +167,10 @@ int pstrenc_url(pstring_t *dst, const pstring_t *src) {
 
 int pstrdec_url(pstring_t *dst, const pstring_t *src) {
     if (!dst || !src)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     if (pstrreserve(dst, pstrlen(src)))
-        return PSTRING_ENOMEM;
+        return PSTRTHROW_ENOMEM;
 
     char *out = pstrend(dst);
     const char *end = pstrend(src);
@@ -187,7 +190,7 @@ int pstrdec_url(pstring_t *dst, const pstring_t *src) {
         char hi = hex2num(escape[1]);
         char lo = hex2num(escape[2]);
         if (hi > 16 || lo > 16)
-            return PSTRING_EINVAL;
+            return PSTRTHROW_EDECODE;
         *out++ = hi * 16 + lo;
         escape += 3;
     }
@@ -206,11 +209,11 @@ int pstrenc_base64table(
     pstring_t *dst, const pstring_t *src, const pstring_t *_table
 ) {
     if (!dst || !src || !_table || pstrlen(_table) != 64)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     size_t len = pstrlen(src);
     if (pstrreserve(dst, (len / 3 + 1) * 4))
-        return PSTRING_ENOMEM;
+        return PSTRTHROW_ENOMEM;
 
     char *out = pstrend(dst);
     const char *chr = pstrbuf(src);
@@ -251,11 +254,11 @@ int pstrdec_base64table(
     pstring_t *dst, const pstring_t *src, const pstring_t *table
 ) {
     if (!dst || !src || !table || pstrlen(table) != 64)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     size_t len = pstrlen(src);
     if (pstrreserve(dst, (len / 4 + 1) * 3))
-        return PSTRING_ENOMEM;
+        return PSTRTHROW_ENOMEM;
 
     char *out = pstrend(dst);
     const char *chr = pstrbuf(src);
@@ -275,7 +278,7 @@ int pstrdec_base64table(
         v[3] = base2num(table, chr[3]);
 
         if (v[0] > 64 || v[1] > 64 || v[2] > 64 || v[3] > 64)
-            return PSTRING_EINVAL;
+            return PSTRTHROW_EDECODE;
 
         *out++ = (v[0] << 2) | ((v[1] & 0x30) >> 4);
         *out++ = ((v[1] & 0x0F) << 4) | ((v[2] & 0x3C) >> 2);
@@ -288,7 +291,7 @@ int pstrdec_base64table(
         v[2] = base2num(table, chr[2]);
 
         if (v[0] > 64 || v[1] > 64 || v[2] > 64)
-            return PSTRING_EINVAL;
+            return PSTRTHROW_EDECODE;
 
         *out++ = (v[0] << 2) | ((v[1] & 0x30) >> 4);
         *out++ = ((v[1] & 0x0F) << 4) | ((v[2] & 0x3C) >> 2);
@@ -297,7 +300,7 @@ int pstrdec_base64table(
         v[1] = base2num(table, chr[1]);
 
         if (v[0] > 64 || v[1] > 64)
-            return PSTRING_EINVAL;
+            return PSTRTHROW_EDECODE;
 
         *out++ = (v[0] << 2) | ((v[1] & 0x30) >> 4);
     }
@@ -336,7 +339,7 @@ int pstrdec_base64url(pstring_t *dst, const pstring_t *src) {
 
 int pstrenc_cstring(pstring_t *dst, const pstring_t *src) {
     if (!dst || !src)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     const char *prev = pstrbuf(src);
     const char *end = pstrend(src);
@@ -359,7 +362,7 @@ int pstrenc_cstring(pstring_t *dst, const pstring_t *src) {
 
         if (pstrreserve(dst, length + 4)) {
             pstr__setlen(dst, dstlen);
-            return PSTRING_ENOMEM;
+            return PSTRTHROW_ENOMEM;
         }
 
         char *out = pstrbuf(dst);
@@ -425,7 +428,7 @@ char *pstr_write_utf8(char *out, uint32_t c) {
 
 int pstrdec_cstring(pstring_t *dst, const pstring_t *src) {
     if (!dst || !src)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     const char *prev = pstrbuf(src);
     const char *end = pstrend(src);
@@ -434,7 +437,7 @@ int pstrdec_cstring(pstring_t *dst, const pstring_t *src) {
     pstring_t search;
 
     if (pstrreserve(dst, pstrlen(src)))
-        return PSTRING_ENOMEM;
+        return PSTRTHROW_ENOMEM;
 
     while (match) {
         pstrrange(&search, NULL, prev, end - 1);
@@ -473,7 +476,7 @@ int pstrdec_cstring(pstring_t *dst, const pstring_t *src) {
                 }
 
                 if (code >= 256)
-                    return PSTRING_EINVAL;
+                    return PSTRTHROW_EDECODE;
 
                 *out++ = code;
                 prev += i - 2;
@@ -486,7 +489,7 @@ int pstrdec_cstring(pstring_t *dst, const pstring_t *src) {
                 char bounds = &match[4] < end ? hex2num(match[4]) : 17;
 
                 if (hi > 16 || (lo < 16 && bounds < 16))
-                    return PSTRING_EINVAL;
+                    return PSTRTHROW_EDECODE;
 
                 if (lo < 16) {
                     *out++ = hi * 16 + lo;
@@ -506,26 +509,26 @@ int pstrdec_cstring(pstring_t *dst, const pstring_t *src) {
                 prev += length;
 
                 if (&match[length + 1] >= end)
-                    return PSTRING_EINVAL;
+                    return PSTRTHROW_EDECODE;
 
                 for (int i = 0; i < length; i += 2) {
                     char hi = hex2num(match[i + 2]);
                     char lo = hex2num(match[i + 3]);
                     if (lo > 16 || hi > 16)
-                        return PSTRING_EINVAL;
+                        return PSTRTHROW_EDECODE;
                     c = (c << 8) | (hi * 16 + lo);
                 }
 
                 if ((c < 0xA0 && c != 0x24 && c != 0x40 && c != 0x60)
                     || (c >= 0xD800 && c <= 0xDFFF) || c > 0x10FFFF) {
-                    return PSTRING_EINVAL;
+                    return PSTRTHROW_EDECODE;
                 }
 
                 out = pstr_write_utf8(out, c);
                 break;
             }
             default:
-                return PSTRING_EINVAL;
+                return PSTRTHROW_EDECODE;
             }
         }
     }
@@ -536,10 +539,10 @@ int pstrdec_cstring(pstring_t *dst, const pstring_t *src) {
 
 int pstrenc_utf8(pstring_t *dst, const uint32_t *src, size_t length) {
     if (!dst || !src)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     if (pstrreserve(dst, length * 4))
-        return PSTRING_ENOMEM;
+        return PSTRTHROW_ENOMEM;
 
     char *out = pstrend(dst);
     for (size_t i = 0; i < length; i++)
@@ -564,7 +567,7 @@ static int utf8_length(char c) {
 
 const char *pstr_read_utf8(const char *chr, const char *end, uint32_t *out) {
     if (!chr || !end || !out || (chr >= end))
-        return NULL;
+        return PSTRTHROW_NULL(PSTRING_EINVAL);
 
     int left = utf8_length(*chr);
 
@@ -606,7 +609,7 @@ const char *pstr_read_utf8(const char *chr, const char *end, uint32_t *out) {
 
 int pstrdec_utf8(uint32_t *dst, size_t *length, const pstring_t *src) {
     if (!dst || !src)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     const char *chr = pstrbuf(src);
     const char *end = pstrend(src);
@@ -617,7 +620,7 @@ int pstrdec_utf8(uint32_t *dst, size_t *length, const pstring_t *src) {
 
     *length = count;
     if (chr < end)
-        return PSTRING_ENOMEM;
+        return PSTRTHROW_ENOMEM;
 
     return PSTRING_OK;
 }
@@ -628,10 +631,10 @@ static inline int is_json_esc(char c) {
 
 int pstrenc_json(pstring_t *dst, const pstring_t *src) {
     if (!dst || !src)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     if (pstrreserve(dst, pstrlen(src)))
-        return PSTRING_ENOMEM;
+        return PSTRTHROW_ENOMEM;
 
     const char *curr = pstrbuf(src);
     const char *end = pstrend(src);
@@ -639,7 +642,7 @@ int pstrenc_json(pstring_t *dst, const pstring_t *src) {
 
     for (i = 0; curr < end; i++, curr++) {
         if (pstrreserve(dst, i + 6))
-            return PSTRING_ENOMEM;
+            return PSTRTHROW_ENOMEM;
 
         char *out = pstrend(dst);
         if (is_json_esc(*curr))
@@ -673,10 +676,10 @@ int pstrenc_json(pstring_t *dst, const pstring_t *src) {
 
 int pstrdec_json(pstring_t *dst, const pstring_t *src) {
     if (!dst || !src)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     if (pstrreserve(dst, pstrlen(src)))
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     pstring_t search;
     pstrwrap(&search, pstrbuf(src), pstrlen(src), 0);
@@ -691,7 +694,7 @@ int pstrdec_json(pstring_t *dst, const pstring_t *src) {
         prev = match + 2;
 
         if (&match[1] >= end)
-            return PSTRING_EINVAL;
+            return PSTRTHROW_EDECODE;
 
         switch (match[1]) {
             /* clang-format off */
@@ -708,14 +711,14 @@ int pstrdec_json(pstring_t *dst, const pstring_t *src) {
 
         case 'u': {
             if (&match[5] >= end)
-                return PSTRING_EINVAL;
+                return PSTRTHROW_EDECODE;
 
             uint32_t code = 0;
             uint8_t hex;
 
             for (int i = 0; i < 4; i++) {
                 if ((hex = hex2num(match[i + 2])) >= 16)
-                    return PSTRING_EINVAL;
+                    return PSTRTHROW_EDECODE;
 
                 code = (code << 4) | hex;
             }
@@ -726,7 +729,7 @@ int pstrdec_json(pstring_t *dst, const pstring_t *src) {
         }
 
         default:
-            return PSTRING_EINVAL;
+            return PSTRTHROW_EDECODE;
         }
 
         pstrrange(&search, NULL, prev, pstrend(src));
@@ -741,10 +744,10 @@ int pstrdec_json(pstring_t *dst, const pstring_t *src) {
 
 int pstrenc_xml(pstring_t *dst, const pstring_t *src) {
     if (!dst || !src)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     if (pstrreserve(dst, pstrlen(src)))
-        return PSTRING_ENOMEM;
+        return PSTRTHROW_ENOMEM;
 
     pstring_t search;
     pstrwrap(&search, pstrbuf(src), pstrlen(src), 0);
@@ -755,7 +758,7 @@ int pstrenc_xml(pstring_t *dst, const pstring_t *src) {
 
     while ((match = pstrpbrk(&search, "<>&\"'"))) {
         if (pstrreserve(dst, i + match - prev + 6))
-            return PSTRING_ENOMEM;
+            return PSTRTHROW_ENOMEM;
 
         char *out = pstrend(dst);
         memcpy(&out[i], prev, match - prev);
@@ -831,10 +834,10 @@ static inline int decode_xml(char *out, pstring_t *entity) {
 
 int pstrdec_xml(pstring_t *dst, const pstring_t *src) {
     if (!dst || !src)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     if (pstrreserve(dst, pstrlen(src)))
-        return PSTRING_ENOMEM;
+        return PSTRTHROW_ENOMEM;
 
     pstring_t search;
     pstrwrap(&search, pstrbuf(src), pstrlen(src), 0);
@@ -846,7 +849,7 @@ int pstrdec_xml(pstring_t *dst, const pstring_t *src) {
 
     while ((amp = pstrchr(&search, '&'))) {
         if (pstrreserve(dst, i + amp - prev + 6))
-            return PSTRING_ENOMEM;
+            return PSTRTHROW_ENOMEM;
 
         /* copy unescaped chunk */
         char *out = pstrend(dst);
@@ -856,12 +859,12 @@ int pstrdec_xml(pstring_t *dst, const pstring_t *src) {
         /* find semicolon */
         pstrrange(&search, NULL, amp, end);
         if (!(semi = pstrchr(&search, ';')))
-            return PSTRING_EINVAL;
+            return PSTRTHROW_EDECODE;
 
         /* decode character entity */
         pstrrange(&search, NULL, amp + 1, semi);
         if ((shift = decode_xml(&out[i], &search)) < 0)
-            return PSTRING_EINVAL;
+            return PSTRTHROW_EDECODE;
 
         i += shift;
         prev = semi + 1;

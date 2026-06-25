@@ -39,7 +39,7 @@ int test_encoding_hex(int seed, int rep) {
     TEST_ENCODING(pstrenc_hex, "", "");
     TEST_ENCODING(pstrdec_hex, "", "");
 
-    pf_assert(PSTRING_EINVAL == pstrdec_hex(&dst, &PSTRWRAP("ABCDE")));
+    pf_assert(PSTRING_EDECODE == pstrdec_hex(&dst, &PSTRWRAP("ABCDE")));
     pf_assert(PSTRING_EINVAL == pstrenc_hex(NULL, NULL));
     pf_assert(PSTRING_EINVAL == pstrdec_hex(NULL, NULL));
 
@@ -59,7 +59,7 @@ int test_encoding_url(int seed, int rep) {
     TEST_ENCODING(pstrdec_url, "%20", " ");
     TEST_ENCODING(pstrdec_url, "", "");
 
-    pf_assert(PSTRING_EINVAL == pstrdec_url(&dst, &PSTRWRAP("%ZY")));
+    pf_assert(PSTRING_EDECODE == pstrdec_url(&dst, &PSTRWRAP("%ZY")));
     pf_assert(PSTRING_EINVAL == pstrenc_url(NULL, NULL));
     pf_assert(PSTRING_EINVAL == pstrdec_url(NULL, NULL));
 
@@ -121,19 +121,21 @@ int test_encoding_cstring(int seed, int rep) {
 
     pf_assert(PSTRING_EINVAL == pstrenc_cstring(NULL, NULL));
     pf_assert(PSTRING_EINVAL == pstrdec_cstring(NULL, NULL));
-    pf_assert(PSTRING_EINVAL == pstrdec_cstring(&dst, &PSTRWRAP("\\xaaa")));
-    pf_assert(PSTRING_EINVAL == pstrdec_cstring(&dst, &PSTRWRAP("\\xz")));
-    pf_assert(PSTRING_EINVAL == pstrdec_cstring(&dst, &PSTRWRAP("\\x")));
-    pf_assert(PSTRING_EINVAL == pstrdec_cstring(&dst, &PSTRWRAP("\\u")));
-    pf_assert(PSTRING_EINVAL == pstrdec_cstring(&dst, &PSTRWRAP("\\U")));
-    pf_assert(PSTRING_EINVAL == pstrdec_cstring(&dst, &PSTRWRAP("\\u123z")));
-    pf_assert(PSTRING_EINVAL == pstrdec_cstring(&dst, &PSTRWRAP("\\U1234567")));
-    pf_assert(PSTRING_EINVAL == pstrdec_cstring(&dst, &PSTRWRAP("\\uD800")));
-    pf_assert(PSTRING_EINVAL == pstrdec_cstring(&dst, &PSTRWRAP("\\uDFFF")));
+    pf_assert(PSTRING_EDECODE == pstrdec_cstring(&dst, &PSTRWRAP("\\xaaa")));
+    pf_assert(PSTRING_EDECODE == pstrdec_cstring(&dst, &PSTRWRAP("\\xz")));
+    pf_assert(PSTRING_EDECODE == pstrdec_cstring(&dst, &PSTRWRAP("\\x")));
+    pf_assert(PSTRING_EDECODE == pstrdec_cstring(&dst, &PSTRWRAP("\\u")));
+    pf_assert(PSTRING_EDECODE == pstrdec_cstring(&dst, &PSTRWRAP("\\U")));
+    pf_assert(PSTRING_EDECODE == pstrdec_cstring(&dst, &PSTRWRAP("\\u123z")));
     pf_assert(
-        PSTRING_EINVAL == pstrdec_cstring(&dst, &PSTRWRAP("\\U00110000"))
+        PSTRING_EDECODE == pstrdec_cstring(&dst, &PSTRWRAP("\\U1234567"))
     );
-    pf_assert(PSTRING_EINVAL == pstrdec_cstring(&dst, &PSTRWRAP("\\u09F")));
+    pf_assert(PSTRING_EDECODE == pstrdec_cstring(&dst, &PSTRWRAP("\\uD800")));
+    pf_assert(PSTRING_EDECODE == pstrdec_cstring(&dst, &PSTRWRAP("\\uDFFF")));
+    pf_assert(
+        PSTRING_EDECODE == pstrdec_cstring(&dst, &PSTRWRAP("\\U00110000"))
+    );
+    pf_assert(PSTRING_EDECODE == pstrdec_cstring(&dst, &PSTRWRAP("\\u09F")));
 
     pstrfree(&dst);
     return 0;
