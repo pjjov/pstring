@@ -253,21 +253,21 @@ int pstream_save_json(
     pstream_t *stream, const void *obj, const struct pstrmodel *model
 ) {
     if (!stream || !obj || !model || !model->members)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
-    int result = PSTRING_OK;
+    int rc = PSTRING_OK;
     struct json_writer json;
     json.base = stream;
     json.prev = PSTRMODEL__BEGIN;
 
-    result |= pstream_putc(json.base, '{');
+    rc |= pstream_putc(json.base, '{');
 
-    for (size_t i = 0; !result && model->members[i].type; i++)
-        result |= json_save_member(&json, obj, &model->members[i]);
+    for (size_t i = 0; !rc && model->members[i].type; i++)
+        rc |= json_save_member(&json, obj, &model->members[i]);
 
-    result |= pstream_putc(json.base, '}');
+    rc |= pstream_putc(json.base, '}');
 
-    return result;
+    return rc ? PSTRTHROW(rc, NULL) : PSTRING_OK;
 }
 
 static int json_isblank(char c) {
@@ -601,7 +601,7 @@ int pstream_load_json(
     pstream_t *stream, void *obj, const struct pstrmodel *model
 ) {
     if (!stream || !obj || !model || !model->members)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     struct json_reader json;
     json.failed = 0;
@@ -613,7 +613,7 @@ int pstream_load_json(
     json_advance(&json);
     int result = json_read_model(&json, obj, model);
     /* seek back */
-    return result;
+    return PSTRTHROW(result, NULL);
 }
 
 static int json_read_obj(struct json_reader *json, pstrobj_t *out);
@@ -750,7 +750,7 @@ static int json_read_obj(struct json_reader *json, pstrobj_t *out) {
 
 pstrobj_t *pstrobj_load_json(pstream_t *stream, allocator_t *allocator) {
     if (!stream)
-        return NULL;
+        return PSTRTHROW_NULL(PSTRING_EINVAL);
 
     pstrobj_t *obj;
     struct json_reader json;
@@ -761,12 +761,12 @@ pstrobj_t *pstrobj_load_json(pstream_t *stream, allocator_t *allocator) {
     json.lexer.end = 0;
 
     if (!(obj = pstrobj_new(allocator)))
-        return NULL;
+        return PSTRTHROW_NULL(PSTRING_ENOMEM);
 
     json_advance(&json);
     if (json_read_obj(&json, obj) || json.failed) {
         pstrobj_free(obj);
-        return NULL;
+        return PSTRTHROW_NULL(PSTRING_EOBJECT);
     }
 
     return obj;
@@ -825,7 +825,8 @@ static int json_write_obj(pstrobj_t *o, pstream_t *s) {
 
 int pstrobj_save_json(pstrobj_t *obj, pstream_t *stream) {
     if (!obj || !stream)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
-    return json_write_obj(obj, stream);
+    int rc = json_write_obj(obj, stream);
+    return PSTRTHROW(rc, NULL);
 }
