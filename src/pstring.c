@@ -210,7 +210,7 @@ size_t pstr__nlen(const char *str, size_t max) {
 
 int pstrnew(pstring_t *out, const char *str, size_t len, allocator_t *alloc) {
     if (!out || !str)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     if (len == 0 && *str != '\0')
         len = strlen(str);
@@ -225,7 +225,7 @@ int pstrnew(pstring_t *out, const char *str, size_t len, allocator_t *alloc) {
 
 int pstralloc(pstring_t *out, size_t capacity, allocator_t *alloc) {
     if (!out)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     if (!alloc) {
         alloc = &standard_allocator;
@@ -241,7 +241,7 @@ int pstralloc(pstring_t *out, size_t capacity, allocator_t *alloc) {
     char *buffer = allocate_aligned(alloc, capacity, ALIGNMENT);
     if (!buffer || !IS_ALIGNED((uintptr_t)buffer, ALIGNMENT)) {
         deallocate(alloc, buffer, capacity);
-        return PSTRING_ENOMEM;
+        return PSTRTHROW_ENOMEM;
     }
 
     out->base.allocator = alloc;
@@ -253,7 +253,7 @@ int pstralloc(pstring_t *out, size_t capacity, allocator_t *alloc) {
 
 int pstrwrap(pstring_t *out, char *buffer, size_t length, size_t capacity) {
     if (!out || !buffer)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     if (length == 0) {
         if (capacity > 0)
@@ -268,11 +268,9 @@ int pstrwrap(pstring_t *out, char *buffer, size_t length, size_t capacity) {
     return pstrwrapb(out, buffer, length, capacity);
 }
 
-PSTR_API int pstrwrapb(
-    pstring_t *out, char *buffer, size_t length, size_t capacity
-) {
+int pstrwrapb(pstring_t *out, char *buffer, size_t length, size_t capacity) {
     if (!out || !buffer || length > capacity)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     out->buffer = buffer;
     out->base.allocator = NULL;
@@ -283,7 +281,7 @@ PSTR_API int pstrwrapb(
 
 int pstrdup(pstring_t *out, const pstring_t *str, allocator_t *allocator) {
     if (!out || !str)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     if (pstrlen(str) == 0)
         return pstralloc(out, 0, allocator);
@@ -292,7 +290,7 @@ int pstrdup(pstring_t *out, const pstring_t *str, allocator_t *allocator) {
 
 char *pstrunwrap(const pstring_t *str, allocator_t *alloc) {
     if (!str)
-        return NULL;
+        return PSTRTHROW_NULL(PSTRING_EINVAL);
 
     if (!pstrsso(str))
         return pstrbuf(str);
@@ -304,7 +302,7 @@ char *pstrunwrap(const pstring_t *str, allocator_t *alloc) {
 
 int pstrslice(pstring_t *out, const pstring_t *str, size_t from, size_t to) {
     if (!out || !str)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     if (to > pstrlen(str))
         to = pstrlen(str);
@@ -320,7 +318,7 @@ int pstrslice(pstring_t *out, const pstring_t *str, size_t from, size_t to) {
 
 int pstrcut(pstring_t *str, size_t from, size_t to) {
     if (!str)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     if (to > pstrlen(str))
         to = pstrlen(str);
@@ -347,7 +345,7 @@ int pstrrange(
     pstring_t *out, const pstring_t *str, const char *from, const char *to
 ) {
     if (!out)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     if (str) {
         if (to > pstrend(str))
@@ -376,7 +374,7 @@ void pstrfree(pstring_t *str) {
 
 int pstrreserve(pstring_t *str, size_t count) {
     if (!str)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     if (count > 0 && pstrlen(str) + count > pstrcap(str))
         if (pstrgrow(str, GROWTH(pstrlen(str), count)))
@@ -387,7 +385,7 @@ int pstrreserve(pstring_t *str, size_t count) {
 
 int pstrgrow(pstring_t *str, size_t count) {
     if (!str || count == 0 || (!pstrsso(str) && !pstrallocator(str)))
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     if (pstrsso(str)) {
         pstring_t tmp;
@@ -405,7 +403,7 @@ int pstrgrow(pstring_t *str, size_t count) {
     char *buffer = reallocate(pstrallocator(str), pstrbuf(str), old, capacity);
 
     if (!buffer)
-        return PSTRING_ENOMEM;
+        return PSTRTHROW_ENOMEM;
 
     str->buffer = buffer;
     str->base.capacity = capacity - 1;
@@ -414,14 +412,14 @@ int pstrgrow(pstring_t *str, size_t count) {
 
 int pstrshrink(pstring_t *str) {
     if (!str || !pstrallocator(str))
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     size_t old = pstrcap(str) + 1;
     size_t capacity = ALIGN(pstrlen(str) + 1, ALIGNMENT);
     char *buffer = reallocate(pstrallocator(str), pstrbuf(str), old, capacity);
 
     if (!buffer)
-        return PSTRING_ENOMEM;
+        return PSTRTHROW_ENOMEM;
 
     str->buffer = buffer;
     str->base.capacity = capacity - 1;
@@ -494,7 +492,7 @@ int pstrcmp(const pstring_t *left, const pstring_t *right) {
 
 int pstrcat(pstring_t *dst, const pstring_t *src) {
     if (!dst || !src)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     if (pstrlen(src) > 0) {
         if (pstrreserve(dst, pstrlen(src)))
@@ -509,7 +507,7 @@ int pstrcat(pstring_t *dst, const pstring_t *src) {
 
 int pstrcats(pstring_t *dst, const char *src, size_t length) {
     if (!dst || !src)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     if (length == 0)
         length = strlen(src);
@@ -527,7 +525,7 @@ int pstrcats(pstring_t *dst, const char *src, size_t length) {
 
 int pstrcatc(pstring_t *dst, char chr) {
     if (!dst)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     if (pstrreserve(dst, 1))
         return PSTRING_ENOMEM;
@@ -539,7 +537,7 @@ int pstrcatc(pstring_t *dst, char chr) {
 
 int pstrrcat(pstring_t *dst, const pstring_t *src) {
     if (!dst || !src)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     if (pstrlen(src) > 0) {
         if (pstrreserve(dst, pstrlen(src)))
@@ -555,7 +553,7 @@ int pstrrcat(pstring_t *dst, const pstring_t *src) {
 
 static int pstr__move(pstring_t *dst, size_t at, size_t count) {
     if (pstrreserve(dst, count))
-        return PSTRING_ENOMEM;
+        return PSTRTHROW_ENOMEM;
 
     size_t dlen = pstrlen(dst);
 
@@ -568,13 +566,13 @@ static int pstr__move(pstring_t *dst, size_t at, size_t count) {
 
 int pstrinsert(pstring_t *dst, size_t at, pstring_t *src) {
     if (!dst || !src || at > pstrlen(dst))
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     if (pstrlen(src) == 0)
         return PSTRING_OK;
 
     if (pstr__move(dst, at, pstrlen(src)))
-        return PSTRING_ENOMEM;
+        return PSTRTHROW_ENOMEM;
 
     memcpy(pstrslot(dst, at), pstrbuf(src), pstrlen(src));
     return PSTRING_OK;
@@ -582,10 +580,10 @@ int pstrinsert(pstring_t *dst, size_t at, pstring_t *src) {
 
 int pstrinsertc(pstring_t *dst, size_t at, size_t count, char chr) {
     if (!dst || count == 0 || at > pstrlen(dst))
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     if (pstr__move(dst, at, count))
-        return PSTRING_ENOMEM;
+        return PSTRTHROW_ENOMEM;
 
     memset(pstrslot(dst, at), chr, count);
     return PSTRING_OK;
@@ -593,11 +591,11 @@ int pstrinsertc(pstring_t *dst, size_t at, size_t count, char chr) {
 
 int pstrremove(pstring_t *str, size_t from, size_t to) {
     if (!str || from >= to)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     size_t len = pstrlen(str);
     if (from >= len || to > len)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     if (to < len)
         memmove(pstrslot(str, from), pstrslot(str, to), len - to);
@@ -607,7 +605,7 @@ int pstrremove(pstring_t *str, size_t from, size_t to) {
 
 int pstrcpy(pstring_t *dst, const pstring_t *src) {
     if (!dst || !src)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     pstr__setlen(dst, 0);
     return pstrcat(dst, src);
@@ -615,7 +613,7 @@ int pstrcpy(pstring_t *dst, const pstring_t *src) {
 
 int pstrjoin(pstring_t *dst, const pstring_t *srcs, size_t count) {
     if (!dst || !srcs)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     size_t req = 0;
     for (size_t i = 0; i < count; i++)
@@ -638,7 +636,7 @@ int pstrjoin(pstring_t *dst, const pstring_t *srcs, size_t count) {
 
 char *pstrchr(const pstring_t *str, int ch) {
     if (!str)
-        return NULL;
+        return PSTRTHROW_NULL(PSTRING_EINVAL);
 
     size_t length = pstrlen(str);
     char *buffer = pstrbuf(str);
@@ -664,7 +662,7 @@ char *pstrchr(const pstring_t *str, int ch) {
 
 char *pstrrchr(const pstring_t *str, int ch) {
     if (!str)
-        return NULL;
+        return PSTRTHROW_NULL(PSTRING_EINVAL);
 
     size_t length = pstrlen(str);
     char *buffer = pstrbuf(str);
@@ -847,7 +845,7 @@ char *pstrpbrk(const pstring_t *str, const char *set) {
 
 char *pstrcpbrk(const pstring_t *str, const char *set) {
     if (!str || !set)
-        return NULL;
+        return PSTRTHROW_NULL(PSTRING_EINVAL);
 
     size_t length = pstrlen(str);
     size_t setlen = pstr__nlen(set, 256);
@@ -911,7 +909,7 @@ char *pstrrpbrk(const pstring_t *str, const char *set) {
 
 char *pstrrcpbrk(const pstring_t *str, const char *set) {
     if (!str || !set)
-        return NULL;
+        return PSTRTHROW_NULL(PSTRING_EINVAL);
 
     size_t length = pstrlen(str);
     size_t setlen = pstr__nlen(set, 256);
@@ -946,7 +944,7 @@ char *pstrrcpbrk(const pstring_t *str, const char *set) {
 
 char *pstrstr(const pstring_t *str, const pstring_t *sub) {
     if (!str || !sub || pstrlen(sub) > pstrlen(str))
-        return NULL;
+        return PSTRTHROW_NULL(PSTRING_EINVAL);
 
     if (pstrlen(sub) == 0)
         return pstrbuf(str);
@@ -969,7 +967,7 @@ char *pstrstr(const pstring_t *str, const pstring_t *sub) {
 
 int pstrtok(pstring_t *dst, const pstring_t *src, const char *set) {
     if (!dst || !src)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     if (!set) {
         pstrslice(dst, src, 0, 0);
@@ -993,7 +991,7 @@ int pstrtok(pstring_t *dst, const pstring_t *src, const char *set) {
 
 int pstrsplit(pstring_t *dst, const pstring_t *src, const pstring_t *sep) {
     if (!dst || !src)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     if (!sep) {
         pstrslice(dst, src, 0, 0);
@@ -1018,7 +1016,7 @@ int pstrrepl(
     pstring_t *str, const pstring_t *src, const pstring_t *dst, size_t max
 ) {
     if (!str || !src || !dst)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     if (max == 0)
         max = SIZE_MAX;
@@ -1056,7 +1054,7 @@ int pstrrepl(
 
 int pstrrepls(pstring_t *str, const char *src, const char *dst, size_t max) {
     if (!src || !dst)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     pstring_t _src, _dst;
     pstrwrap(&_src, (char *)src, 0, 0);
@@ -1066,7 +1064,7 @@ int pstrrepls(pstring_t *str, const char *src, const char *dst, size_t max) {
 
 int pstrreplc(pstring_t *str, char src, char dst, size_t max) {
     if (!str || src == dst)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     pstring_t search;
     char *match = pstrbuf(str);
@@ -1083,7 +1081,7 @@ int pstrreplc(pstring_t *str, char src, char dst, size_t max) {
 
 int pstrlstrip(pstring_t *str, const char *chars) {
     if (!str)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     if (!chars)
         chars = " \t\r\n\v\f";
@@ -1097,7 +1095,7 @@ int pstrlstrip(pstring_t *str, const char *chars) {
 
 int pstrrstrip(pstring_t *str, const char *chars) {
     if (!str)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     if (!chars)
         chars = " \t\r\n\v\f";
@@ -1111,7 +1109,7 @@ int pstrrstrip(pstring_t *str, const char *chars) {
 
 int pstrstrip(pstring_t *str, const char *chars) {
     if (!str)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     if (!chars)
         chars = " \t\r\n\v\f";
@@ -1151,7 +1149,7 @@ static int count_indent(const pstring_t *str, int max, int tab, int *out) {
 
 int pstrdedent(pstring_t *str, int count, int tab) {
     if (!str)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     if (count <= 0)
         count = INT_MAX;
@@ -1187,7 +1185,7 @@ int pstrdedent(pstring_t *str, int count, int tab) {
 
 int pstrindent(pstring_t *str, int count, int tab) {
     if (!str)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     if (count < 0)
         count = 0;
@@ -1223,7 +1221,7 @@ int pstrindent(pstring_t *str, int count, int tab) {
 
 int pstrprefix(const pstring_t *str, const char *prefix, size_t length) {
     if (!str || !prefix)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     if (length == 0)
         length = strlen(prefix);
@@ -1236,7 +1234,7 @@ int pstrprefix(const pstring_t *str, const char *prefix, size_t length) {
 
 int pstrsuffix(const pstring_t *str, const char *suffix, size_t length) {
     if (!str || !suffix)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     if (length == 0)
         length = strlen(suffix);
@@ -1249,7 +1247,7 @@ int pstrsuffix(const pstring_t *str, const char *suffix, size_t length) {
 
 int pstrftime(pstring_t *dst, const char *fmt, struct tm *src) {
     if (!dst || !fmt || !src)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     if (pstrreserve(dst, strlen(fmt) * 2))
         return PSTRING_ENOMEM;
@@ -1257,7 +1255,7 @@ int pstrftime(pstring_t *dst, const char *fmt, struct tm *src) {
     size_t space = pstrcap(dst) - pstrlen(dst);
     size_t written = strftime(pstrend(dst), space, fmt, src);
     pstr__setlen(dst, pstrlen(dst) + written);
-    return written > 0 ? PSTRING_OK : PSTRING_ENOMEM;
+    return written > 0 ? PSTRING_OK : PSTRTHROW_ENOMEM;
 }
 
 static int distance(const pstring_t *left, const pstring_t *right, int **rows) {
@@ -1297,7 +1295,7 @@ static int distance(const pstring_t *left, const pstring_t *right, int **rows) {
 
 int pstrdistance(const pstring_t *left, const pstring_t *right) {
     if (!left || !right)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     size_t mlen = PF_MAX(pstrlen(left), pstrlen(right)) + 1;
 
@@ -1312,7 +1310,7 @@ int pstrdistance(const pstring_t *left, const pstring_t *right) {
         buffer = allocate(&standard_allocator, mlen * sizeof(int));
 
     if (buffer == NULL)
-        return PSTRING_ENOMEM;
+        return PSTRTHROW_ENOMEM;
 
     int *rows[3] = { buffer, &buffer[mlen], &buffer[2 * mlen] };
     int result = distance(left, right, rows);
