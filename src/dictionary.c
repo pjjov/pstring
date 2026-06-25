@@ -110,14 +110,14 @@ pstrdict_t *pstrdict_new(pstrhash_fn *hash, allocator_t *allocator) {
 
     pstrdict_t *out = allocate(allocator, sizeof(pstrdict_t));
 
-    if (out) {
-        out->buckets = NULL;
-        out->count = 0;
-        out->capacity = 0;
-        out->hash = hash;
-        out->allocator = allocator;
-    }
+    if (!out)
+        return PSTRTHROW_NULL(PSTRING_ENOMEM);
 
+    out->buckets = NULL;
+    out->count = 0;
+    out->capacity = 0;
+    out->hash = hash;
+    out->allocator = allocator;
     return out;
 }
 
@@ -177,7 +177,7 @@ static int grow_not_empty(pstrdict_t *dict, size_t capacity) {
 
 int pstrdict_reserve(pstrdict_t *dict, size_t count) {
     if (!dict)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     if (dict->count + count <= dict->capacity * PSTRDICT_THRESHOLD)
         return PSTRING_OK;
@@ -186,8 +186,10 @@ int pstrdict_reserve(pstrdict_t *dict, size_t count) {
     if (capacity < PSTRDICT_BUCKET_SIZE)
         capacity = PSTRDICT_BUCKET_SIZE;
 
-    return dict->count == 0 ? grow_empty(dict, capacity)
-                            : grow_not_empty(dict, capacity);
+    int rc = dict->count == 0 ? grow_empty(dict, capacity)
+                              : grow_not_empty(dict, capacity);
+
+    return rc ? PSTRTHROW(rc, NULL) : PSTRING_OK;
 }
 
 void pstrdict_free(pstrdict_t *dict) {
@@ -248,7 +250,7 @@ static inline struct bucket *iter_next(
 
 void *pstrdict_get(const pstrdict_t *dict, const pstring_t *key) {
     if (!dict || !key || dict->count == 0)
-        return NULL;
+        return PSTRTHROW_NULL(PSTRING_EINVAL);
 
     size_t hash = dict->hash(key);
     uint8_t part = hash_part(hash);
@@ -275,7 +277,7 @@ void *pstrdict_get(const pstrdict_t *dict, const pstring_t *key) {
 
 void *pstrdict_gets(const pstrdict_t *dict, const char *key, size_t length) {
     if (!dict || (!key && length > 0))
-        return NULL;
+        return PSTRTHROW_NULL(PSTRING_EINVAL);
 
     pstring_t buffer;
     pstrwrap(&buffer, (char *)key, length, 0);
@@ -284,10 +286,10 @@ void *pstrdict_gets(const pstrdict_t *dict, const char *key, size_t length) {
 
 int pstrdict_set(pstrdict_t *dict, const pstring_t *key, const void *value) {
     if (!dict || !key || !value)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     if (pstrdict_reserve(dict, 1))
-        return PSTRING_ENOMEM;
+        return PSTRTHROW_ENOMEM;
 
     size_t hash = dict->hash(key);
     uint8_t i, part = hash_part(hash);
@@ -323,10 +325,10 @@ int pstrdict_set(pstrdict_t *dict, const pstring_t *key, const void *value) {
 
 int pstrdict_insert(pstrdict_t *dict, const pstring_t *key, const void *value) {
     if (!dict || !key || !value)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     if (pstrdict_reserve(dict, 1))
-        return PSTRING_ENOMEM;
+        return PSTRTHROW_ENOMEM;
 
     size_t hash = dict->hash(key);
     uint8_t i, part = hash_part(hash);
@@ -360,7 +362,7 @@ int pstrdict_insert(pstrdict_t *dict, const pstring_t *key, const void *value) {
 
 int pstrdict_remove(pstrdict_t *dict, const pstring_t *key) {
     if (!dict || !key)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     if (dict->count == 0)
         return PSTRING_ENOENT;
@@ -395,10 +397,10 @@ int pstrdict_finsert(
     pstrdict_t *dict, const pstring_t *key, const void *value
 ) {
     if (!dict || !key || !value)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     if (pstrdict_reserve(dict, 1))
-        return PSTRING_ENOMEM;
+        return PSTRTHROW_ENOMEM;
 
     size_t hash = dict->hash(key);
     uint8_t i, part = hash_part(hash);
@@ -423,7 +425,7 @@ int pstrdict_finsert(
 
 int pstrdict_each(pstrdict_t *dict, pstrdict_fn *fn, void *user) {
     if (!dict || !fn)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     struct bucket *b = dict->buckets;
 
@@ -447,9 +449,9 @@ int pstrdict_each(pstrdict_t *dict, pstrdict_fn *fn, void *user) {
     return PSTRING_OK;
 }
 
-PSTR_API int pstrdict_filter(pstrdict_t *dict, pstrdict_fn *fn, void *user) {
+int pstrdict_filter(pstrdict_t *dict, pstrdict_fn *fn, void *user) {
     if (!dict || !fn)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     struct bucket *b = dict->buckets;
 
