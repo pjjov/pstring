@@ -42,7 +42,7 @@ pstrobj_t *pstrobj_new(allocator_t *alloc) {
     pstrobj_t *obj;
 
     if (!(obj = allocate(alloc, sizeof(struct pstrobj_str))))
-        return NULL;
+        return PSTRTHROW_NULL(PSTRING_ENOMEM);
 
     obj->next = NULL;
     obj->prev = NULL;
@@ -79,7 +79,7 @@ pstrobj_t *pstrobj_from_buffer(
     const char *format, pstring_t *source, allocator_t *allocator
 ) {
     if (!format || !source)
-        return NULL;
+        return PSTRTHROW_NULL(PSTRING_EINVAL);
 
     pstream_t stream;
     if (pstream_string(&stream, source))
@@ -106,7 +106,7 @@ pstrobj_t *pstrobj_from_path(
 
 int pstrobj_to_buffer(pstrobj_t *obj, const char *format, pstring_t *source) {
     if (!obj || !format || !source)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     pstream_t stream;
     if (pstream_string(&stream, source))
@@ -138,18 +138,28 @@ pstrobj_t *pstrobj_from_stream(
     const char *format, pstream_t *stream, allocator_t *allocator
 ) {
     if (!format || !stream)
-        return NULL;
+        return PSTRTHROW_NULL(PSTRING_EINVAL);
 
     int i = find_format(format);
-    return i != -1 ? formats[i].load(stream, allocator) : NULL;
+
+    if (i == -1)
+        return PSTRTHROW_NULL(PSTRING_ENOSYS);
+
+    pstrobj_t *result = formats[i].load(stream, allocator);
+    return result ? result : PSTRTHROW_NULL(PSTRING_EOBJECT);
 }
 
 int pstrobj_to_stream(pstrobj_t *obj, const char *format, pstream_t *stream) {
     if (!format || !obj || !stream)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     int i = find_format(format);
-    return i != -1 ? formats[i].save(obj, stream) : PSTRING_ENOSYS;
+
+    if (i == -1)
+        return PSTRTHROW_ENOSYS;
+
+    int rc = formats[i].save(obj, stream);
+    return rc ? PSTRTHROW(rc, NULL) : PSTRING_OK;
 }
 
 static void free_string(pstrobj_t *obj) {
@@ -161,7 +171,7 @@ static void free_string(pstrobj_t *obj) {
 
 int pstrobj_set_null(pstrobj_t *obj) {
     if (!obj)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     free_string(obj);
     obj->type = PSTROBJ_NULL;
@@ -170,7 +180,7 @@ int pstrobj_set_null(pstrobj_t *obj) {
 
 int pstrobj_set_bool(pstrobj_t *obj, char value) {
     if (!obj)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     free_string(obj);
     obj->type = PSTROBJ_BOOL;
@@ -184,7 +194,7 @@ int pstrobj_set_int(pstrobj_t *obj, int value) {
 
 int pstrobj_set_long(pstrobj_t *obj, long value) {
     if (!obj)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     free_string(obj);
     obj->type = PSTROBJ_LONG;
@@ -198,7 +208,7 @@ int pstrobj_set_float(pstrobj_t *obj, float value) {
 
 int pstrobj_set_double(pstrobj_t *obj, double value) {
     if (!obj)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     free_string(obj);
     obj->type = PSTROBJ_DOUBLE;
@@ -208,7 +218,7 @@ int pstrobj_set_double(pstrobj_t *obj, double value) {
 
 int pstrobj_set_list(pstrobj_t *obj) {
     if (!obj)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     free_string(obj);
     obj->type = PSTROBJ_LIST;
@@ -217,7 +227,7 @@ int pstrobj_set_list(pstrobj_t *obj) {
 
 int pstrobj_set_dict(pstrobj_t *obj) {
     if (!obj)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     free_string(obj);
     obj->type = PSTROBJ_DICT;
@@ -226,7 +236,7 @@ int pstrobj_set_dict(pstrobj_t *obj) {
 
 int pstrobj_copy_string(pstrobj_t *obj, const char *str, size_t len) {
     if (!obj || (!str && len > 0))
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     pstring_t tmp;
     pstrwrap(&tmp, (char *)str, len, 0);
@@ -235,7 +245,7 @@ int pstrobj_copy_string(pstrobj_t *obj, const char *str, size_t len) {
 
 int pstrobj_copy_pstring(pstrobj_t *obj, const pstring_t *str) {
     if (!obj || !str)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     obj->type = PSTROBJ_STRING;
     obj->flags = PF_FLAG_CLEAR(obj->flags, PSTROBJ_FLAG_WRAP);
@@ -245,7 +255,7 @@ int pstrobj_copy_pstring(pstrobj_t *obj, const pstring_t *str) {
 
 int pstrobj_wrap_string(pstrobj_t *obj, const char *str, size_t len) {
     if (!obj || (!str && len > 0))
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     pstring_t tmp;
     pstrwrap(&tmp, (char *)str, len, 0);
@@ -254,7 +264,7 @@ int pstrobj_wrap_string(pstrobj_t *obj, const char *str, size_t len) {
 
 int pstrobj_wrap_pstring(pstrobj_t *obj, const pstring_t *str) {
     if (!obj || !str)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     obj->type = PSTROBJ_STRING;
     obj->flags = PF_FLAG_SET(obj->flags, PSTROBJ_FLAG_WRAP);
@@ -264,7 +274,7 @@ int pstrobj_wrap_pstring(pstrobj_t *obj, const pstring_t *str) {
 
 int pstrobj_copy_key(pstrobj_t *obj, const pstring_t *str) {
     if (!obj || !str)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     obj->type = PSTROBJ_STRING;
     obj->flags = PF_FLAG_CLEAR(obj->flags, PSTROBJ_FLAG_WRAP_KEY);
@@ -274,7 +284,7 @@ int pstrobj_copy_key(pstrobj_t *obj, const pstring_t *str) {
 
 int pstrobj_copy_keys(pstrobj_t *obj, const char *str, size_t len) {
     if (!obj || (!str && len > 0))
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     pstring_t tmp;
     pstrwrap(&tmp, (char *)str, len, 0);
@@ -283,7 +293,7 @@ int pstrobj_copy_keys(pstrobj_t *obj, const char *str, size_t len) {
 
 int pstrobj_wrap_key(pstrobj_t *obj, const pstring_t *str) {
     if (!obj || !str)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     obj->type = PSTROBJ_STRING;
     obj->flags = PF_FLAG_SET(obj->flags, PSTROBJ_FLAG_WRAP_KEY);
@@ -293,7 +303,7 @@ int pstrobj_wrap_key(pstrobj_t *obj, const pstring_t *str) {
 
 int pstrobj_wrap_keys(pstrobj_t *obj, const char *str, size_t len) {
     if (!obj || (!str && len > 0))
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     pstring_t tmp;
     pstrwrap(&tmp, (char *)str, len, 0);
@@ -418,11 +428,11 @@ static void list_insert_item(
 
 int pstrobj_list_insert(pstrobj_t *list, pstrobj_t *item, size_t i) {
     if (!list || !item)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
     if (list->type != PSTROBJ_LIST && list->type != PSTROBJ_DICT)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EOBJECT;
     if (item->next || item->prev)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EOBJECT;
 
     if (i == 0) {
         if (list->child)
@@ -436,7 +446,7 @@ int pstrobj_list_insert(pstrobj_t *list, pstrobj_t *item, size_t i) {
     pstrobj_t *prev;
 
     if (!(prev = list_get_index(list->child, i - 1)))
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EOBJECT;
 
     list_insert_item(list, prev, item);
     return PSTRING_OK;
@@ -444,14 +454,14 @@ int pstrobj_list_insert(pstrobj_t *list, pstrobj_t *item, size_t i) {
 
 pstrobj_t *pstrobj_list_remove(pstrobj_t *list, size_t i) {
     if (!list)
-        return NULL;
+        return PSTRTHROW_NULL(PSTRING_EINVAL);
     if (list->type != PSTROBJ_LIST && list->type != PSTROBJ_DICT)
-        return NULL;
+        return PSTRTHROW_NULL(PSTRING_EOBJECT);
 
     pstrobj_t *node;
 
     if (!(node = list_get_index(list->child, i)))
-        return NULL;
+        return PSTRTHROW_NULL(PSTRING_ENOENT);
 
     list_remove_item(list, node);
     return node;
@@ -459,9 +469,9 @@ pstrobj_t *pstrobj_list_remove(pstrobj_t *list, size_t i) {
 
 int pstrobj_dict_insert(pstrobj_t *dict, pstrobj_t *item) {
     if (!dict || dict->type != PSTROBJ_DICT)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
     if (item->key == NULL)
-        return PSTRING_EINVAL;
+        return PSTRTHROW_EINVAL;
 
     pstrobj_t *node;
     for (node = dict->child; node; node = node->next)
@@ -480,7 +490,7 @@ pstrobj_t *pstrobj_dict_remove(
     pstrobj_t *dict, const char *key, size_t length
 ) {
     if (!dict || !key || dict->type != PSTROBJ_DICT)
-        return NULL;
+        return PSTRTHROW_NULL(PSTRING_EINVAL);
 
     pstrobj_t *node;
     for (node = dict->child; node; node = node->next) {
@@ -495,7 +505,7 @@ pstrobj_t *pstrobj_dict_remove(
 
 pstrobj_t *pstrobj_dict_get(pstrobj_t *dict, const pstring_t *key) {
     if (!dict || !key)
-        return NULL;
+        return PSTRTHROW_NULL(PSTRING_EINVAL);
 
     pstrobj_t *node;
     for (node = dict->child; node; node = node->next)
@@ -578,7 +588,7 @@ pstrobj_t *pstrobj_query(pstrobj_t *obj, const char *query) {
         return obj;
 
     if (pstrget(&search, 0) != '/')
-        return NULL;
+        return PSTRTHROW_NULL(PSTRING_EINVAL);
     pstrrshift(&search, 1);
 
     pstring_t unescaped, escaped = { 0 };
@@ -605,7 +615,7 @@ void *pstrobj_query_value(pstrobj_t *obj, const char *query) {
     pstrobj_t *res;
 
     if (!(res = pstrobj_query(obj, query)))
-        return NULL;
+        return PSTRTHROW_NULL(PSTRING_EINVAL);
 
     switch (res->type) {
     case PSTROBJ_NULL:
@@ -623,6 +633,6 @@ void *pstrobj_query_value(pstrobj_t *obj, const char *query) {
     case PSTROBJ_DICT:
         return res->child;
     default:
-        return NULL;
+        return PSTRTHROW_NULL(PSTRING_EOBJECT);
     }
 }
