@@ -53,6 +53,13 @@ typedef struct split_state_t {
     pstrexpand_t *handler;
 } split_state_t;
 
+typedef struct path_state_t {
+    words_t *words;
+    words_t *result;
+
+    pstrexpand_t *handler;
+} path_state_t;
+
 static int is_invalid_char(char c) {
     return c == '|' || c == '&' || c == ';' || c == '<' || c == '>' || c == '{'
         || c == '}' || c == '\n';
@@ -459,4 +466,51 @@ static int field_split(split_state_t *state) {
     }
 
     return rc;
+}
+
+static int quote_remove(pstring_t *dst, const pstring_t *src) {
+    const char *s, *end = pstrend(src);
+    char quote = '\0';
+    int rc = PSTRING_OK;
+
+    for (s = pstrbuf(src); !rc && s < end; s++) {
+        if (quote != '"' && *s == '\'')
+            quote = quote == '\'' ? '\0' : '\'';
+        else if (quote != '\'' && *s == '\"')
+            quote = quote == '\"' ? '\0' : '\"';
+        else if (quote != '\'' && *s == '\\' && &s[1] < end)
+            rc = pstrcatc(dst, *(++s));
+        else
+            rc = pstrcatc(dst, *s);
+    }
+
+    return rc;
+}
+
+static int expand_pathname(path_state_t *state) {
+    pstring_t clean = { 0 };
+
+    for (size_t i = 0; i < PF_ARRAY_LEN(state->words); i++) {
+        if (quote_remove(&clean, PF_ARRAY_SLOT(state->words, i)))
+            return PSTRING_EINVAL;
+
+        int hasGlob = pstrpbrk(&clean, "*?[") != NULL;
+
+        if (hasGlob) {
+            int rc = call_handler(
+                state->handler, PSTREXPAND_GLOB, &clean, &state->result
+            );
+
+            pstrfree(&clean);
+            clean = (pstring_t) { 0 };
+
+            if (rc != PSTRING_OK)
+                return PSTRING_ENOSYS;
+        } else {
+            PF_ARRAY_PUSH(state->result, &clean, 1);
+            clean = (pstring_t) { 0 };
+        }
+    }
+
+    return PSTRING_OK;
 }
