@@ -26,16 +26,32 @@
 typedef PF_ARRAY(pstring_t) words_t;
 
 typedef int(pstrexpand_fn)(
-    void *dst, pstring_t *src, int flags, int kind, void *user
+    void *dst, void *src, int flags, int kind, void *user
 );
+
+typedef struct pstrexpand_t {
+    int flags;
+    pstrexpand_fn *cb;
+    void *user;
+} pstrexpand_t;
 
 typedef struct expand_state_t {
     pstring_t *dst;
     pstring_t *src;
-    int flags;
-    pstrexpand_fn *cb;
-    void *user;
+
+    pstrexpand_t *handler;
 } expand_state_t;
+
+typedef struct split_state_t {
+    pstring_t *src;
+    words_t *words;
+    pstring_t ifs;
+
+    char ws[64];
+    char nws[64];
+
+    pstrexpand_t *handler;
+} split_state_t;
 
 static int is_invalid_char(char c) {
     return c == '|' || c == '&' || c == ';' || c == '<' || c == '>' || c == '{'
@@ -156,12 +172,26 @@ static const char *find_closing_double(const char *p, const char *end) {
     return NULL;
 }
 
-static int call_handler(expand_state_t *state, int kind, pstring_t *src) {
-    return state->cb(state->dst, src, state->flags, kind, state->user);
+static int words_push_dup(words_t *words, const pstring_t *s) {
+    pstring_t *dst;
+
+    if (!(dst = PF_ARRAY_INCR(words, 1)))
+        return PSTRING_ENOMEM;
+
+    if (pstrdup(dst, s, NULL)) {
+        PF_ARRAY_DECR(words, 1);
+        return PSTRING_ENOMEM;
+    }
+
+    return PSTRING_OK;
+}
+
+static int call_handler(pstrexpand_t *handler, int kind, void *src, void *dst) {
+    return handler->cb(dst, src, handler->flags, kind, handler->user);
 }
 
 static int expand_tilde(expand_state_t *state) {
-    return call_handler(state, PSTREXPAND_TILDE, NULL);
+    return call_handler(state->handler, PSTREXPAND_TILDE, NULL, state->dst);
 }
 
 static int expand_single_quote(pstring_t *dst, pstring_t *src) {
@@ -217,7 +247,7 @@ static int expand_command_tick(expand_state_t *state) {
 
     pstring_t cmd;
     pstrrange(&cmd, NULL, start, close);
-    return call_handler(state, PSTREXPAND_CMD_TICK, &cmd);
+    return call_handler(state->handler, PSTREXPAND_CMD_TICK, &cmd, state->dst);
 }
 
 static int expand_command_paren(expand_state_t *state) {
@@ -232,7 +262,7 @@ static int expand_command_paren(expand_state_t *state) {
     pstrrange(&var, NULL, open, close);
     pstrrange(src, NULL, close + 1, pstrend(src));
 
-    return call_handler(state, PSTREXPAND_CMD_PAREN, &var);
+    return call_handler(state->handler, PSTREXPAND_CMD_PAREN, &var, state->dst);
 }
 
 static int expand_braced(expand_state_t *state) {
@@ -247,7 +277,7 @@ static int expand_braced(expand_state_t *state) {
     pstrrange(&var, NULL, open, close);
     pstrrange(src, NULL, close + 1, pstrend(src));
 
-    return call_handler(state, PSTREXPAND_BRACE, &var);
+    return call_handler(state->handler, PSTREXPAND_BRACE, &var, state->dst);
 }
 
 static int expand_arithmetic(expand_state_t *state) {
@@ -262,7 +292,9 @@ static int expand_arithmetic(expand_state_t *state) {
     pstrrange(&var, NULL, open, close);
     pstrrange(src, NULL, close + 2, pstrend(src));
 
-    return call_handler(state, PSTREXPAND_ARITHMETIC, &var);
+    return call_handler(
+        state->handler, PSTREXPAND_ARITHMETIC, &var, state->dst
+    );
 }
 
 static int expand_named(expand_state_t *state) {
@@ -277,18 +309,18 @@ static int expand_named(expand_state_t *state) {
     pstrrange(&var, NULL, start, end);
     pstrrange(src, NULL, end, pstrend(src));
 
-    int rc = call_handler(state, PSTREXPAND_NAMED, &var);
+    int rc = call_handler(state->handler, PSTREXPAND_NAMED, &var, state->dst);
     return rc;
 }
 
 static int expand_pid(expand_state_t *state) {
     pstrrshift(state->src, 1);
-    return call_handler(state, PSTREXPAND_PID, NULL);
+    return call_handler(state->handler, PSTREXPAND_PID, NULL, state->dst);
 }
 
 static int expand_status(expand_state_t *state) {
     pstrrshift(state->src, 1);
-    return call_handler(state, PSTREXPAND_STATUS, NULL);
+    return call_handler(state->handler, PSTREXPAND_STATUS, NULL, state->dst);
 }
 
 static int expand_string(expand_state_t *state) {
@@ -354,4 +386,77 @@ static int expand_string(expand_state_t *state) {
     if (!res && end > prev)
         res = pstrcats(dst, prev, end - prev);
     return res;
+}
+
+static int init_ifs_param(split_state_t *state) {
+    int rc = call_handler(state->handler, PSTREXPAND_IFS, NULL, &state->ifs);
+
+    if (rc == PSTRING_ENOENT) {
+        pstrwrap(&state->ifs, " \t\n", 3, 0);
+        return 0;
+    }
+
+    return rc;
+}
+
+static int init_ifs_tables(split_state_t *state) {
+    if (init_ifs_param(state))
+        return PSTRING_EINVAL;
+
+    pstring_t ws, nws;
+
+    pstrwrapb(&ws, state->ws, 0, 63);
+    pstrwrapb(&nws, state->nws, 0, 63);
+
+    for (const char *c = pstrbuf(&state->ifs); *c; c++)
+        if (pstrcatc(pf_isspace(*c) ? &ws : &nws, *c))
+            break;
+
+    state->ws[pstrlen(&ws)] = '\0';
+    state->nws[pstrlen(&nws)] = '\0';
+    return PSTRING_OK;
+}
+
+static int fs_skip_ws(split_state_t *state) {
+    pstring_t *src = state->src;
+
+    if (strchr(state->nws, pstrget(src, 0))) {
+        pstrrshift(src, 1);
+        pstrlstrip(src, state->ws);
+
+        if (pstrlen(src) == 0) {
+            pstring_t empty;
+            pstrslice(&empty, src, 0, 0);
+            return PF_ARRAY_PUSH(state->words, &empty, 1);
+        }
+    } else {
+        pstrlstrip(src, state->ws);
+    }
+
+    return PSTRING_OK;
+}
+
+static int field_split(split_state_t *state) {
+    if (init_ifs_tables(state)) /* empty IFS */
+        return words_push_dup(state->words, state->src);
+
+    pstrlstrip(state->src, state->ws);
+
+    pstring_t field;
+    pstring_t *src = state->src;
+    const char *ws = pstrbuf(state->src);
+    int rc = PSTRING_OK;
+
+    while (!rc && ws) {
+        if (!(ws = pstrcpbrk(src, pstrbuf(&state->ifs))))
+            ws = pstrend(src);
+
+        pstrrange(&field, NULL, pstrbuf(src), ws);
+        pstrrange(src, NULL, ws, pstrend(src));
+
+        pstrrstrip(&field, state->ws);
+        rc = words_push_dup(state->words, &field) || fs_skip_ws(state);
+    }
+
+    return rc;
 }
