@@ -18,10 +18,17 @@
     limitations under the License.
 */
 
+#include "allocator_std.h"
 #include <pstring/pstring.h>
 
-#include <pf_array.h>
+#include <stdalign.h>
+
+#include <allocator.h>
+#include <allocator_arena.h>
 #include <pf_ctype.h>
+
+#define PF_ARRAY_USE_ALLOCATOR_T
+#include <pf_array.h>
 
 typedef PF_ARRAY(pstring_t) words_t;
 
@@ -511,6 +518,91 @@ static int expand_pathname(path_state_t *state) {
             clean = (pstring_t) { 0 };
         }
     }
+
+    return PSTRING_OK;
+}
+
+static void words_free(words_t *words) {
+    for (size_t i = 0; i < PF_ARRAY_LEN(words); i++)
+        pstrfree(PF_ARRAY_SLOT(words, i));
+    PF_ARRAY_FREE(words);
+}
+
+int pstrexpand_with(
+    pstrarray_t *dst, pstring_t *src, int flags, pstrexpand_fn *cb, void *user
+) {
+    if (!dst || !src || !cb || check_invalid_chars(src))
+        return PSTRTHROW_EINVAL;
+
+    pstrexpand_t handler;
+    handler.cb = cb;
+    handler.user = user;
+    handler.flags = flags;
+
+    struct arena_alloc _arena = { 0 };
+    arena_alloc_init(&_arena, &standard_allocator);
+    allocator_t *arena = &_arena.alloc;
+
+    pstring_t expanded = { 0 };
+    if (pstralloc(&expanded, 4096, arena)) {
+        arena_alloc_free(&_arena);
+        return PSTRING_ENOMEM;
+    }
+
+    pstring_t srcSlice;
+    pstrslice(&srcSlice, src, 0, pstrlen(src));
+
+    expand_state_t expandState;
+    expandState.handler = &handler;
+    expandState.dst = &expanded;
+    expandState.src = &srcSlice;
+
+    int rc;
+
+    if ((rc = expand_string(&expandState))) {
+        arena_alloc_free(&_arena);
+        return rc;
+    }
+
+    pstring_t expandedSlice;
+    pstrslice(&expandedSlice, &expanded, 0, pstrlen(&expanded));
+
+#define PF_ARRAY_DEFAULT_ALLOCATOR &arena;
+    words_t splitWords;
+    PF_ARRAY_INIT(&splitWords, 16);
+#undef PF_ARRAY_DEFAULT_ALLOCATOR
+#define PF_ARRAY_DEFAULT_ALLOCATOR &standard_allocator;
+    words_t expandedWords;
+    PF_ARRAY_INIT(&expandedWords, 16);
+#undef PF_ARRAY_DEFAULT_ALLOCATOR
+
+    split_state_t splitState;
+    splitState.handler = &handler;
+    splitState.src = &expandedSlice;
+    splitState.words = &splitWords;
+
+    if ((rc = field_split(&splitState))) {
+        arena_alloc_free(&_arena);
+        return rc;
+    }
+
+    path_state_t pathState;
+    pathState.handler = &handler;
+    pathState.words = &splitWords;
+    pathState.result = &expandedWords;
+
+    if ((rc = expand_pathname(&pathState))) {
+        arena_alloc_free(&_arena);
+        words_free(&expandedWords);
+        return rc;
+    }
+
+    arena_alloc_free(&_arena);
+
+    dst->items = PF_ARRAY_GET(&expandedWords, 0);
+    dst->length = PF_ARRAY_LEN(&expandedWords);
+    dst->capacity = PF_ARRAY_CAP(&expandedWords);
+    dst->allocator = &standard_allocator;
 
     return PSTRING_OK;
 }
