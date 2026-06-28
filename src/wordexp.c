@@ -528,6 +528,51 @@ static void words_free(words_t *words) {
     PF_ARRAY_FREE(words);
 }
 
+static int expand_with(
+    pstrexpand_t *handler, allocator_t *arena, words_t *result, pstring_t *src
+) {
+    pstring_t expanded = { 0 };
+    if (pstralloc(&expanded, 4096, arena))
+        return PSTRING_ENOMEM;
+
+    pstring_t srcSlice;
+    pstrslice(&srcSlice, src, 0, pstrlen(src));
+
+    expand_state_t expandState;
+    expandState.handler = handler;
+    expandState.dst = &expanded;
+    expandState.src = &srcSlice;
+
+    int rc;
+
+    if ((rc = expand_string(&expandState)))
+        return rc;
+
+    pstring_t expandedSlice;
+    pstrslice(&expandedSlice, &expanded, 0, pstrlen(&expanded));
+
+    words_t splitWords;
+    PF_ARRAY_WITH_ALLOCATOR(&splitWords, arena);
+
+    split_state_t splitState;
+    splitState.handler = handler;
+    splitState.src = &expandedSlice;
+    splitState.words = &splitWords;
+
+    if ((rc = field_split(&splitState)))
+        return rc;
+
+    path_state_t pathState;
+    pathState.handler = handler;
+    pathState.words = &splitWords;
+    pathState.result = result;
+
+    if ((rc = expand_pathname(&pathState)))
+        return rc;
+
+    return PSTRING_OK;
+}
+
 int pstrexpand_with(
     pstrarray_t *dst, pstring_t *src, int flags, pstrexpand_fn *cb, void *user
 ) {
@@ -543,66 +588,21 @@ int pstrexpand_with(
     arena_alloc_init(&_arena, &standard_allocator);
     allocator_t *arena = &_arena.alloc;
 
-    pstring_t expanded = { 0 };
-    if (pstralloc(&expanded, 4096, arena)) {
-        arena_alloc_free(&_arena);
-        return PSTRING_ENOMEM;
-    }
+    words_t words;
+    PF_ARRAY_WITH_ALLOCATOR(&words, &standard_allocator);
 
-    pstring_t srcSlice;
-    pstrslice(&srcSlice, src, 0, pstrlen(src));
-
-    expand_state_t expandState;
-    expandState.handler = &handler;
-    expandState.dst = &expanded;
-    expandState.src = &srcSlice;
-
-    int rc;
-
-    if ((rc = expand_string(&expandState))) {
-        arena_alloc_free(&_arena);
-        return rc;
-    }
-
-    pstring_t expandedSlice;
-    pstrslice(&expandedSlice, &expanded, 0, pstrlen(&expanded));
-
-#define PF_ARRAY_DEFAULT_ALLOCATOR &arena;
-    words_t splitWords;
-    PF_ARRAY_INIT(&splitWords, 16);
-#undef PF_ARRAY_DEFAULT_ALLOCATOR
-#define PF_ARRAY_DEFAULT_ALLOCATOR &standard_allocator;
-    words_t expandedWords;
-    PF_ARRAY_INIT(&expandedWords, 16);
-#undef PF_ARRAY_DEFAULT_ALLOCATOR
-
-    split_state_t splitState;
-    splitState.handler = &handler;
-    splitState.src = &expandedSlice;
-    splitState.words = &splitWords;
-
-    if ((rc = field_split(&splitState))) {
-        arena_alloc_free(&_arena);
-        return rc;
-    }
-
-    path_state_t pathState;
-    pathState.handler = &handler;
-    pathState.words = &splitWords;
-    pathState.result = &expandedWords;
-
-    if ((rc = expand_pathname(&pathState))) {
-        arena_alloc_free(&_arena);
-        words_free(&expandedWords);
-        return rc;
-    }
+    int rc = expand_with(&handler, arena, &words, src);
 
     arena_alloc_free(&_arena);
 
-    dst->items = PF_ARRAY_GET(&expandedWords, 0);
-    dst->length = PF_ARRAY_LEN(&expandedWords);
-    dst->capacity = PF_ARRAY_CAP(&expandedWords);
-    dst->allocator = &standard_allocator;
+    if (!rc) {
+        dst->items = PF_ARRAY_GET(&words, 0);
+        dst->length = PF_ARRAY_LEN(&words);
+        dst->capacity = PF_ARRAY_CAP(&words);
+        dst->allocator = &standard_allocator;
+    } else {
+        words_free(&words);
+    }
 
     return PSTRING_OK;
 }
