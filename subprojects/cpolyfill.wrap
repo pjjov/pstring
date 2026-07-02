@@ -4,7 +4,7 @@
   source_url      = https://github.com/pjjov/cpolyfill/archive/refs/tags/v1.3.2.zip
   source_filename = cpolyfill-v1.3.2.zip
   source_hash     = d0bf6a93af75ac54e5a6e60563f1d2ceecb81be80376765342c2e5126d6349a2
-  
+
   [provide]
-  dependency_names = (todo)
-  
+  dependency_names = cpolyfill
+
