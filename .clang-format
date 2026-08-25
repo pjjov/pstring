@@ -1,9 +1,12 @@
-# SPDX-FileCopyrightText: 2026 Предраг Јовановић
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2025-2026 Предраг Јовановић
+# SPDX-License-Identifier: CC0-1.0
 
 BasedOnStyle: WebKit
 AlignAfterOpenBracket: BlockIndent
 AlignEscapedNewlines: LeftWithLastLine
+AlignTrailingComments:
+  Kind: Always
+  OverEmptyLines: 0
 BinPackArguments: false
 BinPackParameters: false
 BreakBeforeBraces: Attach
@@ -15,4 +18,3 @@ PenaltyBreakAssignment: 999
 PenaltyReturnTypeOnItsOwnLine: 999
 PointerAlignment: Right
 ReflowComments: false
-# SkipMacroDefinitionBody: true
