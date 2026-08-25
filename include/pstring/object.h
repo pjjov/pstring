@@ -29,6 +29,10 @@
     #define PSTR_API
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /** ## NAME
 
     **pstring-object** - dynamic object handling and serialization.
@@ -272,5 +276,9 @@ PSTR_INLINE int pstrobj_dict_free(
 /* Forcefully sets the string or key by dereferencing `str`. */
 void pstrobj__set_string(pstrobj_t *obj, pstring_t *str);
 void pstrobj__set_key(pstrobj_t *obj, pstring_t *key);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

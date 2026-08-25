@@ -33,6 +33,10 @@
     #define PSTR_NO_RETURN
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdarg.h>
 #include <stddef.h>
 
@@ -671,5 +675,9 @@ PSTR_INLINE void pstr__setlen(pstring_t *str, size_t length) {
 }
 
 PSTR_API size_t pstr__nlen(const char *str, size_t max);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

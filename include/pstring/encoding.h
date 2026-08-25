@@ -29,6 +29,10 @@
     #define PSTR_API
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stddef.h>
 #include <stdint.h>
 typedef struct pstring_t pstring_t;
@@ -203,5 +207,9 @@ PSTR_API const char *pstr_read_utf8(
     be big enough to store at least 4 bytes.
 **/
 PSTR_API char *pstr_write_utf8(char *out, uint32_t c);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

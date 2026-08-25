@@ -29,6 +29,10 @@
     #define PSTR_API
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stddef.h>
 
 typedef struct allocator_t allocator_t;
@@ -137,5 +141,9 @@ PSTR_API int pstrdict_each(pstrdict_t *dict, pstrdict_fn *fn, void *user);
     Possible error codes: PSTRING_EINVAL, PSTRING_EINTR.
 **/
 PSTR_API int pstrdict_filter(pstrdict_t *dict, pstrdict_fn *fn, void *user);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

@@ -29,6 +29,10 @@
     #define PSTR_API
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /** ## NAME
 
     **pstring-io** - streaming and serialization functions for **pstrings**.
@@ -286,5 +290,9 @@ PSTR_API int pstream_save_json(
 PSTR_API int pstream_load_json(
     pstream_t *stream, void *obj, const struct pstrmodel *model
 );
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
