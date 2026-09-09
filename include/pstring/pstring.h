@@ -286,6 +286,9 @@ PSTR_API int pstralloc(pstring_t *out, size_t capacity, allocator_t *alloc);
 /** Frees all resources used by `str`, if it is owned. */
 PSTR_API void pstrfree(pstring_t *str);
 
+/** Frees all strings in array `a`, if they are owned. */
+PSTR_API void pstrarray_free(pstrarray_t *array);
+
 /** Returns the character buffer of `str`. If `str` is using SSO,
     the contents of `str` will be copied to a brand new buffer.
 **/
@@ -374,6 +377,9 @@ PSTR_API int pstrshrink(pstring_t *str);
 
 /** Checks if `left` and `right` pstring are equal. **/
 PSTR_API int pstrequal(const pstring_t *left, const pstring_t *right);
+PSTR_API int pstrequalb(
+    const pstring_t *left, const char *right, size_t length
+);
 
 /** Checks if `left` pstring and `right` string are equal.
     If `length` is zero, `right` is treated as a null-terminated string.

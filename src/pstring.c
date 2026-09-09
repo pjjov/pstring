@@ -239,7 +239,7 @@ int pstralloc(pstring_t *out, size_t capacity, allocator_t *alloc) {
 
     capacity = ALIGN(capacity + 1, ALIGNMENT);
     char *buffer = allocate_aligned(alloc, capacity, ALIGNMENT);
-    if (!buffer || !IS_ALIGNED((uintptr_t)buffer, ALIGNMENT)) {
+    if (!buffer) {
         deallocate(alloc, buffer, capacity);
         return PSTRTHROW_ENOMEM;
     }
@@ -372,6 +372,14 @@ void pstrfree(pstring_t *str) {
     }
 }
 
+void pstrarray_free(pstrarray_t *array) {
+    if (!array)
+        return;
+
+    for (size_t i = 0; i < array->length; i++)
+        pstrfree(&array->items[i]);
+}
+
 int pstrreserve(pstring_t *str, size_t count) {
     if (!str)
         return PSTRTHROW_EINVAL;
@@ -454,6 +462,12 @@ int pstrequal(const pstring_t *left, const pstring_t *right) {
 int pstrequals(const pstring_t *left, const char *right, size_t length) {
     pstring_t tmp;
     pstrwrap(&tmp, (char *)right, length, length);
+    return pstrequal(left, &tmp);
+}
+
+int pstrequalb(const pstring_t *left, const char *right, size_t length) {
+    pstring_t tmp;
+    pstrwrapb(&tmp, (char *)right, length, length);
     return pstrequal(left, &tmp);
 }
 

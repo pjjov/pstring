@@ -28,13 +28,10 @@
 #include <pf_ctype.h>
 
 #define PF_ARRAY_USE_ALLOCATOR_T
+#define PF_ARRAY_DEFAULT_ALLOCATOR NULL
 #include <pf_array.h>
 
 typedef PF_ARRAY(pstring_t) words_t;
-
-typedef int(pstrexpand_fn)(
-    void *dst, void *src, int flags, int kind, void *user
-);
 
 typedef struct pstrexpand_t {
     int flags;
@@ -461,7 +458,7 @@ static int field_split(split_state_t *state) {
     const char *ws = pstrbuf(state->src);
     int rc = PSTRING_OK;
 
-    while (!rc && ws) {
+    while (!rc && ws < pstrend(src)) {
         if (!(ws = pstrcpbrk(src, pstrbuf(&state->ifs))))
             ws = pstrend(src);
 
@@ -512,7 +509,7 @@ static int expand_pathname(path_state_t *state) {
             clean = (pstring_t) { 0 };
 
             if (rc != PSTRING_OK)
-                return PSTRING_ENOSYS;
+                return rc;
         } else {
             PF_ARRAY_PUSH(state->result, &clean, 1);
             clean = (pstring_t) { 0 };
@@ -584,8 +581,10 @@ int pstrexpand_with(
     handler.user = user;
     handler.flags = flags;
 
+    char _arenaBuffer[4096];
     struct arena_alloc _arena = { 0 };
     arena_alloc_init(&_arena, &standard_allocator);
+    arena_alloc_buffer(&_arena, _arenaBuffer, 4096);
     allocator_t *arena = &_arena.alloc;
 
     words_t words;
