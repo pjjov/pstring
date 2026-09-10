@@ -142,6 +142,22 @@ enum pstrexpand_hook {
     PSTREXPAND_GLOB,
 };
 
+/* Flags for `pstrexpand` family of functions */
+enum pstrexpand_flags {
+    PSTREXPAND_UNDEF = 0x1,
+    PSTREXPAND_REUSE = 0x2,
+    PSTREXPAND_NOCMD = 0x4,
+    PSTREXPAND_APPEND = 0x8,
+};
+
+/* Error codes that mirror <wordexp.h> codes */
+enum pstrexpand_error {
+    PSTREXPAND_BADCHAR = -200,
+    PSTREXPAND_BADVAL = -201,
+    PSTREXPAND_CMDSUB = -202,
+    PSTREXPAND_SYNTAX = -203,
+};
+
 /** This function set's up the exception handler for the `<pf_exception.h>`
     exception handling interface. The first call will return `NULL`, after
     which exception-throwing code can be executed.
@@ -667,6 +683,26 @@ PSTR_API int pstrprefix(
 /** Checks if `str` ends with a `suffix`. **/
 PSTR_API int pstrsuffix(
     const pstring_t *str, const char *suffix, size_t length
+);
+
+/** Callback used for the `wordexp` shell expansion. **/
+typedef int(pstrexpand_fn)(
+    void *dst, void *src, int flags, int kind, void *user
+);
+
+/** Performs word expansion using the default callback. **/
+PSTR_API int pstrexpand(
+    pstrarray_t *dst, pstring_t *src, int flags, pstrexpand_fn *cb
+);
+
+/** Performs word expansion using the provided callback. **/
+PSTR_API int pstrexpand_with(
+    pstrarray_t *dst, pstring_t *src, int flags, pstrexpand_fn *cb, void *user
+);
+
+/** Default callback used for `wordexp` shell expansion. */
+PSTR_API int pstrexpand_default_cb(
+    void *dst, void *src, int flags, int kind, void *user
 );
 
 /** Naively sets the length of `str` to `length` **/

@@ -31,6 +31,8 @@
 #define PF_ARRAY_DEFAULT_ALLOCATOR NULL
 #include <pf_array.h>
 
+#define MAX_ENV_NAME_LEN 256
+
 typedef PF_ARRAY(pstring_t) words_t;
 
 typedef struct pstrexpand_t {
@@ -202,7 +204,16 @@ static int call_handler(pstrexpand_t *handler, int kind, void *src, void *dst) {
 }
 
 static int expand_tilde(expand_state_t *state) {
-    return call_handler(state->handler, PSTREXPAND_TILDE, NULL, state->dst);
+    pstrrshift(state->src, 1); /* skip '~' */
+
+    pstring_t username;
+    pstring_t *src = state->src;
+    const char *end = pstrpbrk(src, "/:");
+    pstrrange(&username, NULL, pstrbuf(src), end ? end : pstrend(src));
+
+    return call_handler(
+        state->handler, PSTREXPAND_TILDE, &username, state->dst
+    );
 }
 
 static int expand_single_quote(pstring_t *dst, pstring_t *src) {
@@ -382,10 +393,12 @@ static int expand_string(expand_state_t *state) {
             break;
         }
         case '~':
-            if (special == start || special[-1] == ':' || special[-1] == '=')
+            if (special == start || special[-1] == ':' || special[-1] == '=') {
                 res = expand_tilde(state);
-            else
+            } else {
                 pstrcatc(dst, '~');
+                pstrrshift(src, 1);
+            }
             break;
         default:
             break;
@@ -431,6 +444,9 @@ static int init_ifs_tables(split_state_t *state) {
 static int fs_skip_ws(split_state_t *state) {
     pstring_t *src = state->src;
 
+    if (pstrlen(src) == 0)
+        return PSTRING_OK;
+
     if (strchr(state->nws, pstrget(src, 0))) {
         pstrrshift(src, 1);
         pstrlstrip(src, state->ws);
@@ -460,6 +476,9 @@ static int field_split(split_state_t *state) {
 
     while (!rc && ws < pstrend(src)) {
         if (!(ws = pstrcpbrk(src, pstrbuf(&state->ifs))))
+            ws = pstrend(src);
+
+        if (ws == pstrbuf(src))
             ws = pstrend(src);
 
         pstrrange(&field, NULL, pstrbuf(src), ws);
@@ -604,4 +623,81 @@ int pstrexpand_with(
     }
 
     return PSTRING_OK;
+}
+
+static int default_expand_ifs(pstring_t *out) {
+    const char *ifs = getenv("IFS");
+
+    if (ifs) {
+        pstrwrap(out, (char *)ifs, 0, 0);
+        return PSTRING_OK;
+    }
+
+    return PSTRING_ENOENT;
+}
+
+static int default_expand_tilde(
+    pstring_t *out, const pstring_t *username, int flags
+) {
+    // TODO: pf_homedir(username, buf, bufsz)
+    return PSTRING_ENOSYS;
+}
+
+static int default_expand_pid(pstring_t *out) {
+    // TODO: pf_pid()
+    return PSTRING_ENOSYS;
+}
+
+static int default_expand_status(pstring_t *out) {
+    return pstrcatc(out, '0'); /* no shell state */
+}
+
+static int default_expand_named(pstring_t *out, pstring_t *name, int flags) {
+    if (pstrlen(name) >= MAX_ENV_NAME_LEN)
+        return PSTRING_ENOMEM;
+
+    char tmp[MAX_ENV_NAME_LEN];
+    memcpy(tmp, pstrbuf(name), pstrlen(name));
+    tmp[pstrlen(name)] = '\0';
+
+    const char *value = getenv(tmp);
+    if (value) {
+        return pstrcats(out, value, 0);
+    } else if (flags & PSTREXPAND_UNDEF) {
+        return PSTREXPAND_BADVAL;
+    }
+
+    return PSTRING_OK;
+}
+
+int pstrexpand_default_cb(
+    void *dst, void *src, int flags, int kind, void *user
+) {
+    switch (kind) {
+    case PSTREXPAND_NONE:
+        return PSTRING_OK;
+    case PSTREXPAND_NAMED:
+        return default_expand_named(dst, src, flags);
+    case PSTREXPAND_TILDE:
+        return default_expand_tilde(dst, src, flags);
+    case PSTREXPAND_STATUS:
+        return default_expand_status(dst);
+    case PSTREXPAND_PID:
+        return default_expand_pid(dst);
+    case PSTREXPAND_IFS:
+        return default_expand_ifs(dst);
+    case PSTREXPAND_BRACE:
+        return PSTRING_ENOSYS;
+    case PSTREXPAND_CMD_PAREN:
+    case PSTREXPAND_CMD_TICK:
+        return PSTRING_ENOSYS;
+    case PSTREXPAND_ARITHMETIC:
+        return PSTRING_ENOSYS;
+    case PSTREXPAND_GLOB:
+        return PSTRING_ENOSYS;
+    }
+}
+
+int pstrexpand(pstrarray_t *dst, pstring_t *src, int flags, pstrexpand_fn *cb) {
+    return pstrexpand_with(dst, src, flags, pstrexpand_default_cb, NULL);
 }
