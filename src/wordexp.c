@@ -625,17 +625,6 @@ int pstrexpand_with(
     return PSTRING_OK;
 }
 
-static int default_expand_ifs(pstring_t *out) {
-    const char *ifs = getenv("IFS");
-
-    if (ifs) {
-        pstrwrap(out, (char *)ifs, 0, 0);
-        return PSTRING_OK;
-    }
-
-    return PSTRING_ENOENT;
-}
-
 static int default_expand_tilde(
     pstring_t *out, const pstring_t *username, int flags
 ) {
@@ -648,26 +637,16 @@ static int default_expand_pid(pstring_t *out) {
     return PSTRING_ENOSYS;
 }
 
-static int default_expand_status(pstring_t *out) {
-    return pstrcatc(out, '0'); /* no shell state */
-}
-
 static int default_expand_named(pstring_t *out, pstring_t *name, int flags) {
-    if (pstrlen(name) >= MAX_ENV_NAME_LEN)
-        return PSTRING_ENOMEM;
+    pstring_t value;
+    int rc = pstrenv(&value, name);
 
-    char tmp[MAX_ENV_NAME_LEN];
-    memcpy(tmp, pstrbuf(name), pstrlen(name));
-    tmp[pstrlen(name)] = '\0';
-
-    const char *value = getenv(tmp);
-    if (value) {
-        return pstrcats(out, value, 0);
-    } else if (flags & PSTREXPAND_UNDEF) {
+    if (rc == PSTRING_ENOENT && flags & PSTREXPAND_UNDEF)
         return PSTREXPAND_BADVAL;
-    }
 
-    return PSTRING_OK;
+    if (rc == PSTRING_OK)
+        pstrcat(out, &value);
+    return rc;
 }
 
 int pstrexpand_default_cb(
@@ -681,11 +660,11 @@ int pstrexpand_default_cb(
     case PSTREXPAND_TILDE:
         return default_expand_tilde(dst, src, flags);
     case PSTREXPAND_STATUS:
-        return default_expand_status(dst);
+        return pstrcatc(dst, '0');
     case PSTREXPAND_PID:
         return default_expand_pid(dst);
     case PSTREXPAND_IFS:
-        return default_expand_ifs(dst);
+        return pstrenv(dst, PSTR("IFS"));
     case PSTREXPAND_BRACE:
         return PSTRING_ENOSYS;
     case PSTREXPAND_CMD_PAREN:

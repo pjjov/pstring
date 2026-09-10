@@ -305,6 +305,26 @@ PSTR_API void pstrfree(pstring_t *str);
 /** Frees all strings in array `a`, if they are owned. */
 PSTR_API void pstrarray_free(pstrarray_t *array);
 
+/** Copies the contents of `str` to `buffer` as a null-terminated string.
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
+**/
+PSTR_API int pstrdump(const pstring_t *str, char *buffer, size_t size);
+
+/** Ensures that `str` is null-terminated by copying it's content to a new
+    buffer and appending '\0', if it's not currently null-terminated.
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
+**/
+PSTR_API int pstrterm(pstring_t *str, allocator_t *allocator);
+
+/** Ensures that `str` is null-terminated by copying it's content to the given
+    buffer and appending '\0', if it's not currently null-terminated.
+    Returned string is either `buffer` or `pstrbuf(str)`.
+**/
+PSTR_API char *pstrterms(pstring_t *str, char *buffer, size_t size);
+
+/** Checks if `str` is null-terminated. **/
+PSTR_INLINE int pstristerm(pstring_t *str) { return pstrowned(str); }
+
 /** Returns the character buffer of `str`. If `str` is using SSO,
     the contents of `str` will be copied to a brand new buffer.
 **/
@@ -684,6 +704,12 @@ PSTR_API int pstrprefix(
 PSTR_API int pstrsuffix(
     const pstring_t *str, const char *suffix, size_t length
 );
+
+/** Gets the value of the environment variable `name` and slices it as `out`.
+    Object `name` can be a slice, i.e. null termination is not required.
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOENT, PSTRING_ENOMEM.
+**/
+PSTR_API int pstrenv(pstring_t *out, const pstring_t *name);
 
 /** Callback used for the `wordexp` shell expansion. **/
 typedef int(pstrexpand_fn)(

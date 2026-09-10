@@ -56,6 +56,8 @@
 #define GROWTH(old, req) (((old) + (req)) * 2 - (old))
 #define PSTRING_MAX_SET 256
 
+#define PSTRING_MAX_ENV_NAME 4096
+
 #ifdef PSTRING_AVX
 static uint64_t pstr__match_set_avx(
     const char *buffer, const char *set, size_t length
@@ -283,6 +285,12 @@ int pstrdup(pstring_t *out, const pstring_t *str, allocator_t *allocator) {
     if (!out || !str)
         return PSTRTHROW_EINVAL;
 
+    pstring_t tmp;
+    if (out == str) {
+        tmp = *str;
+        str = &tmp;
+    }
+
     if (pstrlen(str) == 0)
         return pstralloc(out, 0, allocator);
     return pstrnew(out, pstrbuf(str), pstrlen(str), allocator);
@@ -378,6 +386,18 @@ void pstrarray_free(pstrarray_t *array) {
 
     for (size_t i = 0; i < array->length; i++)
         pstrfree(&array->items[i]);
+}
+
+int pstrdump(const pstring_t *str, char *buffer, size_t size) {
+    if (!str || !buffer || size == 0)
+        return PSTRING_EINVAL;
+    if (pstrlen(str) >= size)
+        return PSTRING_ENOMEM;
+
+    if (pstrlen(str) != 0)
+        memcpy(buffer, pstrbuf(str), pstrlen(str));
+    buffer[pstrlen(str)] = '\0';
+    return PSTRING_OK;
 }
 
 int pstrreserve(pstring_t *str, size_t count) {
@@ -1366,3 +1386,47 @@ size_t pstrhash(const pstring_t *str) {
 }
 
 #endif
+
+int pstrterm(pstring_t *str, allocator_t *allocator) {
+    if (!str)
+        return PSTRING_EINVAL;
+    if (pstristerm(str))
+        return PSTRING_OK;
+
+    return pstrdup(str, str, allocator);
+}
+
+char *pstrterms(pstring_t *str, char *buffer, size_t size) {
+    if (!str)
+        return NULL;
+    if (pstristerm(str))
+        return pstrbuf(str);
+    if (pstrlen(str) >= size)
+        return NULL;
+
+    if (pstrlen(str) > 0)
+        memcpy(buffer, pstrbuf(str), pstrlen(str));
+    buffer[pstrlen(str)] = '\0';
+    return buffer;
+}
+
+int pstrenv(pstring_t *out, const pstring_t *name) {
+    if (!out || !name)
+        return PSTRING_EINVAL;
+
+    char tmp[PSTRING_MAX_ENV_NAME];
+    const char *cname = pstrterms(out, tmp, PSTRING_MAX_ENV_NAME);
+
+    if (!cname)
+        return PSTRING_ENOMEM;
+
+    const char *value = getenv(cname);
+
+    if (value) {
+        pstrwrap(out, (char *)value, 0, 0);
+        return PSTRING_OK;
+    }
+
+    *out = (pstring_t) { 0 };
+    return PSTRING_ENOENT;
+}
