@@ -1,9 +1,8 @@
 [wrap-file]
-  directory = allocator_t-1.0.2
+directory = allocator_t-1.1
+source_url = https://github.com/pjjov/allocator_t/archive/refs/tags/v1.1.tar.gz
+source_filename = allocator_t-v1.1.tar.gz
+source_hash = ff643da7c29ee4635d4edb01455031e1962294f086d3a4062767296f5595dd9b
 
-  source_url      = https://github.com/pjjov/allocator_t/archive/refs/tags/v1.0.2.zip
-  source_filename = allocator_t-v1.0.2.zip
-  source_hash     = 05e982d49987fd14f06d385ff058faf7b399e14b86b8ec340eedce850d917017
-
-  [provide]
-  dependency_names = allocator_t
+[provide]
+dependency_names = allocator_t
