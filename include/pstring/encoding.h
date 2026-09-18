@@ -107,6 +107,17 @@ PSTR_API int pstrdec_url(pstring_t *dst, const pstring_t *src);
 **/
 PSTR_API int pstrenc_base64(pstring_t *dst, const pstring_t *src);
 
+/** Encodes/decodes RFC 4648 base32 (the `A-Z2-7` alphabet, `=` padding).
+    Unlike base64, base32's alphabet avoids visually ambiguous characters
+    (no `0`/`O`, `1`/`I`/`l`) and is case-insensitive on decode, which is
+    why it shows up in things meant to be typed by hand: TOTP/2FA secret
+    keys, DNSSEC/DANE record encodings, and Crockford-style IDs (though
+    Crockford's own variant uses a different alphabet, not this one).
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
+**/
+PSTR_API int pstrenc_base32(pstring_t *dst, const pstring_t *src);
+PSTR_API int pstrdec_base32(pstring_t *dst, const pstring_t *src);
+
 /** Encodes `src` into a URL-safe Base64-encoded string.
     Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
 **/
