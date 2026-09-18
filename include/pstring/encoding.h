@@ -172,6 +172,39 @@ PSTR_API int pstrenc_utf8(pstring_t *dst, const uint32_t *src, size_t length);
 **/
 PSTR_API int pstrdec_utf8(uint32_t *dst, size_t *length, const pstring_t *src);
 
+enum pstr_utf16_endian {
+    /** Little-endian byte order (the common case: x86/x64, and the
+        default assumed by Windows' `wchar_t`/`UTF-16LE`). **/
+    PSTR_UTF16_LE = 0,
+    /** Big-endian byte order ("UTF-16BE", also the network/file-format
+        default when no BOM is present, per RFC 2781). **/
+    PSTR_UTF16_BE = 1,
+};
+
+/** Encodes codepoints from `src` as UTF-16 code units into `dst`, using
+    `endian` byte order. Codepoints above `0xFFFF` are encoded as a
+    surrogate pair (four bytes); a codepoint in the surrogate range
+    (`0xD800`-`0xDFFF`) or above `0x10FFFF` is invalid UTF-16 and is
+    replaced with the replacement character `U+FFFD`, matching how
+    `pstrdec_utf8` already handles invalid input rather than failing.
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
+**/
+PSTR_API int pstrenc_utf16(
+    pstring_t *dst, const uint32_t *src, size_t length, int endian
+);
+
+/** Decodes UTF-16 code units from `src` (byte order `endian`) into
+    Unicode codepoints in `dst`. `length` should point to the capacity of
+    `dst` in codepoints (not code units); it is updated to the number of
+    codepoints actually decoded. An unpaired or out-of-order surrogate
+    decodes to `U+FFFD` and consumes just the one code unit, so decoding
+    never gets permanently stuck on malformed input.
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
+**/
+PSTR_API int pstrdec_utf16(
+    uint32_t *dst, size_t *length, const pstring_t *src, int endian
+);
+
 /** Encodes `src` as a JSON string into `dst`.
     Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
 **/
@@ -218,6 +251,22 @@ PSTR_API const char *pstr_read_utf8(
     be big enough to store at least 4 bytes.
 **/
 PSTR_API char *pstr_write_utf8(char *out, uint32_t c);
+
+/** Reads one UTF-16 code unit sequence (one code unit, or a surrogate
+    pair) starting at `chr` and stores the decoded codepoint in `out` if
+    it's not `NULL`. Returns a pointer to the first byte after the
+    sequence read, which is always `chr + 2` (a lone/invalid code unit)
+    or `chr + 4` (a valid surrogate pair). **/
+PSTR_API const char *pstr_read_utf16(
+    const char *chr, const char *end, uint32_t *out, int endian
+);
+
+/** Writes codepoint `c` as one or two UTF-16 code units (four bytes for
+    a surrogate pair), returning the end of the written sequence. The
+    output buffer should be big enough to store at least 4 bytes. A
+    codepoint that cannot be represented in UTF-16 (in the surrogate
+    range, or above `0x10FFFF`) is replaced with `U+FFFD`. **/
+PSTR_API char *pstr_write_utf16(char *out, uint32_t c, int endian);
 
 #ifdef __cplusplus
 }
