@@ -19,189 +19,24 @@
 */
 
 #include <pstring/pstring.h>
+
+#include <allocator.h>
+#include <allocator_std.h>
+#include <pf_macro.h>
+
+#include <limits.h>
 #include <stdint.h>
 #include <string.h>
 #include <time.h>
 
-#include <pf_bitwise.h>
-#include <pf_macro.h>
-
-#include <allocator.h>
-#include <allocator_std.h>
-
-#if !defined(PSTRING_NO_AVX) && defined(__AVX__)
-    #include <immintrin.h>
-    #define PSTRING_AVX
-#endif
-
-#if !defined(PSTRING_NO_SSE) && defined(__SSE2__)
-    #include <emmintrin.h>
-    #define PSTRING_SSE
-#endif
-
-#ifdef PSTRING_AVX
-    #define ALIGNMENT (_Alignof(__m256i))
-#elif defined(PSTRING_SSE)
-    #define ALIGNMENT (_Alignof(__m128i))
-#else
-    #define ALIGNMENT (_Alignof(char))
-#endif
+#define ALIGNMENT 32
 
 #define ALIGN(x, a) (((x) + ((a) - 1)) & ~((a) - 1))
 #define IS_ALIGNED(x, a) (!((x) & (a - 1)))
 
-#define MIN(x, y) ((x) < (y) ? (x) : (y))
-#define MAX(x, y) ((x) > (y) ? (x) : (y))
-
 #define GROWTH(old, req) (((old) + (req)) * 2 - (old))
-#define PSTRING_MAX_SET 256
 
 #define PSTRING_MAX_ENV_NAME 4096
-
-#ifdef PSTRING_AVX
-static uint64_t pstr__match_set_avx(
-    const char *buffer, const char *set, size_t length
-) {
-    __m256i vec = _mm256_loadu_si256((const __m256i *)buffer);
-    uint64_t result = 0;
-
-    #ifndef PSTRING_ALT_SPN
-    __m256i tmp = _mm256_setzero_si256();
-    for (size_t ch = 0; ch < length; ch++) {
-        __m256i check = _mm256_set1_epi8(set[ch]);
-        tmp = _mm256_or_si256(tmp, _mm256_cmpeq_epi8(vec, check));
-    }
-    result = _mm256_movemask_epi8(tmp);
-    #else
-    for (size_t ch = 0; ch < length; ch++) {
-        __m256i check = _mm256_set1_epi8(set[ch]);
-        result |= _mm256_movemask_epi8(_mm256_cmpeq_epi8(vec, check));
-    }
-    #endif
-
-    return result;
-}
-
-static uint64_t pstr__match_chr_avx(const char *buffer, int ch) {
-    __m256i vec = _mm256_set1_epi8((char)ch);
-    __m256i chars = _mm256_loadu_si256((const __m256i *)buffer);
-    return _mm256_movemask_epi8(_mm256_cmpeq_epi8(vec, chars));
-}
-
-static uint64_t pstr__compare_avx(const char *left, const char *right) {
-    __m256i leftVec = _mm256_loadu_si256((const __m256i *)left);
-    __m256i rightVec = _mm256_loadu_si256((const __m256i *)right);
-    return _mm256_movemask_epi8(_mm256_cmpeq_epi8(leftVec, rightVec));
-}
-#endif
-
-#ifdef PSTRING_SSE
-static uint64_t pstr__match_set_sse(
-    const char *buffer, const char *set, size_t length
-) {
-    __m128i vec = _mm_loadu_si128((const __m128i *)buffer);
-    uint64_t result = 0;
-
-    #ifndef PSTRING_ALT_SPN
-    __m128i tmp = _mm_setzero_si128();
-    for (size_t ch = 0; ch < length; ch++) {
-        __m128i check = _mm_set1_epi8(set[ch]);
-        tmp = _mm_or_si128(tmp, _mm_cmpeq_epi8(vec, check));
-    }
-    result = _mm_movemask_epi8(tmp);
-    #else
-    for (size_t ch = 0; ch < length; ch++) {
-        __m128i check = _mm_set1_epi8(set[ch]);
-        result |= _mm_movemask_epi8(_mm_cmpeq_epi8(vec, check));
-    }
-    #endif
-
-    return result;
-}
-
-static uint64_t pstr__match_chr_sse(const char *buffer, int ch) {
-    __m128i vec = _mm_set1_epi8((char)ch);
-    __m128i chars = _mm_loadu_si128((const __m128i *)buffer);
-    return _mm_movemask_epi8(_mm_cmpeq_epi8(vec, chars));
-}
-
-static uint64_t pstr__compare_sse(const char *left, const char *right) {
-    __m128i leftVec = _mm_loadu_si128((const __m128i *)left);
-    __m128i rightVec = _mm_loadu_si128((const __m128i *)right);
-    return _mm_movemask_epi8(_mm_cmpeq_epi8(leftVec, rightVec));
-}
-
-#endif
-
-static struct {
-    size_t size; /* vector size */
-    uint64_t (*match_set)(const char *buffer, const char *set, size_t length);
-    uint64_t (*match_chr)(const char *buffer, int ch);
-    uint64_t (*compare)(const char *left, const char *right);
-} g_impl = {
-#if !defined(PSTRING_DETECT) && defined(PSTRING_AVX)
-    .size = 32,
-    .match_set = &pstr__match_set_avx,
-    .match_chr = &pstr__match_chr_avx,
-    .compare = &pstr__compare_avx,
-#elif !defined(PSTRING_DETECT) && defined(PSTRING_SSE)
-    .size = 16,
-    .match_set = &pstr__match_set_sse,
-    .match_chr = &pstr__match_chr_sse,
-    .compare = &pstr__compare_sse,
-#else
-    0
-#endif
-};
-
-#ifdef PSTRING_DETECT
-    #include <pf_cpuinfo.h>
-#endif
-
-void pstrdetect(void) {
-#ifdef PSTRING_DETECT
-    #ifdef PSTRING_AVX
-    if (PF_HAS_AVX) {
-        g_impl.size = 32;
-        g_impl.match_set = &pstr__match_set_avx;
-        g_impl.match_chr = &pstr__match_chr_avx;
-        g_impl.compare = &pstr__compare_avx;
-    }
-    #endif
-#endif
-}
-
-/** Mask covering the `size` low bits, avoiding the undefined `1 << 32`. **/
-static inline uint32_t pstr__width_mask(size_t size) {
-    return size >= 32 ? UINT32_MAX : (uint32_t)((1u << size) - 1);
-}
-
-/** Index of the lowest set bit. `x` must be non-zero. **/
-static inline int pstr__first_bit(uint32_t x) {
-#if defined(__GNUC__) || defined(__clang__)
-    return __builtin_ctz(x);
-#else
-    int n = 0;
-    while (!(x & 1u)) {
-        x >>= 1;
-        n++;
-    }
-    return n;
-#endif
-}
-
-/** Index of the highest set bit, i.e. the last matching byte in a block.
-    `x` must be non-zero. **/
-static inline int pstr__last_bit(uint32_t x) {
-#if defined(__GNUC__) || defined(__clang__)
-    return 31 - __builtin_clz(x);
-#else
-    int n = 0;
-    while (x >>= 1)
-        n++;
-    return n;
-#endif
-}
 
 size_t pstr__nlen(const char *str, size_t max) {
     if (!str)
@@ -469,31 +304,6 @@ int pstrshrink(pstring_t *str) {
     return PSTRING_OK;
 }
 
-int pstrequal(const pstring_t *left, const pstring_t *right) {
-    if (left == right)
-        return PSTRING_TRUE;
-
-    size_t length = pstrlen(left);
-    if (length != pstrlen(right))
-        return PSTRING_FALSE;
-
-    const char *leftBuf = pstrbuf(left);
-    const char *rightBuf = pstrbuf(right);
-    size_t i = 0, mask = (1ull << g_impl.size) - 1;
-
-    if (g_impl.size > 0) {
-        for (; length - i >= g_impl.size; i += g_impl.size)
-            if (mask != g_impl.compare(&leftBuf[i], &rightBuf[i]))
-                return PSTRING_FALSE;
-    }
-
-    for (; i < length; i++)
-        if (leftBuf[i] != rightBuf[i])
-            return PSTRING_FALSE;
-
-    return PSTRING_TRUE;
-}
-
 int pstrequals(const pstring_t *left, const char *right, size_t length) {
     pstring_t tmp;
     pstrwrap(&tmp, (char *)right, length, length);
@@ -510,33 +320,6 @@ int pstrcmps(const pstring_t *left, const char *right, size_t length) {
     pstring_t tmp;
     pstrwrap(&tmp, (char *)right, length, length);
     return pstrcmp(left, &tmp);
-}
-
-int pstrcmp(const pstring_t *left, const pstring_t *right) {
-    if (left == right)
-        return 0;
-
-    size_t length = MIN(pstrlen(left), pstrlen(right));
-    const char *leftBuf = pstrbuf(left);
-    const char *rightBuf = pstrbuf(right);
-    size_t i = 0;
-
-    if (g_impl.size > 0) {
-        for (; length - i >= g_impl.size; i += g_impl.size) {
-            int result = ~g_impl.compare(&leftBuf[i], &rightBuf[i]);
-
-            if (result) {
-                int bit = pstr__clz_masked(result, g_impl.size);
-                return leftBuf[bit] - rightBuf[bit];
-            }
-        }
-    }
-
-    for (; i < length; i++)
-        if (leftBuf[i] != rightBuf[i])
-            return leftBuf[i] - rightBuf[i];
-
-    return 0;
 }
 
 int pstrcat(pstring_t *dst, const pstring_t *src) {
@@ -681,197 +464,6 @@ int pstrjoin(pstring_t *dst, const pstring_t *srcs, size_t count) {
         pstr__setlen(dst, req);
     }
     return PSTRING_OK;
-}
-
-char *pstrchr(const pstring_t *str, int ch) {
-    if (!str)
-        return PSTRTHROW_NULL(PSTRING_EINVAL);
-
-    size_t length = pstrlen(str);
-    char *buffer = pstrbuf(str);
-    size_t i = 0;
-
-    if (g_impl.size > 0) {
-        for (; length - i >= g_impl.size; i += g_impl.size) {
-            int result = g_impl.match_chr(&buffer[i], ch);
-
-            if (result) {
-                int bit = pf_ctz64(result);
-                return &buffer[i + bit];
-            }
-        }
-    }
-
-    for (; i < length; i++)
-        if (buffer[i] == (char)ch)
-            return &buffer[i];
-
-    return NULL;
-}
-
-char *pstrrchr(const pstring_t *str, int ch) {
-    if (!str)
-        return PSTRTHROW_NULL(PSTRING_EINVAL);
-
-    size_t length = pstrlen(str);
-    char *buffer = pstrbuf(str);
-    size_t left = length;
-
-    if (g_impl.size > 0) {
-        for (; left >= g_impl.size; left -= g_impl.size) {
-            const char *slot = &buffer[left - g_impl.size];
-            uint32_t result = g_impl.match_chr(slot, ch);
-            if (result)
-                return (char *)&slot[pstr__last_bit(result)];
-        }
-    }
-
-    while (left-- > 0)
-        if (buffer[left] == (char)ch)
-            return &buffer[left];
-
-    return NULL;
-}
-
-/** Scans forward for the first byte whose set membership equals `wanted`,
-    returning the index of that byte or `length` when there is none. **/
-static size_t pstr__scan(
-    const char *buffer, size_t length, const pstr_set_t *set, int wanted
-) {
-    size_t i = 0;
-
-    if (g_impl.size > 0 && g_impl.match_set) {
-        uint32_t keep = pstr__width_mask(g_impl.size);
-
-        for (; length - i >= g_impl.size; i += g_impl.size) {
-            uint32_t hits = g_impl.match_set(&buffer[i], set) & keep;
-            uint32_t result = wanted ? hits : (~hits & keep);
-
-            if (result)
-                return i + pf_ctz32(result);
-        }
-    }
-
-    for (; i < length; i++)
-        if (pstr__set_test(set, buffer[i]) == !!wanted)
-            return i;
-
-    return length;
-}
-
-/** Reverse counterpart of `pstr__scan`. Returns the index of the last byte
-    whose membership equals `wanted`, or `length` when there is none. **/
-static size_t pstr__rscan(
-    const char *buffer, size_t length, const pstr_set_t *set, int wanted
-) {
-    size_t left = length;
-
-    if (g_impl.size > 0 && g_impl.match_set) {
-        uint32_t keep = pstr__width_mask(g_impl.size);
-
-        for (; left >= g_impl.size; left -= g_impl.size) {
-            const char *slot = &buffer[left - g_impl.size];
-            uint32_t hits = g_impl.match_set(slot, set) & keep;
-            uint32_t result = wanted ? hits : (~hits & keep);
-
-            if (result)
-                return (left - g_impl.size) + pstr__last_bit(result);
-        }
-    }
-
-    while (left-- > 0)
-        if (pstr__set_test(set, buffer[left]) == !!wanted)
-            return left;
-
-    return length;
-}
-
-/** Compiles `set` and reports whether the string is usable. **/
-static int pstr__set_from(pstr_set_t *out, const char *set) {
-    if (!set)
-        return 0;
-    pstr__set_build(out, set, pstr__nlen(set, PSTRING_MAX_SET));
-    return 1;
-}
-
-size_t pstrspn(const pstring_t *str, const char *set) {
-    pstr_set_t compiled;
-    if (!str || !pstr__set_from(&compiled, set))
-        return 0;
-
-    /* number of leading bytes that are members: index of the first non-member */
-    return pstr__scan(pstrbuf(str), pstrlen(str), &compiled, 0);
-}
-
-size_t pstrcspn(const pstring_t *str, const char *set) {
-    pstr_set_t compiled;
-    if (!str || !pstr__set_from(&compiled, set))
-        return 0;
-
-    return pstr__scan(pstrbuf(str), pstrlen(str), &compiled, 1);
-}
-
-size_t pstrrspn(const pstring_t *str, const char *set) {
-    pstr_set_t compiled;
-    if (!str || !pstr__set_from(&compiled, set))
-        return 0;
-
-    size_t length = pstrlen(str);
-    size_t at = pstr__rscan(pstrbuf(str), length, &compiled, 0);
-
-    /* distance from the end back to the last non-member */
-    return at == length ? length : length - at - 1;
-}
-
-size_t pstrrcspn(const pstring_t *str, const char *set) {
-    pstr_set_t compiled;
-    if (!str || !pstr__set_from(&compiled, set))
-        return 0;
-
-    size_t length = pstrlen(str);
-    size_t at = pstr__rscan(pstrbuf(str), length, &compiled, 1);
-
-    return at == length ? length : length - at - 1;
-}
-
-char *pstrpbrk(const pstring_t *str, const char *set) {
-    pstr_set_t compiled;
-    if (!str || !pstr__set_from(&compiled, set))
-        return PSTRTHROW_NULL(PSTRING_EINVAL);
-
-    size_t length = pstrlen(str);
-    size_t at = pstr__scan(pstrbuf(str), length, &compiled, 1);
-    return at == length ? NULL : &pstrbuf(str)[at];
-}
-
-char *pstrcpbrk(const pstring_t *str, const char *set) {
-    pstr_set_t compiled;
-    if (!str || !pstr__set_from(&compiled, set))
-        return PSTRTHROW_NULL(PSTRING_EINVAL);
-
-    size_t length = pstrlen(str);
-    size_t at = pstr__scan(pstrbuf(str), length, &compiled, 0);
-    return at == length ? NULL : &pstrbuf(str)[at];
-}
-
-char *pstrrpbrk(const pstring_t *str, const char *set) {
-    pstr_set_t compiled;
-    if (!str || !pstr__set_from(&compiled, set))
-        return PSTRTHROW_NULL(PSTRING_EINVAL);
-
-    size_t length = pstrlen(str);
-    size_t at = pstr__rscan(pstrbuf(str), length, &compiled, 1);
-    return at == length ? NULL : &pstrbuf(str)[at];
-}
-
-char *pstrrcpbrk(const pstring_t *str, const char *set) {
-    pstr_set_t compiled;
-    if (!str || !pstr__set_from(&compiled, set))
-        return PSTRTHROW_NULL(PSTRING_EINVAL);
-
-    size_t length = pstrlen(str);
-    size_t at = pstr__rscan(pstrbuf(str), length, &compiled, 0);
-    return at == length ? NULL : &pstrbuf(str)[at];
 }
 
 char *pstrstr(const pstring_t *str, const pstring_t *sub) {
@@ -1222,7 +814,7 @@ static int distance(const pstring_t *left, const pstring_t *right, int **rows) {
 
             if (i > 1 && j > 1 && lbuf[i - 1] == rbuf[j - 2]
                 && lbuf[i - 2] == rbuf[j - 1]) {
-                curr[j] = MIN(curr[j], transpose[j - 2] + cost);
+                curr[j] = PF_MIN(curr[j], transpose[j - 2] + cost);
             }
         }
 
