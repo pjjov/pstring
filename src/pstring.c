@@ -168,46 +168,52 @@ void pstrdetect(void) {
         g_impl.compare = &pstr__compare_avx;
     }
     #endif
-    #ifdef PSTRING_SSE
-    if (PF_HAS_SSE) {
-        g_impl.size = 16;
-        g_impl.match_set = &pstr__match_set_sse;
-        g_impl.match_chr = &pstr__match_chr_sse;
-        g_impl.compare = &pstr__compare_sse;
-    }
-    #endif
 #endif
 }
 
-static inline int pstr__clz_masked(uint64_t x, int bits) {
-    return pf_clz(x & ((1 << bits) - 1)) - bits;
+/** Mask covering the `size` low bits, avoiding the undefined `1 << 32`. **/
+static inline uint32_t pstr__width_mask(size_t size) {
+    return size >= 32 ? UINT32_MAX : (uint32_t)((1u << size) - 1);
+}
+
+/** Index of the lowest set bit. `x` must be non-zero. **/
+static inline int pstr__first_bit(uint32_t x) {
+#if defined(__GNUC__) || defined(__clang__)
+    return __builtin_ctz(x);
+#else
+    int n = 0;
+    while (!(x & 1u)) {
+        x >>= 1;
+        n++;
+    }
+    return n;
+#endif
+}
+
+/** Index of the highest set bit, i.e. the last matching byte in a block.
+    `x` must be non-zero. **/
+static inline int pstr__last_bit(uint32_t x) {
+#if defined(__GNUC__) || defined(__clang__)
+    return 31 - __builtin_clz(x);
+#else
+    int n = 0;
+    while (x >>= 1)
+        n++;
+    return n;
+#endif
 }
 
 size_t pstr__nlen(const char *str, size_t max) {
-#if __STDC_VERSION__ >= 201112L && __STDC_LIB_EXT1__
-    return strnlen_s(str, max);
-#elif _POSIX_C_SOURCE >= 200809L
-    return strnlen(str, max);
-#else
     if (!str)
         return 0;
 
     size_t i = 0;
-    if (g_impl.size > 0) {
-        for (int result; max - i >= g_impl.size; i += g_impl.size) {
-            if ((result = g_impl.match_chr(str, '\0'))) {
-                int bit = pf_ctz64(result);
-                return i + bit;
-            }
-        }
-    }
 
     for (; i < max; i++)
         if (str[i] == '\0')
             break;
 
     return i;
-#endif
 }
 
 int pstrnew(pstring_t *out, const char *str, size_t len, allocator_t *alloc) {
@@ -377,6 +383,7 @@ int pstrrange(
 void pstrfree(pstring_t *str) {
     if (str && pstrallocator(str)) {
         deallocate(pstrallocator(str), pstrbuf(str), pstrcap(str) + 1);
+        *str = (pstring_t) { 0 };
     }
 }
 
@@ -386,6 +393,14 @@ void pstrarray_free(pstrarray_t *array) {
 
     for (size_t i = 0; i < array->length; i++)
         pstrfree(&array->items[i]);
+
+    if (array->items && array->allocator) {
+        deallocate(
+            array->allocator, array->items, array->capacity * sizeof(pstring_t)
+        );
+    }
+
+    *array = (pstrarray_t) { 0 };
 }
 
 int pstrdump(const pstring_t *str, char *buffer, size_t size) {
@@ -700,285 +715,171 @@ char *pstrrchr(const pstring_t *str, int ch) {
 
     size_t length = pstrlen(str);
     char *buffer = pstrbuf(str);
-    size_t i = 0;
+    size_t left = length;
 
     if (g_impl.size > 0) {
-        for (; length - i >= g_impl.size; i += g_impl.size) {
-            char *slot = &buffer[length - i - g_impl.size];
-            int result = g_impl.match_chr(slot, ch);
+        for (; left >= g_impl.size; left -= g_impl.size) {
+            const char *slot = &buffer[left - g_impl.size];
+            uint32_t result = g_impl.match_chr(slot, ch);
+            if (result)
+                return (char *)&slot[pstr__last_bit(result)];
+        }
+    }
 
-            if (result) {
-                int bit = pstr__clz_masked(result, g_impl.size);
-                return &slot[g_impl.size - bit - 1];
-            }
+    while (left-- > 0)
+        if (buffer[left] == (char)ch)
+            return &buffer[left];
+
+    return NULL;
+}
+
+/** Scans forward for the first byte whose set membership equals `wanted`,
+    returning the index of that byte or `length` when there is none. **/
+static size_t pstr__scan(
+    const char *buffer, size_t length, const pstr_set_t *set, int wanted
+) {
+    size_t i = 0;
+
+    if (g_impl.size > 0 && g_impl.match_set) {
+        uint32_t keep = pstr__width_mask(g_impl.size);
+
+        for (; length - i >= g_impl.size; i += g_impl.size) {
+            uint32_t hits = g_impl.match_set(&buffer[i], set) & keep;
+            uint32_t result = wanted ? hits : (~hits & keep);
+
+            if (result)
+                return i + pf_ctz32(result);
         }
     }
 
     for (; i < length; i++)
-        if (buffer[length - i - 1] == (char)ch)
-            return &buffer[length - i - 1];
+        if (pstr__set_test(set, buffer[i]) == !!wanted)
+            return i;
 
-    return NULL;
+    return length;
+}
+
+/** Reverse counterpart of `pstr__scan`. Returns the index of the last byte
+    whose membership equals `wanted`, or `length` when there is none. **/
+static size_t pstr__rscan(
+    const char *buffer, size_t length, const pstr_set_t *set, int wanted
+) {
+    size_t left = length;
+
+    if (g_impl.size > 0 && g_impl.match_set) {
+        uint32_t keep = pstr__width_mask(g_impl.size);
+
+        for (; left >= g_impl.size; left -= g_impl.size) {
+            const char *slot = &buffer[left - g_impl.size];
+            uint32_t hits = g_impl.match_set(slot, set) & keep;
+            uint32_t result = wanted ? hits : (~hits & keep);
+
+            if (result)
+                return (left - g_impl.size) + pstr__last_bit(result);
+        }
+    }
+
+    while (left-- > 0)
+        if (pstr__set_test(set, buffer[left]) == !!wanted)
+            return left;
+
+    return length;
+}
+
+/** Compiles `set` and reports whether the string is usable. **/
+static int pstr__set_from(pstr_set_t *out, const char *set) {
+    if (!set)
+        return 0;
+    pstr__set_build(out, set, pstr__nlen(set, PSTRING_MAX_SET));
+    return 1;
 }
 
 size_t pstrspn(const pstring_t *str, const char *set) {
-    if (!str || !set)
+    pstr_set_t compiled;
+    if (!str || !pstr__set_from(&compiled, set))
         return 0;
 
-    const char *buffer = pstrbuf(str);
-    size_t length = pstrlen(str);
-    size_t setlen = pstr__nlen(set, PSTRING_MAX_SET);
-    size_t i = 0;
-    int result = 0;
-
-    if (g_impl.size > 0) {
-        for (; length - i >= g_impl.size; i += g_impl.size) {
-            result = g_impl.match_set(&buffer[i], set, setlen);
-
-            if (~result) {
-                int bit = result ? pf_ctz64(~result) : 0;
-                return i + bit;
-            }
-        }
-    }
-
-    for (result = 0; i < length; i++) {
-        for (size_t j = 0; !result && j < setlen; j++)
-            result |= buffer[i] == set[j];
-
-        if (!result)
-            return i;
-        result = 0;
-    }
-
-    return 0;
+    /* number of leading bytes that are members: index of the first non-member */
+    return pstr__scan(pstrbuf(str), pstrlen(str), &compiled, 0);
 }
 
 size_t pstrcspn(const pstring_t *str, const char *set) {
-    if (!str || !set)
+    pstr_set_t compiled;
+    if (!str || !pstr__set_from(&compiled, set))
         return 0;
 
-    const char *buffer = pstrbuf(str);
-    size_t length = pstrlen(str);
-    size_t setlen = pstr__nlen(set, PSTRING_MAX_SET);
-    size_t i = 0;
-    int result = 0;
-
-    if (g_impl.size > 0) {
-        for (; length - i >= g_impl.size; i += g_impl.size) {
-            result = g_impl.match_set(&buffer[i], set, setlen);
-
-            if (result) {
-                int bit = ~result ? pf_ctz64(result) : 0;
-                return i + bit;
-            }
-        }
-    }
-
-    for (result = 0; i < length; i++) {
-        for (size_t j = 0; j < setlen; j++)
-            if (buffer[i] == set[j])
-                return i;
-    }
-    return length;
+    return pstr__scan(pstrbuf(str), pstrlen(str), &compiled, 1);
 }
 
 size_t pstrrspn(const pstring_t *str, const char *set) {
-    if (!str || !set)
+    pstr_set_t compiled;
+    if (!str || !pstr__set_from(&compiled, set))
         return 0;
 
     size_t length = pstrlen(str);
-    size_t setlen = pstr__nlen(set, PSTRING_MAX_SET);
-    const char *buffer = pstrbuf(str);
-    size_t i = 0;
-    int result = 0;
+    size_t at = pstr__rscan(pstrbuf(str), length, &compiled, 0);
 
-    if (g_impl.size > 0) {
-        for (; length - i >= g_impl.size; i += g_impl.size) {
-            const char *slot = &buffer[length - i - g_impl.size];
-            result = g_impl.match_set(slot, set, setlen);
-
-            if (~result) {
-                int bit = result ? pstr__clz_masked(~result, g_impl.size) : 0;
-                return i + bit;
-            }
-        }
-    }
-
-    for (result = 0; i < length; i++) {
-        for (size_t j = 0; !result && j < setlen; j++)
-            result |= buffer[length - i - 1] == set[j];
-
-        if (!result)
-            return i;
-        result = 0;
-    }
-
-    return 0;
+    /* distance from the end back to the last non-member */
+    return at == length ? length : length - at - 1;
 }
 
 size_t pstrrcspn(const pstring_t *str, const char *set) {
-    if (!str || !set)
+    pstr_set_t compiled;
+    if (!str || !pstr__set_from(&compiled, set))
         return 0;
 
     size_t length = pstrlen(str);
-    size_t setlen = pstr__nlen(set, PSTRING_MAX_SET);
-    const char *buffer = pstrbuf(str);
-    size_t i = 0;
-    int result = 0;
+    size_t at = pstr__rscan(pstrbuf(str), length, &compiled, 1);
 
-    if (g_impl.size > 0) {
-        for (; length - i >= g_impl.size; i += g_impl.size) {
-            const char *slot = &buffer[length - i - g_impl.size];
-            result = g_impl.match_set(slot, set, setlen);
-
-            if (result) {
-                int bit = ~result ? pstr__clz_masked(result, g_impl.size) : 0;
-                return i + bit;
-            }
-        }
-    }
-
-    for (; i < length; i++) {
-        for (size_t j = 0; j < setlen; j++)
-            if (buffer[length - i - 1] == set[j])
-                return i;
-    }
-
-    return length;
+    return at == length ? length : length - at - 1;
 }
 
 char *pstrpbrk(const pstring_t *str, const char *set) {
-    if (!str || !set)
-        return 0;
+    pstr_set_t compiled;
+    if (!str || !pstr__set_from(&compiled, set))
+        return PSTRTHROW_NULL(PSTRING_EINVAL);
 
     size_t length = pstrlen(str);
-    size_t setlen = pstr__nlen(set, 256);
-    char *buffer = pstrbuf(str);
-    size_t i = 0;
-
-    if (g_impl.size > 0) {
-        for (; length - i >= g_impl.size; i += g_impl.size) {
-            int result = g_impl.match_set(&buffer[i], set, setlen);
-
-            if (result) {
-                int bit = pf_ctz64(result);
-                return &buffer[i + bit];
-            }
-        }
-    }
-
-    for (; i < length; i++) {
-        for (size_t j = 0; j < setlen; j++)
-            if (buffer[i] == set[j])
-                return &buffer[i];
-    }
-
-    return NULL;
+    size_t at = pstr__scan(pstrbuf(str), length, &compiled, 1);
+    return at == length ? NULL : &pstrbuf(str)[at];
 }
 
 char *pstrcpbrk(const pstring_t *str, const char *set) {
-    if (!str || !set)
+    pstr_set_t compiled;
+    if (!str || !pstr__set_from(&compiled, set))
         return PSTRTHROW_NULL(PSTRING_EINVAL);
 
     size_t length = pstrlen(str);
-    size_t setlen = pstr__nlen(set, 256);
-    char *buffer = pstrbuf(str);
-    size_t i = 0, j;
-
-    if (g_impl.size > 0) {
-        for (; length - i >= g_impl.size; i += g_impl.size) {
-            int result = g_impl.match_set(&buffer[i], set, setlen);
-            result = ~result & ((1 << g_impl.size) - 1);
-
-            if (result) {
-                int bit = pf_ctz64(result);
-                return &buffer[i + bit];
-            }
-        }
-    }
-
-    for (; i < length; i++) {
-        for (j = 0; j < setlen; j++)
-            if (buffer[i] == set[j])
-                break;
-
-        if (j == setlen)
-            return &buffer[i];
-    }
-
-    return NULL;
+    size_t at = pstr__scan(pstrbuf(str), length, &compiled, 0);
+    return at == length ? NULL : &pstrbuf(str)[at];
 }
 
 char *pstrrpbrk(const pstring_t *str, const char *set) {
-    if (!str || !set)
-        return 0;
+    pstr_set_t compiled;
+    if (!str || !pstr__set_from(&compiled, set))
+        return PSTRTHROW_NULL(PSTRING_EINVAL);
 
     size_t length = pstrlen(str);
-    size_t setlen = pstr__nlen(set, 256);
-    char *buffer = pstrbuf(str);
-    size_t i = 0;
-
-    if (g_impl.size > 0) {
-        for (; length - i >= g_impl.size; i += g_impl.size) {
-            int result = g_impl.match_set(
-                &buffer[length - i - g_impl.size], set, setlen
-            );
-
-            if (result) {
-                int bit = pstr__clz_masked(result, g_impl.size);
-                return &buffer[length - i - bit - 1];
-            }
-        }
-    }
-
-    for (; i > 0; i--) {
-        for (size_t j = 0; j < setlen; j++)
-            if (buffer[length - i - 1] == set[j])
-                return &buffer[length - i - 1];
-    }
-
-    return NULL;
+    size_t at = pstr__rscan(pstrbuf(str), length, &compiled, 1);
+    return at == length ? NULL : &pstrbuf(str)[at];
 }
 
 char *pstrrcpbrk(const pstring_t *str, const char *set) {
-    if (!str || !set)
+    pstr_set_t compiled;
+    if (!str || !pstr__set_from(&compiled, set))
         return PSTRTHROW_NULL(PSTRING_EINVAL);
 
     size_t length = pstrlen(str);
-    size_t setlen = pstr__nlen(set, 256);
-    char *buffer = pstrbuf(str);
-    size_t i = 0, j;
-
-    if (g_impl.size > 0) {
-        for (; length - i >= g_impl.size; i += g_impl.size) {
-            int result = g_impl.match_set(
-                &buffer[length - i - g_impl.size], set, setlen
-            );
-            result = ~result & ((1 << g_impl.size) - 1);
-
-            if (result) {
-                int bit = ~result ? pstr__clz_masked(result, g_impl.size) : 0;
-                return &buffer[length - i - bit - 1];
-            }
-        }
-    }
-
-    for (; i < length; i++) {
-        for (j = 0; j < setlen; j++)
-            if (buffer[length - i - 1] == set[j])
-                break;
-
-        if (j == setlen)
-            return &buffer[length - i - 1];
-    }
-
-    return NULL;
+    size_t at = pstr__rscan(pstrbuf(str), length, &compiled, 0);
+    return at == length ? NULL : &pstrbuf(str)[at];
 }
 
 char *pstrstr(const pstring_t *str, const pstring_t *sub) {
-    if (!str || !sub || pstrlen(sub) > pstrlen(str))
+    if (!str || !sub)
         return PSTRTHROW_NULL(PSTRING_EINVAL);
+
+    if (pstrlen(sub) > pstrlen(str))
+        return NULL;
 
     if (pstrlen(sub) == 0)
         return pstrbuf(str);
@@ -1061,22 +962,28 @@ int pstrrepl(
     pstring_t search;
     pstrslice(&search, str, 0, pstrlen(str));
     size_t length = pstrlen(str);
-    long diff = dlen - slen;
+    ptrdiff_t diff = (ptrdiff_t)dlen - (ptrdiff_t)slen;
     char *match;
 
     while (max-- > 0) {
         if (!(match = pstrstr(&search, src)))
             break;
 
-        if (diff > 0 && pstrreserve(str, length + diff))
-            return PSTRING_ENOMEM;
+        if (diff > 0) {
+            size_t offset = match - pstrbuf(str);
 
-        if (dlen > 0) {
-            memcpy(&match[dlen], match + slen, pstrend(str) - match - slen);
-            memcpy(match, pstrbuf(dst), dlen);
-        } else {
-            memcpy(match, &match[slen], pstrend(str) - match - slen);
+            if (pstrreserve(str, (size_t)diff))
+                return PSTRING_ENOMEM;
+
+            /* the buffer may have moved under us */
+            match = pstrbuf(str) + offset;
         }
+
+        /* source and destination overlap whenever the lengths differ */
+        memmove(&match[dlen], match + slen, pstrend(str) - match - slen);
+
+        if (dlen > 0)
+            memcpy(match, pstrbuf(dst), dlen);
 
         length += diff;
         pstr__setlen(str, length);
@@ -1100,14 +1007,17 @@ int pstrreplc(pstring_t *str, char src, char dst, size_t max) {
     if (!str || src == dst)
         return PSTRTHROW_EINVAL;
 
+    if (max == 0)
+        max = SIZE_MAX;
+
     pstring_t search;
     char *match = pstrbuf(str);
 
     pstrrange(&search, NULL, match, pstrend(str));
 
-    while ((match = pstrchr(&search, src))) {
+    while (max-- > 0 && (match = pstrchr(&search, src))) {
         *match = dst;
-        pstrrange(&search, NULL, match, pstrend(str));
+        pstrrange(&search, NULL, match + 1, pstrend(str));
     }
 
     return PSTRING_OK;
@@ -1226,28 +1136,26 @@ int pstrindent(pstring_t *str, int count, int tab) {
     if (tab <= 0)
         tab = 4;
 
+    size_t prev = 0;
     pstring_t search;
-    const char *prev = pstrbuf(str);
-    const char *match = prev;
-
-    pstrrange(&search, NULL, prev, pstrend(str));
     int indent, min = -1;
 
-    while (prev < pstrend(str)) {
-        if (!(match = pstrchr(&search, '\n')))
-            match = pstrend(str);
+    while (prev < pstrlen(str)) {
+        pstrrange(&search, NULL, &pstrbuf(str)[prev], pstrend(str));
 
-        pstrrange(&search, NULL, prev, match);
+        char *found = pstrchr(&search, '\n');
+        size_t match = found ? (size_t)(found - pstrbuf(str)) : pstrlen(str);
+
+        pstrrange(&search, NULL, &pstrbuf(str)[prev], &pstrbuf(str)[match]);
 
         if (count <= 0) {
             count_indent(&search, INT_MAX, tab, &indent);
             if (min == -1 || min > indent)
                 min = indent;
-        } else if (pstrinsertc(str, prev - pstrbuf(str), count, ' '))
+        } else if (pstrinsertc(str, prev, count, ' '))
             return PSTRING_ENOMEM;
 
         prev = match + count + 1;
-        pstrrange(&search, NULL, prev, pstrend(str));
     }
 
     return min == -1 ? 0 : min;
@@ -1340,8 +1248,10 @@ int pstrdistance(const pstring_t *left, const pstring_t *right) {
     int _buffer[3 * PSTRDISTANCE_BUF_SIZE];
     int *buffer = _buffer;
 
+    size_t bytes = 3 * mlen * sizeof(int);
+
     if (mlen > PSTRDISTANCE_BUF_SIZE)
-        buffer = allocate(&standard_allocator, mlen * sizeof(int));
+        buffer = allocate(&standard_allocator, bytes);
 
     if (buffer == NULL)
         return PSTRTHROW_ENOMEM;
@@ -1350,7 +1260,7 @@ int pstrdistance(const pstring_t *left, const pstring_t *right) {
     int result = distance(left, right, rows);
 
     if (mlen > PSTRDISTANCE_BUF_SIZE)
-        deallocate(&standard_allocator, buffer, mlen * sizeof(int));
+        deallocate(&standard_allocator, buffer, bytes);
     return result;
 }
 
@@ -1415,7 +1325,7 @@ int pstrenv(pstring_t *out, const pstring_t *name) {
         return PSTRING_EINVAL;
 
     char tmp[PSTRING_MAX_ENV_NAME];
-    const char *cname = pstrterms(out, tmp, PSTRING_MAX_ENV_NAME);
+    const char *cname = pstrterms((pstring_t *)name, tmp, PSTRING_MAX_ENV_NAME);
 
     if (!cname)
         return PSTRING_ENOMEM;

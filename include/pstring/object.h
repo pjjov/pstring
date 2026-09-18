@@ -77,8 +77,8 @@ enum pstrobj_type {
 enum pstrobj_flag {
     PSTROBJ_FLAG_ROOT = 1,
     PSTROBJ_FLAG_ARENA = 2,
-    PSTROBJ_FLAG_WRAP = 3,
-    PSTROBJ_FLAG_WRAP_KEY = 4,
+    PSTROBJ_FLAG_WRAP = 4,
+    PSTROBJ_FLAG_WRAP_KEY = 8,
 };
 
 struct pstrobj_t {

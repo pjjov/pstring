@@ -62,8 +62,13 @@ static void pstrobj__free(pstrobj_t *obj) {
     if (obj->next)
         pstrobj__free(obj->next);
 
-    if (!PF_FLAG_TEST(obj->flags, PSTROBJ_FLAG_WRAP))
+    if (obj->type == PSTROBJ_STRING
+        && !PF_FLAG_TEST(obj->flags, PSTROBJ_FLAG_WRAP)) {
         pstrfree(obj->as.string);
+    }
+
+    if (obj->key && !PF_FLAG_TEST(obj->flags, PSTROBJ_FLAG_WRAP_KEY))
+        pstrfree(obj->key);
 
     if (!PF_FLAG_TEST(obj->flags, PSTROBJ_FLAG_ARENA))
         deallocate(obj->allocator, obj, sizeof(struct pstrobj_str));
@@ -85,7 +90,7 @@ pstrobj_t *pstrobj_from_buffer(
     if (pstream_string(&stream, source))
         return NULL;
 
-    pstream_seek(&stream, PSTR_SEEK_SET, 0);
+    pstream_seek(&stream, 0, PSTR_SEEK_SET);
     pstrobj_t *res = pstrobj_from_stream(format, &stream, allocator);
     pstream_close(&stream);
 
@@ -247,6 +252,7 @@ int pstrobj_copy_pstring(pstrobj_t *obj, const pstring_t *str) {
     if (!obj || !str)
         return PSTRTHROW_EINVAL;
 
+    free_string(obj);
     obj->type = PSTROBJ_STRING;
     obj->flags = PF_FLAG_CLEAR(obj->flags, PSTROBJ_FLAG_WRAP);
     obj->as.string = PSTROBJ_BUFFER(obj, str);
@@ -259,13 +265,14 @@ int pstrobj_wrap_string(pstrobj_t *obj, const char *str, size_t len) {
 
     pstring_t tmp;
     pstrwrap(&tmp, (char *)str, len, 0);
-    return pstrobj_copy_pstring(obj, &tmp);
+    return pstrobj_wrap_pstring(obj, &tmp);
 }
 
 int pstrobj_wrap_pstring(pstrobj_t *obj, const pstring_t *str) {
     if (!obj || !str)
         return PSTRTHROW_EINVAL;
 
+    free_string(obj);
     obj->type = PSTROBJ_STRING;
     obj->flags = PF_FLAG_SET(obj->flags, PSTROBJ_FLAG_WRAP);
     obj->as.string = PSTROBJ_BUFFER(obj, str);
@@ -276,7 +283,9 @@ int pstrobj_copy_key(pstrobj_t *obj, const pstring_t *str) {
     if (!obj || !str)
         return PSTRTHROW_EINVAL;
 
-    obj->type = PSTROBJ_STRING;
+    if (obj->key && !PF_FLAG_TEST(obj->flags, PSTROBJ_FLAG_WRAP_KEY))
+        pstrfree(obj->key);
+
     obj->flags = PF_FLAG_CLEAR(obj->flags, PSTROBJ_FLAG_WRAP_KEY);
     obj->key = PSTROBJ_BUFFER(obj, key);
     return pstrdup(obj->key, str, obj->allocator);
@@ -295,7 +304,9 @@ int pstrobj_wrap_key(pstrobj_t *obj, const pstring_t *str) {
     if (!obj || !str)
         return PSTRTHROW_EINVAL;
 
-    obj->type = PSTROBJ_STRING;
+    if (obj->key && !PF_FLAG_TEST(obj->flags, PSTROBJ_FLAG_WRAP_KEY))
+        pstrfree(obj->key);
+
     obj->flags = PF_FLAG_SET(obj->flags, PSTROBJ_FLAG_WRAP_KEY);
     obj->key = PSTROBJ_BUFFER(obj, key);
     return pstrslice(obj->key, str, 0, pstrlen(str));
@@ -329,7 +340,8 @@ void pstrobj__set_key(pstrobj_t *obj, pstring_t *key) {
 void pstrobj_expect_null(pstrobj_t *obj, int *status) {
     if (!status)
         return;
-    if (obj && obj->type == PSTROBJ_NULL)
+
+    if (!obj || obj->type != PSTROBJ_NULL)
         *status = PSTRING_EINVAL;
 }
 
@@ -339,6 +351,54 @@ void pstrobj_expect_null(pstrobj_t *obj, int *status) {
             *status = PSTRING_EINVAL; \
         return 0;                     \
     }
+
+const char *pstrobj_expect_string(pstrobj_t *obj, int *status) {
+    EXPECT_NULL_CHECK;
+
+    if (obj->type != PSTROBJ_STRING) {
+        if (status)
+            *status = PSTRING_EINVAL;
+        return NULL;
+    }
+
+    return pstrbuf(obj->as.string);
+}
+
+pstring_t *pstrobj_expect_pstring(pstrobj_t *obj, int *status) {
+    EXPECT_NULL_CHECK;
+
+    if (obj->type != PSTROBJ_STRING) {
+        if (status)
+            *status = PSTRING_EINVAL;
+        return NULL;
+    }
+
+    return obj->as.string;
+}
+
+pstrobj_t *pstrobj_expect_list(pstrobj_t *obj, int *status) {
+    EXPECT_NULL_CHECK;
+
+    if (obj->type != PSTROBJ_LIST) {
+        if (status)
+            *status = PSTRING_EINVAL;
+        return NULL;
+    }
+
+    return obj;
+}
+
+pstrobj_t *pstrobj_expect_dict(pstrobj_t *obj, int *status) {
+    EXPECT_NULL_CHECK;
+
+    if (obj->type != PSTROBJ_DICT) {
+        if (status)
+            *status = PSTRING_EINVAL;
+        return NULL;
+    }
+
+    return obj;
+}
 
 int pstrobj_expect_bool(pstrobj_t *obj, int *status) {
     EXPECT_NULL_CHECK;
@@ -359,27 +419,31 @@ float pstrobj_expect_float(pstrobj_t *obj, int *status) {
 long pstrobj_expect_long(pstrobj_t *obj, int *status) {
     EXPECT_NULL_CHECK;
 
-    int res = obj && (obj->type == PSTROBJ_LONG || obj->type == PSTROBJ_DOUBLE);
-    if (status && !res)
-        *status = PSTRING_EINVAL;
+    if (obj->type == PSTROBJ_DOUBLE)
+        return (long)obj->as.double_;
 
-    if (!res && obj->type == PSTROBJ_DOUBLE)
-        return obj->as.double_;
+    if (obj->type != PSTROBJ_LONG) {
+        if (status)
+            *status = PSTRING_EINVAL;
+        return 0;
+    }
 
-    return res ? obj->as.long_ : 0;
+    return obj->as.long_;
 }
 
 double pstrobj_expect_double(pstrobj_t *obj, int *status) {
     EXPECT_NULL_CHECK;
 
-    int res = obj && (obj->type == PSTROBJ_LONG || obj->type == PSTROBJ_DOUBLE);
-    if (status && !res)
-        *status = PSTRING_EINVAL;
+    if (obj->type == PSTROBJ_LONG)
+        return (double)obj->as.long_;
 
-    if (!res && obj->type == PSTROBJ_LONG)
-        return obj->as.long_;
+    if (obj->type != PSTROBJ_DOUBLE) {
+        if (status)
+            *status = PSTRING_EINVAL;
+        return 0;
+    }
 
-    return res ? obj->as.double_ : 0;
+    return obj->as.double_;
 }
 
 #define IMPL_DEFAULT(TYPE)                                \
@@ -413,6 +477,9 @@ static void list_remove_item(pstrobj_t *list, pstrobj_t *node) {
         next->prev = prev;
     if (node == list->child)
         list->child = next;
+
+    node->next = NULL;
+    node->prev = NULL;
 }
 
 static void list_insert_item(

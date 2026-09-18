@@ -257,6 +257,12 @@ int pstrdec_base64table(
         return PSTRTHROW_EINVAL;
 
     size_t len = pstrlen(src);
+
+    /* an empty input decodes to an empty output; without this, `end[-1]`
+       below reads one byte before the (empty) buffer */
+    if (len == 0)
+        return PSTRING_OK;
+
     if (pstrreserve(dst, (len / 4 + 1) * 3))
         return PSTRTHROW_ENOMEM;
 
@@ -268,7 +274,7 @@ int pstrdec_base64table(
     /* padding characters */
     if (end[-1] == '=')
         end--;
-    if (end[-1] == '=')
+    if (end > chr && end[-1] == '=')
         end--;
 
     for (; &chr[3] < end; chr += 4) {

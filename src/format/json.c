@@ -156,7 +156,7 @@ struct json_serialize_dict_state {
 static int json_serialize_dict_each(void *user, pstring_t *key, void *value) {
     struct json_writer *json = user;
     return pstream_printf(json->base, "\"%!json%P\":", key)
-        || json_serialize(json, value, json->member);
+        || json_serialize(json, json->member, value);
 }
 
 static int json_serialize_dict(
@@ -646,9 +646,6 @@ static int json_read_obj_pair(
         return result;
     pstrobj__set_key(child, &tmp);
 
-    if (pstrobj_copy_key(child, &json->prevValue))
-        return PSTRING_ENOMEM;
-
     json_consume(json, ':');
 
     if ((result = json_read_obj(json, child)))
@@ -737,8 +734,18 @@ static int json_read_obj(struct json_reader *json, pstrobj_t *out) {
         return pstrobj_set_null(out);
 
     case 'd': {
-        double value = strtold(pstrbuf(&json->prevValue), NULL);
-        return pstrobj_set_double(out, value);
+        pstring_t *text = &json->prevValue;
+        int isFloat = NULL != pstrpbrk(text, ".eE");
+
+        char buf[64];
+        const char *cstr = pstrterms(text, buf, sizeof(buf));
+        if (!cstr)
+            return PSTRING_EINVAL;
+
+        if (isFloat)
+            return pstrobj_set_double(out, strtod(cstr, NULL));
+
+        return pstrobj_set_long(out, strtol(cstr, NULL, 10));
     }
 
     default:
@@ -778,7 +785,7 @@ static int json_write_obj(pstrobj_t *o, pstream_t *s) {
     case PSTROBJ_NULL: return pstream_puts(s, "null");
     case PSTROBJ_BOOL: return pstream_puts(s, o->as.bool_ ? "true" : "false");
     case PSTROBJ_LONG: return pstream_printf(s, "%ld", o->as.long_);
-    case PSTROBJ_DOUBLE: return pstream_printf(s, "%f", o->as.double_);
+    case PSTROBJ_DOUBLE: return pstream_printf(s, "%.17g", o->as.double_);
         /* clang-format on */
 
     case PSTROBJ_STRING:

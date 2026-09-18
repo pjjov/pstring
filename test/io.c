@@ -156,6 +156,7 @@ int test_io_json(int seed, int rep) {
     pf_assert(dst.d == 5.5);
 
     pstrfree(&dst.pstr);
+    free((void *)dst.str);
 
     pstream_close(&base);
     pstrfree(&str);
