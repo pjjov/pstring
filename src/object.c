@@ -129,6 +129,7 @@ static struct {
     pstrobj_save_fn *save;
 } formats[] = {
     { "json", pstrobj_load_json, pstrobj_save_json },
+    { "xml", pstrobj_load_xml, pstrobj_save_xml },
     { 0 },
 };
 

@@ -117,6 +117,7 @@ PSTR_API pstrobj_t *pstrobj_from_stream(
 PSTR_API pstrobj_t *pstrobj_load_json(
     pstream_t *stream, allocator_t *allocator
 );
+PSTR_API pstrobj_t *pstrobj_load_xml(pstream_t *stream, allocator_t *allocator);
 
 /** Loads an object in `format` by reading from the file at `path`. **/
 PSTR_API pstrobj_t *pstrobj_from_path(
@@ -133,6 +134,18 @@ PSTR_API int pstrobj_to_stream(
     pstrobj_t *obj, const char *format, pstream_t *stream
 );
 PSTR_API int pstrobj_save_json(pstrobj_t *obj, pstream_t *stream);
+
+/** Saves an object as an XML document by writing to `stream`.
+
+    Since XML has no native list/dict distinction the way JSON does, the
+    mapping used is: the root object becomes a single `<root>` element;
+    a dict's members become child elements named after their keys; a
+    list's items become repeated `<item>` elements; a string/long/double/
+    bool becomes the element's text content; `null` becomes an empty
+    element. This is the same convention most JSON&lt;-&gt;XML converters
+    use, and is reversed exactly by `pstrobj_load_xml`.
+**/
+PSTR_API int pstrobj_save_xml(pstrobj_t *obj, pstream_t *stream);
 
 /** Frees object and it's children if it's detached. **/
 PSTR_API void pstrobj_free(pstrobj_t *obj);
