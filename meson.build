@@ -5,14 +5,28 @@
 project('pstring', 'c')
 
 src = [
+    'src/encoding/base32.c',
+    'src/encoding/base64.c',
+    'src/encoding/cstring.c',
+    'src/encoding/hex.c',
+    'src/encoding/json.c',
+    'src/encoding/url.c',
+    'src/encoding/utf8.c',
+    'src/encoding/utf16.c',
+    'src/encoding/xml.c',
     'src/format/json.c',
+    'src/format/xml.c',
     'src/dictionary.c',
     'src/encoding.c',
     'src/global.c',
+    'src/glob.c',
+    'src/eval.c',
     'src/io.c',
     'src/object.c',
     'src/pattern.c',
     'src/pstring.c',
+    'src/simd.c',
+    'src/wordexp.c',
 ]
 
 args = []
@@ -51,6 +65,8 @@ meson.override_dependency('pstring', pstring_dep)
 install_headers(
     'include/pstring/dictionary.h',
     'include/pstring/encoding.h',
+    'include/pstring/eval.h',
+    'include/pstring/glob.h',
     'include/pstring/io.h',
     'include/pstring/object.h',
     'include/pstring/pattern.h',
@@ -80,9 +96,5 @@ if not meson.is_subproject()
         ]
     )
 
-    test('pstring/pstring', tests, args: ['pstring'], protocol: 'tap')
-    test('pstring/dictionary', tests, args: ['dictionary'], protocol: 'tap')
-    test('pstring/encoding', tests, args: ['encoding'], protocol: 'tap')
-    test('pstring/io', tests, args: ['io'], protocol: 'tap')
-    test('pstring/pattern', tests, args: ['pattern'], protocol: 'tap')
+    test('pstring', tests, args: ['--tap'], protocol: 'tap')
 endif
