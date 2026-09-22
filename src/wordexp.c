@@ -18,14 +18,21 @@
     limitations under the License.
 */
 
-#include "allocator_std.h"
+#include <pstring/eval.h>
+#include <pstring/glob.h>
 #include <pstring/pstring.h>
 
 #include <stdalign.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include <allocator.h>
 #include <allocator_arena.h>
+#include <allocator_std.h>
 #include <pf_ctype.h>
+#include <pf_filesystem.h>
+#include <pf_process.h>
 
 #define PF_ARRAY_USE_ALLOCATOR_T
 #define PF_ARRAY_DEFAULT_ALLOCATOR NULL
@@ -66,13 +73,17 @@ typedef struct path_state_t {
     pstrexpand_t *handler;
 } path_state_t;
 
-static int is_invalid_char(char c) {
-    return c == '|' || c == '&' || c == ';' || c == '<' || c == '>' || c == '{'
-        || c == '}' || c == '\n';
-}
+static int expand_command_tick(expand_state_t *state);
+static int expand_command_paren(expand_state_t *state);
+static int expand_braced(expand_state_t *state);
+static int expand_arithmetic(expand_state_t *state);
+static int expand_named(expand_state_t *state);
+static int expand_pid(expand_state_t *state);
+static int expand_status(expand_state_t *state);
 
-static int is_escape_char(char c) {
-    return c == '$' || c == '`' || c == '"' || c == '\\' || c == '\n';
+static int is_invalid_char(char c) {
+    return c == '|' || c == '&' || c == ';' || c == '<' || c == '>'
+        || c == '\n';
 }
 
 static int check_invalid_chars(pstring_t *src) {
@@ -103,6 +114,9 @@ static int check_invalid_chars(pstring_t *src) {
             break;
         }
     }
+
+    if (quote != '\0')
+        return PSTRING_EINVAL;
 
     return PSTRING_OK;
 }
@@ -225,24 +239,93 @@ static int expand_single_quote(pstring_t *dst, pstring_t *src) {
 
     const char *quote = pstrchr(src, '\'');
 
+    int rc = PSTRING_OK;
     if (quote > start)
-        pstrcats(src, start, quote - start);
+        rc = pstrcats(dst, start, quote - start);
+
     pstrrange(src, NULL, quote ? quote + 1 : end, end);
-    return PSTRING_OK;
+    return rc;
 }
 
-static int expand_double_quote(pstring_t *dst, pstring_t *src) {
-    if (pstrget(src, 0) == '"')
+/** Decodes the body of a double-quoted string starting right after the
+    opening `"` (already consumed by the caller). Per POSIX, inside
+    double quotes:
+    - `$` and `` ` `` keep their special meaning (parameter/command/
+      arithmetic expansion still happens),
+    - `'` is an ordinary character,
+    - `\\` only escapes `$`, `` ` ``, `"`, `\\` and a following newline
+      (which it deletes, i.e. a line continuation); any other `\\x` is
+      copied through literally, backslash included. **/
+static int expand_double_quote(expand_state_t *state) {
+    pstring_t *dst = state->dst;
+    pstring_t *src = state->src;
+
+    if (pstrget(src, 0) == '"') {
+        pstrrshift(src, 1); /* empty "" */
         return PSTRING_OK;
+    }
 
-    const char *start = pstrbuf(src);
-    const char *close = find_closing_quote(src, '"');
+    const char *end = pstrend(src);
+    const char *prev = pstrbuf(src);
+    int res = PSTRING_OK;
+    const char *special;
 
-    if (!close)
-        return PSTRING_EINVAL;
+    while (!res && (special = pstrpbrk(src, "$`\"\\"))) {
+        if ((res = pstrcatb(dst, prev, special - prev)))
+            break;
 
-    /* TODO: decode and concat */
-    return PSTRING_ENOSYS;
+        if (*special == '"') {
+            pstrrange(src, NULL, special + 1, end);
+            return PSTRING_OK;
+        }
+
+        pstrrange(src, NULL, special + 1, end);
+
+        switch (*special) {
+        case '\\': {
+            char c = pstrget(src, 0);
+            if (c == '$' || c == '`' || c == '"' || c == '\\') {
+                res = pstrcatc(dst, c);
+                pstrrshift(src, 1);
+            } else if (c == '\n') {
+                pstrrshift(src, 1); /* line continuation: drop both chars */
+            } else {
+                res = pstrcatc(dst, '\\'); /* not a recognised escape */
+            }
+            break;
+        }
+        case '`':
+            res = expand_command_tick(state);
+            break;
+        case '$': {
+            char curr = pstrget(src, 0);
+            char next = pstrget(src, 1);
+
+            if (curr == '(' && next == '(')
+                res = expand_arithmetic(state);
+            else if (curr == '(')
+                res = expand_command_paren(state);
+            else if (curr == '{')
+                res = expand_braced(state);
+            else if (pf_isalpha(curr) || curr == '_')
+                res = expand_named(state);
+            else if (curr == '$')
+                res = expand_pid(state);
+            else if (curr == '?')
+                res = expand_status(state);
+            else
+                res = pstrcatc(dst, '$');
+            break;
+        }
+        }
+
+        prev = pstrbuf(src);
+    }
+
+    /* ran off the end without seeing the closing '"' -- `check_invalid_chars`
+       is supposed to catch this earlier, so reaching it here means the two
+       scans disagree about what is/isn't inside a quote */
+    return res ? res : PSTRTHROW_EINVAL;
 }
 
 static int expand_escape(pstring_t *dst, pstring_t *src) {
@@ -262,6 +345,7 @@ static int expand_command_tick(expand_state_t *state) {
         return PSTRING_EINVAL;
 
     const char *start = pstrbuf(state->src);
+    const char *end = pstrend(state->src);
     const char *close = find_closing_quote(state->src, '`');
 
     if (!close)
@@ -269,6 +353,9 @@ static int expand_command_tick(expand_state_t *state) {
 
     pstring_t cmd;
     pstrrange(&cmd, NULL, start, close);
+
+    pstrrange(state->src, NULL, close + 1, end);
+
     return call_handler(state->handler, PSTREXPAND_CMD_TICK, &cmd, state->dst);
 }
 
@@ -364,7 +451,7 @@ static int expand_string(expand_state_t *state) {
             res = expand_escape(dst, src);
             break;
         case '"':
-            res = expand_double_quote(dst, src);
+            res = expand_double_quote(state);
             break;
         case '\'':
             res = expand_single_quote(dst, src);
@@ -373,8 +460,8 @@ static int expand_string(expand_state_t *state) {
             res = expand_command_tick(state);
             break;
         case '$': {
-            char curr = pstrget(src, 1);
-            char next = pstrget(src, 2);
+            char curr = pstrget(src, 0);
+            char next = pstrget(src, 1);
 
             if (curr == '(' && next == '(')
                 res = expand_arithmetic(state);
@@ -382,14 +469,14 @@ static int expand_string(expand_state_t *state) {
                 res = expand_command_paren(state);
             else if (curr == '{')
                 res = expand_braced(state);
-            else if (pf_isalpha(curr))
+            else if (pf_isalpha(curr) || curr == '_')
                 res = expand_named(state);
             else if (curr == '$')
                 res = expand_pid(state);
             else if (curr == '?')
                 res = expand_status(state);
             else
-                res = PSTRING_EINVAL;
+                res = pstrcatc(dst, '$');
             break;
         }
         case '~':
@@ -475,10 +562,7 @@ static int field_split(split_state_t *state) {
     int rc = PSTRING_OK;
 
     while (!rc && ws < pstrend(src)) {
-        if (!(ws = pstrcpbrk(src, pstrbuf(&state->ifs))))
-            ws = pstrend(src);
-
-        if (ws == pstrbuf(src))
+        if (!(ws = pstrpbrk(src, pstrbuf(&state->ifs))))
             ws = pstrend(src);
 
         pstrrange(&field, NULL, pstrbuf(src), ws);
@@ -521,7 +605,7 @@ static int expand_pathname(path_state_t *state) {
 
         if (hasGlob) {
             int rc = call_handler(
-                state->handler, PSTREXPAND_GLOB, &clean, &state->result
+                state->handler, PSTREXPAND_GLOB, &clean, state->result
             );
 
             pstrfree(&clean);
@@ -600,10 +684,8 @@ int pstrexpand_with(
     handler.user = user;
     handler.flags = flags;
 
-    char _arenaBuffer[4096];
-    struct arena_alloc _arena = { 0 };
-    arena_alloc_init(&_arena, &standard_allocator);
-    arena_alloc_buffer(&_arena, _arenaBuffer, 4096);
+    arena_allocator_t _arena = { 0 };
+    arena_allocator_init(&_arena, &standard_allocator);
     allocator_t *arena = &_arena.alloc;
 
     words_t words;
@@ -611,7 +693,7 @@ int pstrexpand_with(
 
     int rc = expand_with(&handler, arena, &words, src);
 
-    arena_alloc_free(&_arena);
+    arena_allocator_free(&_arena);
 
     if (!rc) {
         dst->items = PF_ARRAY_GET(&words, 0);
@@ -622,36 +704,217 @@ int pstrexpand_with(
         words_free(&words);
     }
 
-    return PSTRING_OK;
+    return rc;
 }
 
 static int default_expand_tilde(
     pstring_t *out, const pstring_t *username, int flags
 ) {
-    // TODO: pf_homedir(username, buf, bufsz)
-    return PSTRING_ENOSYS;
+    (void)flags;
+
+    /* pf_homedir requires a NUL-terminated string. */
+    char name[256];
+    const char *cname = pstrterms((pstring_t *)username, name, sizeof(name));
+    if (!cname)
+        return PSTRING_ENOMEM;
+
+    char path[4096];
+    if (!pf_homedir(name, path, sizeof(path)))
+        return PSTRING_ENOENT;
+
+    return pstrcats(out, path, 0);
 }
 
 static int default_expand_pid(pstring_t *out) {
-    // TODO: pf_pid()
-    return PSTRING_ENOSYS;
+    return pstrfmt(out, "%ld", (long)getpid());
+}
+
+/** Runs `cmd` (already-expanded shell text) through the platform shell
+    and appends its standard output to `out`, with the trailing run of
+    newlines stripped -- matching POSIX command substitution, which
+    always removes trailing newlines (but nothing else) from the
+    captured output. **/
+static int default_expand_command(pstring_t *out, const pstring_t *cmd) {
+    /* `cmd` is a slice into the word currently being expanded, not an
+       owned string -- `pstrunwrap` hands back ownership of an existing
+       heap buffer (or duplicates an SSO one), neither of which applies
+       to a plain slice, so the pointer it returned here was not one
+       `free()` could safely take. Make an explicit owned copy (which is
+       always NUL-terminated) and free it the pstring way instead. */
+    pstring_t owned = { 0 };
+    if (pstrdup(&owned, cmd, NULL))
+        return PSTRING_ENOMEM;
+
+    FILE *pipe = popen(pstrbuf(&owned), "r");
+    pstrfree(&owned);
+
+    if (!pipe)
+        return PSTREXPAND_CMDSUB;
+
+    char chunk[4096];
+    size_t n;
+    int rc = PSTRING_OK;
+
+    while (!rc && (n = fread(chunk, 1, sizeof(chunk), pipe)) > 0)
+        rc = pstrcats(out, chunk, n);
+
+    pclose(pipe);
+
+    if (rc)
+        return rc;
+
+    /* strip only the trailing newlines, not trailing whitespace in
+       general -- a command that prints "a \n" keeps the trailing space */
+    size_t len = pstrlen(out);
+    while (len > 0 && pstrget(out, len - 1) == '\n')
+        len--;
+    pstr__setlen(out, len);
+
+    return PSTRING_OK;
+}
+
+/** Evaluates `expr` (the text between `$((` and `))`) via `pstreval`,
+    resolving bare identifiers as shell/environment variables. Nested
+    expansions ($VAR inside the arithmetic expression, which POSIX also
+    allows) are intentionally not re-run here: `pstreval`'s own
+    identifier resolution already covers the common case of referencing
+    a variable by name, which is what shell arithmetic almost always
+    does in practice. **/
+static int arith_get(long long *out, const pstring_t *name, void *user) {
+    (void)user;
+    pstring_t value;
+    int rc = pstrenv(&value, name);
+    if (rc == PSTRING_ENOENT) {
+        *out = 0;
+        return PSTRING_OK;
+    }
+    if (rc)
+        return rc;
+
+    char buf[64];
+    const char *cstr = pstrterms(&value, buf, sizeof(buf));
+    if (!cstr)
+        return PSTRING_ENOMEM;
+
+    char *stop;
+    *out = strtoll(cstr, &stop, 0);
+    return *stop == '\0' ? PSTRING_OK : PSTREXPAND_BADVAL;
+}
+
+static int default_expand_arithmetic(pstring_t *out, pstring_t *expr) {
+    long long value;
+    int rc = pstreval(&value, expr, arith_get, NULL, NULL);
+    if (rc)
+        return rc == PSTRING_EINVAL ? PSTREXPAND_SYNTAX : rc;
+    return pstrfmt(out, "%lld", value);
+}
+
+/** Implements the common POSIX `${...}` parameter-expansion operators:
+    `${var}` (plain), `${var:-word}` (use default), `${var:=word}`
+    (assign default -- accepted syntactically, but since pstring has no
+    variable *store* to write back to, this behaves like `:-`),
+    `${var:+word}` (use alternate value), `${var:?word}` (error if
+    unset), and `${#var}` (length). Nested `$`/backtick expansion inside
+    `word` is deliberately not attempted -- pattern-removal operators
+    (`${var#pattern}`, `${var%pattern}`) are not implemented and fall
+    through to PSTRING_ENOSYS. **/
+static int default_expand_brace(pstring_t *out, pstring_t *body, int flags) {
+    int wantLength = pstrget(body, 0) == '#';
+    if (wantLength)
+        pstrrshift(body, 1);
+
+    const char *nameEnd = pstrcpbrk(body, PF_CTYPE_ALNUM "_");
+    pstring_t name;
+    pstrrange(&name, NULL, pstrbuf(body), nameEnd ? nameEnd : pstrend(body));
+
+    pstring_t value;
+    int rc = pstrenv(&value, &name);
+    int isSet = (rc == PSTRING_OK);
+
+    if (wantLength) {
+        if (!isSet) {
+            if (flags & PSTREXPAND_UNDEF)
+                return PSTREXPAND_BADVAL;
+            return pstrcatc(out, '0');
+        }
+
+        return pstrfmt(out, "%zu", pstrlen(&value));
+    }
+
+    if (!nameEnd || nameEnd == pstrend(body)) {
+        /* bare ${var}, nothing following the name */
+        if (isSet)
+            return pstrcat(out, &value);
+        return (flags & PSTREXPAND_UNDEF) ? PSTREXPAND_BADVAL : PSTRING_OK;
+    }
+
+    char op = *nameEnd;
+    if (op != ':') {
+        /* only the ${var#pattern}/${var%pattern} family starts without
+           a colon, and those aren't implemented */
+        return PSTRING_ENOSYS;
+    }
+
+    pstring_t rest;
+    pstrrange(&rest, NULL, nameEnd + 1, pstrend(body));
+    char sub = pstrget(&rest, 0);
+    pstrrshift(&rest, 1);
+
+    switch (sub) {
+    case '-': /* use default if unset or empty */
+        if (isSet && pstrlen(&value) > 0)
+            return pstrcat(out, &value);
+        return pstrcat(out, &rest);
+    case '=': /* assign default -- no variable store, so behaves as ':-' */
+        if (isSet && pstrlen(&value) > 0)
+            return pstrcat(out, &value);
+        return pstrcat(out, &rest);
+    case '+': /* use alternate value if set and non-empty */
+        if (isSet && pstrlen(&value) > 0)
+            return pstrcat(out, &rest);
+        return PSTRING_OK;
+    case '?': /* error with message if unset or empty */
+        if (isSet && pstrlen(&value) > 0)
+            return pstrcat(out, &value);
+        return PSTREXPAND_BADVAL;
+    default:
+        return PSTRING_ENOSYS;
+    }
 }
 
 static int default_expand_named(pstring_t *out, pstring_t *name, int flags) {
     pstring_t value;
     int rc = pstrenv(&value, name);
 
-    if (rc == PSTRING_ENOENT && flags & PSTREXPAND_UNDEF)
-        return PSTREXPAND_BADVAL;
+    if (rc == PSTRING_ENOENT)
+        return (flags & PSTREXPAND_UNDEF) ? PSTREXPAND_BADVAL : PSTRING_OK;
 
     if (rc == PSTRING_OK)
-        pstrcat(out, &value);
+        return pstrcat(out, &value);
     return rc;
+}
+
+static int default_expand_glob(words_t *result, pstring_t *pattern) {
+    pstrarray_t matches = { 0 };
+    int rc = pstrglob(&matches, pattern, PSTRGLOB_NOCHECK, NULL);
+    if (rc)
+        return rc;
+
+    for (size_t i = 0; i < matches.length; i++) {
+        if (words_push_dup(result, &matches.items[i])) {
+            pstrarray_free(&matches);
+            return PSTRING_ENOMEM;
+        }
+    }
+    pstrarray_free(&matches);
+    return PSTRING_OK;
 }
 
 int pstrexpand_default_cb(
     void *dst, void *src, int flags, int kind, void *user
 ) {
+    (void)user;
+
     switch (kind) {
     case PSTREXPAND_NONE:
         return PSTRING_OK;
@@ -666,17 +929,23 @@ int pstrexpand_default_cb(
     case PSTREXPAND_IFS:
         return pstrenv(dst, PSTR("IFS"));
     case PSTREXPAND_BRACE:
-        return PSTRING_ENOSYS;
+        return default_expand_brace(dst, src, flags);
     case PSTREXPAND_CMD_PAREN:
     case PSTREXPAND_CMD_TICK:
-        return PSTRING_ENOSYS;
+        if (flags & PSTREXPAND_NOCMD)
+            return PSTREXPAND_CMDSUB;
+        return default_expand_command(dst, src);
     case PSTREXPAND_ARITHMETIC:
-        return PSTRING_ENOSYS;
+        return default_expand_arithmetic(dst, src);
     case PSTREXPAND_GLOB:
-        return PSTRING_ENOSYS;
+        return default_expand_glob(dst, src);
     }
+
+    return PSTRTHROW_EINVAL;
 }
 
 int pstrexpand(pstrarray_t *dst, pstring_t *src, int flags, pstrexpand_fn *cb) {
-    return pstrexpand_with(dst, src, flags, pstrexpand_default_cb, NULL);
+    return pstrexpand_with(
+        dst, src, flags, cb ? cb : pstrexpand_default_cb, NULL
+    );
 }
