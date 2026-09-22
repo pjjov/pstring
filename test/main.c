@@ -19,59 +19,28 @@
 */
 
 #include <pf_test.h>
-#include <string.h>
 
 /* clang-format off */
 
-extern const pf_test suite_pstring[];
-extern const pf_test suite_dict[];
-extern const pf_test suite_encoding[];
-extern const pf_test suite_io[];
-extern const pf_test suite_pattern[];
-
-static const pf_test *suites[] = {
-    suite_pstring,
-    suite_dict,
-    suite_encoding,
-    suite_io,
-    suite_pattern,
-    NULL,
-};
-
-static const char *names[] = {
-    "pstring",
-    "dictionary",
-    "encoding",
-    "io",
-    "pattern",
-    NULL,
-};
+extern const pf_test_t suite_pstring[];
+extern const pf_test_t suite_dict[];
+extern const pf_test_t suite_encoding[];
+extern const pf_test_t suite_io[];
+extern const pf_test_t suite_pattern[];
+extern const pf_test_t suite_wordexp[];
 
 /* clang-format on */
 
 int main(int argc, char *argv[]) {
-    if (argc > 2) {
-        fputs("usage: pstring-test [suite]\nsuites:", stderr);
+    static const pf_suite_t suites[] = {
+        { "core", 1, suite_pstring },
+        { "dictionary", 1, suite_dict },
+        { "encoding", 1, suite_encoding },
+        { "io", 1, suite_io },
+        { "pattern", 1, suite_pattern },
+        { "wordexp", 1, suite_wordexp },
+        { 0 },
+    };
 
-        for (int i = 0; names[i]; i++) {
-            fputc(' ', stderr);
-            fputs(names[i], stderr);
-        }
-
-        fputc('\n', stderr);
-        return -1;
-    }
-
-    if (argc == 1)
-        return pf_suite_run_all(suites, 0, NULL);
-
-    for (int i = 0; names[i]; i++) {
-        if (0 == strcmp(argv[1], names[i])) {
-            pf_suite_run_tap(suites[i], 0, NULL);
-            return 0;
-        }
-    }
-
-    fprintf(stderr, "pstring-test: unknown suite '%s'\n", argv[1]);
-    return -1;
+    return pf_test_main(argc, argv, suites);
 }

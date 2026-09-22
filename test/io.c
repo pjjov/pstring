@@ -163,10 +163,10 @@ int test_io_json(int seed, int rep) {
     return 0;
 }
 
-const struct pf_test suite_io[] = {
-    { test_io_read, "/pstring/io/read", 1 },
-    { test_io_write, "/pstring/io/write", 1 },
-    { test_io_format, "/pstring/io/format", 1 },
-    { test_io_json, "/pstring/io/json", 1 },
+const pf_test_t suite_io[] = {
+    { test_io_read, "/pstring/io/read" },
+    { test_io_write, "/pstring/io/write" },
+    { test_io_format, "/pstring/io/format" },
+    { test_io_json, "/pstring/io/json" },
     { 0 },
 };

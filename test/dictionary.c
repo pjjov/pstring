@@ -148,11 +148,11 @@ int test_pstrdict_each(int seed, int rep) {
     return 0;
 }
 
-const struct pf_test suite_dict[] = {
-    { test_pstrdict_new, "/pstring/dict/new", 1 },
-    { test_pstrdict_reserve, "/pstring/dict/reserve", 1 },
-    { test_pstrdict_get_set, "/pstring/dict/get_set", 1 },
-    { test_pstrdict_insert_remove, "/pstring/dict/insert_remove", 1 },
-    { test_pstrdict_each, "/pstring/dict/each", 1 },
+const pf_test_t suite_dict[] = {
+    { test_pstrdict_new, "/pstring/dict/new" },
+    { test_pstrdict_reserve, "/pstring/dict/reserve" },
+    { test_pstrdict_get_set, "/pstring/dict/get_set" },
+    { test_pstrdict_insert_remove, "/pstring/dict/insert_remove" },
+    { test_pstrdict_each, "/pstring/dict/each" },
     { 0 },
 };

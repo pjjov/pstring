@@ -245,13 +245,13 @@ int test_encoding_xml(int seed, int rep) {
     return 0;
 }
 
-const struct pf_test suite_encoding[] = {
-    { test_encoding_hex, "/pstring/encoding/hex", 1 },
-    { test_encoding_url, "/pstring/encoding/url", 1 },
-    { test_encoding_base64, "/pstring/encoding/base64", 1 },
-    { test_encoding_cstring, "/pstring/encoding/cstring", 1 },
-    { test_encoding_utf8, "/pstring/encoding/utf8", 1 },
-    { test_encoding_json, "/pstring/encoding/json", 1 },
-    { test_encoding_xml, "/pstring/encoding/xml", 1 },
+const pf_test_t suite_encoding[] = {
+    { test_encoding_hex, "/pstring/encoding/hex" },
+    { test_encoding_url, "/pstring/encoding/url" },
+    { test_encoding_base64, "/pstring/encoding/base64" },
+    { test_encoding_cstring, "/pstring/encoding/cstring" },
+    { test_encoding_utf8, "/pstring/encoding/utf8" },
+    { test_encoding_json, "/pstring/encoding/json" },
+    { test_encoding_xml, "/pstring/encoding/xml" },
     { 0 },
 };
