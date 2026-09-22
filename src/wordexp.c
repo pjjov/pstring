@@ -686,6 +686,7 @@ int pstrexpand_with(
 
     arena_allocator_t _arena = { 0 };
     arena_allocator_init(&_arena, &standard_allocator);
+    _arena.alignment = 32;
     allocator_t *arena = &_arena.alloc;
 
     words_t words;
