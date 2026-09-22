@@ -16,7 +16,6 @@ src = [
     'src/encoding/xml.c',
     'src/format/json.c',
     'src/format/xml.c',
-    'src/dictionary.c',
     'src/encoding.c',
     'src/global.c',
     'src/glob.c',
@@ -63,7 +62,6 @@ pstring_dep = declare_dependency(
 meson.override_dependency('pstring', pstring_dep)
 
 install_headers(
-    'include/pstring/dictionary.h',
     'include/pstring/encoding.h',
     'include/pstring/eval.h',
     'include/pstring/glob.h',
@@ -76,7 +74,6 @@ install_headers(
 
 install_man(
     'docs/pstring.3',
-    'docs/pstring-dictionary.3',
     'docs/pstring-encoding.3',
     'docs/pstring-object.3'
 )
@@ -87,7 +84,6 @@ if not meson.is_subproject()
         install: false,
         dependencies: [pstring_dep, cpolyfill_dep],
         sources: [
-            'test/dictionary.c',
             'test/encoding.c',
             'test/io.c',
             'test/main.c',

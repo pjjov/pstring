@@ -18,7 +18,6 @@
     limitations under the License.
 */
 
-#include <pstring/dictionary.h>
 #include <pstring/encoding.h>
 #include <pstring/io.h>
 #include <pstring/object.h>
@@ -148,30 +147,6 @@ static int json_serialize_llist(
     return res;
 }
 
-struct json_serialize_dict_state {
-    pstream_t *stream;
-    struct pstrmodel_member *member;
-};
-
-static int json_serialize_dict_each(void *user, pstring_t *key, void *value) {
-    struct json_writer *json = user;
-    return pstream_printf(json->base, "\"%!json%P\":", key)
-        || json_serialize(json, json->member, value);
-}
-
-static int json_serialize_dict(
-    struct json_writer *json, const void *obj, struct pstrmodel_member *member
-) {
-    pstream_putc(json->base, '{');
-    json->member = member;
-
-    pstrdict_t *dict = *(pstrdict_t **)obj;
-    int res = pstrdict_each(dict, json_serialize_dict_each, json);
-
-    pstream_putc(json->base, '}');
-    return res;
-}
-
 static int json_serialize(
     struct json_writer *json,
     const struct pstrmodel_member *member,
@@ -211,8 +186,6 @@ static int json_serialize(
         return json_serialize_array(json->base, item, member->model);
     case PSTRMODEL_LLIST:
         return json_serialize_llist(json->base, item, member->model);
-    case PSTRDICT_TYPE:
-        return json_serialize_dict(json, item, member->model);
 
     default:
         if (pf_type_is_integer(member->type))

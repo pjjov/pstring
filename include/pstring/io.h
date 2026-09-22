@@ -70,7 +70,6 @@ enum pstream_origin {
 enum pstring_typeid {
     PSTRING_TYPE = 3 | ('P' << 8),
     PSTRING_PTR_TYPE,
-    PSTRDICT_TYPE,
     PSTREAM_TYPE,
     PSTRMODEL_TYPE,
     PSTRMODEL_ARRAY,
