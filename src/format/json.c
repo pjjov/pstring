@@ -27,6 +27,7 @@
 #include <string.h>
 
 #define PF_TYPE_HELPERS
+#include <pf_io.h>
 #include <pf_macro.h>
 #include <pf_typeid.h>
 
@@ -34,7 +35,7 @@
 #define JSON_BUFFER_SIZE 4096
 
 struct json_lexer {
-    pstream_t *stream;
+    pf_stream_t *stream;
     size_t start;
     size_t end;
     int eof;
@@ -43,14 +44,14 @@ struct json_lexer {
 
 struct json_reader {
     struct json_lexer lexer;
-    pstream_t *stream;
+    pf_stream_t *stream;
     int prev, curr;
     unsigned int failed : 1;
     pstring_t prevValue, currValue;
 };
 
 struct json_writer {
-    pstream_t *base;
+    pf_stream_t *base;
     int prev;
 
     const struct pstrmodel_member *member;
@@ -62,7 +63,7 @@ static int json_serialize(
     const void *item
 );
 
-static int json_write_int(pstream_t *stream, int type, const void *item) {
+static int json_write_int(pf_stream_t *stream, int type, const void *item) {
     char buffer[256];
     uintmax_t value;
     int res;
@@ -78,13 +79,13 @@ static int json_write_int(pstream_t *stream, int type, const void *item) {
     if (res <= 0 || res >= 256)
         return PSTRING_EINVAL;
 
-    if (res != pstream_write(stream, buffer, res))
+    if (res != pf_stream_write(stream, buffer, res))
         return PSTRING_EIO;
 
     return PSTRING_OK;
 }
 
-static int json_write_float(pstream_t *stream, int type, const void *item) {
+static int json_write_float(pf_stream_t *stream, int type, const void *item) {
     char buffer[256];
     double value;
     int res;
@@ -102,34 +103,34 @@ static int json_write_float(pstream_t *stream, int type, const void *item) {
     if (res <= 0 || res >= 256)
         return PSTRING_EINVAL;
 
-    if (res != pstream_write(stream, buffer, res))
+    if (res != pf_stream_write(stream, buffer, res))
         return PSTRING_EIO;
 
     return PSTRING_OK;
 }
 
 static int json_serialize_array(
-    pstream_t *stream, const void *obj, struct pstrmodel_array *model
+    pf_stream_t *stream, const void *obj, struct pstrmodel_array *model
 ) {
-    pstream_putc(stream, '[');
+    pf_stream_putc(stream, '[');
     int res = PSTRING_OK;
 
     for (size_t i = 0; !res && i < model->count; i++) {
         if (i > 0)
-            pstream_putc(stream, ',');
+            pf_stream_putc(stream, ',');
 
         const void *item = PF_OFFSET(obj, model->stride * i);
         res = pstream_save_json(stream, item, model->submodel);
     }
 
-    pstream_putc(stream, ']');
+    pf_stream_putc(stream, ']');
     return res;
 }
 
 static int json_serialize_llist(
-    pstream_t *stream, const void *obj, struct pstrmodel_llist *model
+    pf_stream_t *stream, const void *obj, struct pstrmodel_llist *model
 ) {
-    pstream_putc(stream, '[');
+    pf_stream_putc(stream, '[');
     int res = PSTRING_OK;
 
     const void *head = *(const void **)obj;
@@ -137,13 +138,13 @@ static int json_serialize_llist(
 
     for (item = head; item; item = *link) {
         if (item != head)
-            pstream_putc(stream, ',');
+            pf_stream_putc(stream, ',');
 
         link = PF_OFFSET(item, model->linkOffset);
         res = pstream_save_json(stream, item, model->submodel);
     }
 
-    pstream_putc(stream, ']');
+    pf_stream_putc(stream, ']');
     return res;
 }
 
@@ -158,26 +159,26 @@ static int json_serialize(
     switch (member->type) {
     case PF_TYPE_BOOL: {
         pf_bool value = *(pf_bool *)item;
-        res = pstream_puts(json->base, value ? "true" : "false");
+        res = pf_stream_puts(json->base, value ? "true" : "false");
         break;
     }
 
     case PF_TYPE_CHAR:
-        res = pstream__printf(json->base, "\"%c\"", *(char *)item);
+        res = pf_stream_printf(json->base, "\"%c\"", *(char *)item);
         break; /* todo: escape character */
     case PF_TYPE_CSTRING:
         pstrwrap(&str, *(char **)item, 0, 0);
-        res = pstream_printf(json->base, "\"%!json%P\"", &str);
+        res = pstrfprintf(json->base, "\"%!json%P\"", &str);
         break;
     case PSTRING_TYPE:
-        res = pstream_printf(json->base, "\"%!json%P\"", item);
+        res = pstrfprintf(json->base, "\"%!json%P\"", item);
         break;
     case PSTRING_PTR_TYPE:
-        res = pstream_printf(json->base, "\"%!json%P\"", *(pstring_t **)item);
+        res = pstrfprintf(json->base, "\"%!json%P\"", *(pstring_t **)item);
         break;
 
     case PF_TYPE_PTR:
-        res = pstream__printf(json->base, "\"%p\"", *(void **)item);
+        res = pf_stream_printf(json->base, "\"%p\"", *(void **)item);
         break;
 
     case PSTRMODEL_TYPE:
@@ -200,10 +201,10 @@ static int json_serialize(
     return res;
 }
 
-static int json_write_key(pstream_t *stream, const char *key) {
+static int json_write_key(pf_stream_t *stream, const char *key) {
     pstring_t str;
     pstrwrap(&str, (char *)key, 0, 0);
-    return pstream_printf(stream, "\"%!json%P\":", &str);
+    return pstrfprintf(stream, "\"%!json%P\":", &str);
 }
 
 static int json_save_member(
@@ -213,7 +214,7 @@ static int json_save_member(
 ) {
     const void *item = PF_OFFSET(obj, member->offset);
 
-    if (json->prev != PSTRMODEL__BEGIN && pstream_putc(json->base, ','))
+    if (json->prev != PSTRMODEL__BEGIN && pf_stream_putc(json->base, ','))
         return PSTRING_EIO;
 
     if (json_write_key(json->base, member->name))
@@ -223,7 +224,7 @@ static int json_save_member(
 }
 
 int pstream_save_json(
-    pstream_t *stream, const void *obj, const struct pstrmodel *model
+    pf_stream_t *stream, const void *obj, const struct pstrmodel *model
 ) {
     if (!stream || !obj || !model || !model->members)
         return PSTRTHROW_EINVAL;
@@ -233,12 +234,12 @@ int pstream_save_json(
     json.base = stream;
     json.prev = PSTRMODEL__BEGIN;
 
-    rc |= pstream_putc(json.base, '{');
+    rc |= pf_stream_putc(json.base, '{');
 
     for (size_t i = 0; !rc && model->members[i].type; i++)
         rc |= json_save_member(&json, obj, &model->members[i]);
 
-    rc |= pstream_putc(json.base, '}');
+    rc |= pf_stream_putc(json.base, '}');
 
     return rc ? PSTRTHROW(rc, NULL) : PSTRING_OK;
 }
@@ -260,7 +261,7 @@ static int json_reserve(struct json_lexer *lex, size_t count) {
         lex->end = diff;
     }
 
-    size_t read = pstream_read(
+    size_t read = pf_stream_read(
         lex->stream, &lex->buf[lex->end], JSON_BUFFER_SIZE - diff
     );
 
@@ -571,7 +572,7 @@ static int json_read_model(
 }
 
 int pstream_load_json(
-    pstream_t *stream, void *obj, const struct pstrmodel *model
+    pf_stream_t *stream, void *obj, const struct pstrmodel *model
 ) {
     if (!stream || !obj || !model || !model->members)
         return PSTRTHROW_EINVAL;
@@ -728,7 +729,7 @@ static int json_read_obj(struct json_reader *json, pstrobj_t *out) {
     return PSTRING_EINVAL;
 }
 
-pstrobj_t *pstrobj_load_json(pstream_t *stream, allocator_t *allocator) {
+pstrobj_t *pstrobj_load_json(pf_stream_t *stream, allocator_t *allocator) {
     if (!stream)
         return PSTRTHROW_NULL(PSTRING_EINVAL);
 
@@ -752,49 +753,49 @@ pstrobj_t *pstrobj_load_json(pstream_t *stream, allocator_t *allocator) {
     return obj;
 }
 
-static int json_write_obj(pstrobj_t *o, pstream_t *s) {
+static int json_write_obj(pstrobj_t *o, pf_stream_t *s) {
     switch (o->type) {
         /* clang-format off */
-    case PSTROBJ_NULL: return pstream_puts(s, "null");
-    case PSTROBJ_BOOL: return pstream_puts(s, o->as.bool_ ? "true" : "false");
-    case PSTROBJ_LONG: return pstream_printf(s, "%ld", o->as.long_);
-    case PSTROBJ_DOUBLE: return pstream_printf(s, "%.17g", o->as.double_);
+    case PSTROBJ_NULL: return pf_stream_puts(s, "null");
+    case PSTROBJ_BOOL: return pf_stream_puts(s, o->as.bool_ ? "true" : "false");
+    case PSTROBJ_LONG: return pf_stream_printf(s, "%ld", o->as.long_);
+    case PSTROBJ_DOUBLE: return pf_stream_printf(s, "%.17g", o->as.double_);
         /* clang-format on */
 
     case PSTROBJ_STRING:
         if (pstrlen(o->as.string) > 0)
-            return pstream_printf(s, "\"%!json%P\"", o->as.string);
+            return pstrfprintf(s, "\"%!json%P\"", o->as.string);
         else
-            return pstream_puts(s, "\"\"");
+            return pf_stream_puts(s, "\"\"");
 
     case PSTROBJ_LIST: {
         pstrobj_t *child;
         int result = PSTRING_OK;
-        pstream_putc(s, '[');
+        pf_stream_putc(s, '[');
 
         for (child = o->child; !result && child; child = child->next) {
             if (child != o->child)
-                pstream_putc(s, ',');
+                pf_stream_putc(s, ',');
             result = json_write_obj(child, s);
         }
 
-        pstream_putc(s, ']');
+        pf_stream_putc(s, ']');
         return result;
     }
     case PSTROBJ_DICT: {
         pstrobj_t *ch;
         int result = PSTRING_OK;
-        pstream_putc(s, '{');
+        pf_stream_putc(s, '{');
 
         for (ch = o->child; !result && ch; ch = ch->next) {
             if (ch != o->child)
-                pstream_putc(s, ',');
+                pf_stream_putc(s, ',');
 
-            result = pstream_printf(s, "\"%!json%P\":", ch->key)
+            result = pstrfprintf(s, "\"%!json%P\":", ch->key)
                 || json_write_obj(ch, s);
         }
 
-        pstream_putc(s, '}');
+        pf_stream_putc(s, '}');
         return result;
     }
 
@@ -803,7 +804,7 @@ static int json_write_obj(pstrobj_t *o, pstream_t *s) {
     }
 }
 
-int pstrobj_save_json(pstrobj_t *obj, pstream_t *stream) {
+int pstrobj_save_json(pstrobj_t *obj, pf_stream_t *stream) {
     if (!obj || !stream)
         return PSTRTHROW_EINVAL;
 

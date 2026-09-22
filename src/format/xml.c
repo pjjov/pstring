@@ -10,6 +10,8 @@
 #include <pstring/object.h>
 #include <pstring/pstring.h>
 
+#include <pf_io.h>
+
 #include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
@@ -18,7 +20,7 @@
    writer
    ================================================================== */
 
-static int write_value(pstream_t *s, pstrobj_t *obj);
+static int write_value(pf_stream_t *s, pstrobj_t *obj);
 
 static int is_valid_name(pstring_t *key) {
     if (!key || pstrlen(key) == 0)
@@ -37,7 +39,7 @@ static int is_valid_name(pstring_t *key) {
     return 1;
 }
 
-static int write_children(pstream_t *s, pstrobj_t *obj) {
+static int write_children(pf_stream_t *s, pstrobj_t *obj) {
     pstrobj_t *child;
     int rc = PSTRING_OK;
 
@@ -45,11 +47,11 @@ static int write_children(pstream_t *s, pstrobj_t *obj) {
         int usedFallback = !is_valid_name(child->key);
 
         if (usedFallback) {
-            if ((rc = pstream_printf(s, "<field key=\"%!xml%P\">", child->key)))
+            if ((rc = pstrfprintf(s, "<field key=\"%!xml%P\">", child->key)))
                 break;
         } else {
-            if ((rc = pstream_putc(s, '<') || pstream_putp(s, child->key)
-                     || pstream_putc(s, '>')))
+            if ((rc = pf_stream_putc(s, '<') || pf_stream_putp(s, child->key)
+                     || pf_stream_putc(s, '>')))
                 break;
         }
 
@@ -57,10 +59,10 @@ static int write_children(pstream_t *s, pstrobj_t *obj) {
             break;
 
         if (usedFallback)
-            rc = pstream_puts(s, "</field>");
+            rc = pf_stream_puts(s, "</field>");
         else {
-            rc = pstream_puts(s, "</") || pstream_putp(s, child->key)
-                || pstream_putc(s, '>');
+            rc = pf_stream_puts(s, "</") || pf_stream_putp(s, child->key)
+                || pf_stream_putc(s, '>');
         }
 
         if (rc)
@@ -70,7 +72,7 @@ static int write_children(pstream_t *s, pstrobj_t *obj) {
     return rc;
 }
 
-static int write_value(pstream_t *s, pstrobj_t *obj) {
+static int write_value(pf_stream_t *s, pstrobj_t *obj) {
     if (!obj)
         return PSTRING_OK;
 
@@ -79,24 +81,24 @@ static int write_value(pstream_t *s, pstrobj_t *obj) {
         return PSTRING_OK;
 
     case PSTROBJ_BOOL:
-        return pstream_puts(s, obj->as.bool_ ? "true" : "false");
+        return pf_stream_puts(s, obj->as.bool_ ? "true" : "false");
 
     case PSTROBJ_LONG:
-        return pstream_printf(s, "%ld", obj->as.long_);
+        return pf_stream_printf(s, "%ld", obj->as.long_);
 
     case PSTROBJ_DOUBLE:
-        return pstream_printf(s, "%.17g", obj->as.double_);
+        return pf_stream_printf(s, "%.17g", obj->as.double_);
 
     case PSTROBJ_STRING:
-        return pstream_printf(s, "%!xml%P", obj->as.string);
+        return pstrfprintf(s, "%!xml%P", obj->as.string);
 
     case PSTROBJ_LIST: {
         pstrobj_t *child;
         int rc = PSTRING_OK;
 
         PSTROBJ_FOREACH(obj, child) {
-            if ((rc = pstream_puts(s, "<item>") || write_value(s, child)
-                     || pstream_puts(s, "</item>")))
+            if ((rc = pf_stream_puts(s, "<item>") || write_value(s, child)
+                     || pf_stream_puts(s, "</item>")))
                 break;
         }
 
@@ -110,13 +112,15 @@ static int write_value(pstream_t *s, pstrobj_t *obj) {
     return PSTRTHROW_EINVAL;
 }
 
-int pstrobj_save_xml(pstrobj_t *obj, pstream_t *stream) {
+int pstrobj_save_xml(pstrobj_t *obj, pf_stream_t *stream) {
     if (!obj || !stream)
         return PSTRTHROW_EINVAL;
 
-    int rc = pstream_puts(stream, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>")
-        || pstream_puts(stream, "<root>") || write_value(stream, obj)
-        || pstream_puts(stream, "</root>");
+    int rc = pf_stream_puts(
+                 stream, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+             )
+        || pf_stream_puts(stream, "<root>") || write_value(stream, obj)
+        || pf_stream_puts(stream, "</root>");
 
     return rc ? PSTRTHROW(rc, NULL) : PSTRING_OK;
 }
@@ -567,7 +571,7 @@ static pstrobj_t *xml_parse_element(struct xml_parser *x, pstring_t *outName) {
     return obj;
 }
 
-pstrobj_t *pstrobj_load_xml(pstream_t *stream, allocator_t *allocator) {
+pstrobj_t *pstrobj_load_xml(pf_stream_t *stream, allocator_t *allocator) {
     if (!stream)
         return PSTRTHROW_NULL(PSTRING_EINVAL);
 
@@ -575,7 +579,7 @@ pstrobj_t *pstrobj_load_xml(pstream_t *stream, allocator_t *allocator) {
     char chunk[4096];
     size_t n;
 
-    while ((n = pstream_read(stream, chunk, sizeof(chunk))) > 0) {
+    while ((n = pf_stream_read(stream, chunk, sizeof(chunk))) > 0) {
         if (pstrcats(&buffer, chunk, n)) {
             pstrfree(&buffer);
             return PSTRTHROW_NULL(PSTRING_ENOMEM);

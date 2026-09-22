@@ -39,8 +39,8 @@ extern "C" {
 
     ## DESCRIPTION
 
-    The `pstream_t` object can be used as a generic interface for interacting
-    with byte streams. Unlike standard library `FILE`, `pstream_t` objects
+    The `pf_stream_t` object can be used as a generic interface for interacting
+    with byte streams. Unlike standard library `FILE`, `pf_stream_t` objects
     can use user-defined stream implementations such as network sockets,
     in-memory buffers, encoders and serializers.
 
@@ -57,7 +57,7 @@ extern "C" {
 #include <stdio.h>
 typedef struct allocator_t allocator_t;
 typedef struct pstring_t pstring_t;
-typedef struct pstream_t pstream_t;
+typedef struct pf_stream_t pf_stream_t;
 
 #define PSTREAM_STATE_SIZE 24
 
@@ -70,7 +70,6 @@ enum pstream_origin {
 enum pstring_typeid {
     PSTRING_TYPE = 3 | ('P' << 8),
     PSTRING_PTR_TYPE,
-    PSTREAM_TYPE,
     PSTRMODEL_TYPE,
     PSTRMODEL_ARRAY,
     PSTRMODEL_LLIST,
@@ -91,23 +90,8 @@ PSTR_API int pstrio_printf(pstring_t *dst, const char *fmt, ...);
 **/
 PSTR_API int pstrio_vprintf(pstring_t *dst, const char *fmt, va_list args);
 
-struct pstream_vt {
-    size_t (*read)(pstream_t *stream, void *buffer, size_t size);
-    size_t (*write)(pstream_t *stream, const void *buffer, size_t size);
-    size_t (*tell)(pstream_t *stream);
-    int (*seek)(pstream_t *stream, long offset, int origin);
-    void (*flush)(pstream_t *stream);
-    void (*close)(pstream_t *stream);
-};
-
-struct pstream_t {
-    const struct pstream_vt *vtable;
-    union {
-        char _size[PSTREAM_STATE_SIZE];
-        void *_align;
-        void *ptr[PSTREAM_STATE_SIZE / sizeof(void *)];
-    } state;
-};
+PSTR_API int pstrfprintf(pf_stream_t *stream, const char *fmt, ...);
+PSTR_API int pstrvfprintf(pf_stream_t *stream, const char *fmt, va_list args);
 
 struct pstrmodel_array {
     size_t stride;
@@ -134,22 +118,12 @@ struct pstrmodel {
 };
 
 typedef int(pstream_save_fn)(
-    pstream_t *stream, const void *obj, const struct pstrmodel *model
+    pf_stream_t *stream, const void *obj, const struct pstrmodel *model
 );
 
 typedef int(pstream_load_fn)(
-    pstream_t *stream, void *obj, const struct pstrmodel *model
+    pf_stream_t *stream, void *obj, const struct pstrmodel *model
 );
-
-/** Opens the file located at `path` as a stream.
-    Possible error codes: PSTRING_EINVAL, PSTRING_EIO.
-**/
-PSTR_API int pstream_open(pstream_t *out, const char *path, const char *mode);
-
-/** Wraps provided `file` handle into a stream.
-    Possible error codes: PSTRING_EINVAL, PSTRING_EIO.
-**/
-PSTR_API int pstream_file(pstream_t *out, FILE *file);
 
 /** Initializes a stream that will read and write to the buffer
     of `str`, expanding it if needed. `str` will NOT be freed by
@@ -158,136 +132,33 @@ PSTR_API int pstream_file(pstream_t *out, FILE *file);
     Stream cursor will be at the end of the string.
     Possible error codes: PSTRING_EINVAL, PSTRING_EIO.
 **/
-PSTR_API int pstream_string(pstream_t *out, pstring_t *str);
-
-/** Initializes `out` as a custom stream.
-    `vtable` and it's members cannot be `NULL`.
-
-    Possible error codes: PSTRING_EINVAL.
-**/
-PSTR_API int pstream_init(pstream_t *out, const struct pstream_vt *vtable);
-
-/*
-    Since `pstream_init` does `NULL` checking for vtable members before
-    any stream is used, checking for `NULL` again in each of the helper
-    functions is unnecessary and a real performance drop.
-
-    As such, all helper functions checks are done through PSTREAM_ASSERT
-    which can be removed by defining PSTREAM_NDEBUG.
-*/
-#ifndef PSTREAM_NDEBUG
-    #define PSTREAM_ASSERT(m_fn, m_ret)                          \
-        if (!(stream && stream->vtable && stream->vtable->m_fn)) \
-            return (m_ret);
-#else
-    #define PSTREAM_ASSERT(m_fn, m_ret)
-#endif
-
-/** Sets the position of the stream to an offset of the specified origin.
-    Possible error codes: PSTRING_EINVAL, PSTRING_EIO.
-**/
-PSTR_INLINE int pstream_seek(pstream_t *stream, long offset, int origin) {
-    PSTREAM_ASSERT(seek, 0);
-    return stream->vtable->seek(stream, offset, origin);
-}
-
-/** Returns the current position of the stream. **/
-PSTR_INLINE size_t pstream_tell(pstream_t *stream) {
-    PSTREAM_ASSERT(tell, 0);
-    return stream->vtable->tell(stream);
-}
-
-/** Reads up to `size` bytes from `stream` and returns number of bytes read.
-    Possible error codes: PSTRING_EINVAL, PSTRING_EIO.
-**/
-PSTR_INLINE size_t pstream_read(pstream_t *stream, void *buffer, size_t size) {
-    PSTREAM_ASSERT(tell, 0);
-    return stream->vtable->read(stream, buffer, size);
-}
-
-/** Attempts to write `size` bytes from `buffer` to `stream`.
-    The number of bytes actually written is returned.
-    Possible error codes: PSTRING_EINVAL, PSTRING_EIO.
-**/
-PSTR_INLINE size_t
-pstream_write(pstream_t *stream, const void *buffer, size_t size) {
-    PSTREAM_ASSERT(write, 0);
-    return stream->vtable->write(stream, buffer, size);
-}
-
-/** Flushes internal buffers of a stream. **/
-PSTR_INLINE void pstream_flush(pstream_t *stream) {
-    PSTREAM_ASSERT(flush, (void)0);
-    stream->vtable->flush(stream);
-}
-
-/** Closes the stream and frees it's resources. **/
-PSTR_INLINE void pstream_close(pstream_t *stream) {
-    PSTREAM_ASSERT(close, (void)0);
-    return stream->vtable->close(stream);
-}
-
-/** Writes a single character to `stream`.
-    Possible error codes: PSTRING_EINVAL, PSTRING_EIO.
-**/
-PSTR_INLINE int pstream_putc(pstream_t *stream, char chr) {
-    return 1 != pstream_write(stream, &chr, 1);
-}
-
-/** Writes a null-terminated string to `stream`.
-    Possible error codes: PSTRING_EINVAL, PSTRING_EIO.
-**/
-PSTR_API int pstream_puts(pstream_t *stream, const char *str);
+PSTR_API int pf_stream_pstring(pf_stream_t *out, pstring_t *str);
 
 /** Writes a `pstring_t` to `stream`.
     Possible error codes: PSTRING_EINVAL, PSTRING_EIO.
 **/
-PSTR_API int pstream_putp(pstream_t *stream, const pstring_t *str);
-
-/** Writes to stream a string formatted as `fmt` using variable arguments.
-    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
-**/
-PSTR_API int pstream_printf(pstream_t *stream, const char *fmt, ...);
-
-/** Writes to stream a string formatted as `fmt` using variable arguments.
-    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
-**/
-PSTR_API int pstream_vprintf(pstream_t *stream, const char *fmt, va_list args);
-
-/** Writes to stream a string formatted as `fmt` using variable
-    arguments and only standard library formatting options.
-
-    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
-**/
-PSTR_API int pstream__printf(pstream_t *stream, const char *fmt, ...);
-
-/** Writes to stream a string formatted as `fmt` using variable
-    arguments and only standard library formatting options.
-
-    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
-**/
-PSTR_API int pstream__vprintf(pstream_t *stream, const char *fmt, va_list args);
+PSTR_API int pf_stream_putp(pf_stream_t *stream, const pstring_t *str);
 
 PSTR_API int pstream_save(
     const char *format,
-    pstream_t *stream,
+    pf_stream_t *stream,
     const void *obj,
     const struct pstrmodel *model
 );
 
 PSTR_API int pstream_load(
     const char *format,
-    pstream_t *stream,
+    pf_stream_t *stream,
     void *obj,
     const struct pstrmodel *model
 );
 
 PSTR_API int pstream_save_json(
-    pstream_t *stream, const void *obj, const struct pstrmodel *model
+    pf_stream_t *stream, const void *obj, const struct pstrmodel *model
 );
 
 PSTR_API int pstream_load_json(
-    pstream_t *stream, void *obj, const struct pstrmodel *model
+    pf_stream_t *stream, void *obj, const struct pstrmodel *model
 );
 
 #ifdef __cplusplus

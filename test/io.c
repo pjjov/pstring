@@ -19,6 +19,7 @@
 */
 
 #include <pf_assert.h>
+#include <pf_io.h>
 #include <pf_test.h>
 #include <pf_typeid.h>
 
@@ -32,62 +33,62 @@
 int test_io_read(int seed, int rep) {
     char buffer[BUF_SIZE];
     pstring_t *string = PSTR("Hello, world!");
-    pstream_t stream;
+    pf_stream_t stream;
 
-    pf_assert_ok(pstream_string(&stream, string));
-    pf_assert_ok(pstream_seek(&stream, 0, PSTR_SEEK_SET));
-    pf_assert(0 == pstream_tell(&stream));
+    pf_assert_ok(pf_stream_pstring(&stream, string));
+    pf_assert_ok(pf_stream_seek(&stream, 0, PSTR_SEEK_SET));
+    pf_assert(0 == pf_stream_tell(&stream));
 
-    pf_assert(5 == pstream_read(&stream, buffer, 5));
-    pf_assert(5 == pstream_tell(&stream));
+    pf_assert(5 == pf_stream_read(&stream, buffer, 5));
+    pf_assert(5 == pf_stream_tell(&stream));
     pf_assert_memcmp(buffer, pstrbuf(string), 5);
 
-    pf_assert(pstrlen(string) - 5 == pstream_read(&stream, buffer, BUF_SIZE));
-    pf_assert(pstrlen(string) == pstream_tell(&stream));
+    pf_assert(pstrlen(string) - 5 == pf_stream_read(&stream, buffer, BUF_SIZE));
+    pf_assert(pstrlen(string) == pf_stream_tell(&stream));
     pf_assert_memcmp(buffer, &pstrbuf(string)[5], pstrlen(string) - 5);
 
-    pf_assert_ok(pstream_seek(&stream, 0, PSTR_SEEK_SET));
-    pf_assert(0 == pstream_tell(&stream));
-    pf_assert(5 == pstream_read(&stream, buffer, 5));
-    pf_assert(5 == pstream_tell(&stream));
+    pf_assert_ok(pf_stream_seek(&stream, 0, PSTR_SEEK_SET));
+    pf_assert(0 == pf_stream_tell(&stream));
+    pf_assert(5 == pf_stream_read(&stream, buffer, 5));
+    pf_assert(5 == pf_stream_tell(&stream));
     pf_assert_memcmp(buffer, pstrbuf(string), 5);
 
-    pf_assert_ok(pstream_seek(&stream, -5, PSTR_SEEK_CUR));
-    pf_assert(0 == pstream_tell(&stream));
-    pf_assert_ok(pstream_seek(&stream, 0, PSTR_SEEK_END));
-    pf_assert(pstrlen(string) == pstream_tell(&stream));
+    pf_assert_ok(pf_stream_seek(&stream, -5, PSTR_SEEK_CUR));
+    pf_assert(0 == pf_stream_tell(&stream));
+    pf_assert_ok(pf_stream_seek(&stream, 0, PSTR_SEEK_END));
+    pf_assert(pstrlen(string) == pf_stream_tell(&stream));
 
-    pstream_close(&stream);
+    pf_stream_close(&stream);
     return 0;
 }
 
 int test_io_write(int seed, int rep) {
     pstring_t buffer;
     pstring_t *string = &buffer;
-    pstream_t stream;
+    pf_stream_t stream;
 
     pf_assert_ok(pstrnew(&buffer, "Hello, world!", 0, NULL));
-    pf_assert_ok(pstream_string(&stream, string));
+    pf_assert_ok(pf_stream_pstring(&stream, string));
 
-    pf_assert(3 == pstream_write(&stream, "abc", 3));
-    pf_assert(pstrlen(string) == pstream_tell(&stream));
+    pf_assert(3 == pf_stream_write(&stream, "abc", 3));
+    pf_assert(pstrlen(string) == pf_stream_tell(&stream));
     pf_assert_memcmp("abc", &pstrend(string)[-3], 3);
     pf_assert(pstrlen(string) == 16);
 
-    pf_assert_ok(pstream_seek(&stream, 0, PSTR_SEEK_SET));
-    pf_assert(0 == pstream_tell(&stream));
+    pf_assert_ok(pf_stream_seek(&stream, 0, PSTR_SEEK_SET));
+    pf_assert(0 == pf_stream_tell(&stream));
 
-    pf_assert(4 == pstream_write(&stream, "ABCD", 4));
-    pf_assert(4 == pstream_tell(&stream));
+    pf_assert(4 == pf_stream_write(&stream, "ABCD", 4));
+    pf_assert(4 == pf_stream_tell(&stream));
     pf_assert(pstrlen(string) == 16);
     pf_assert_memcmp("ABCDo, world!abc", pstrbuf(string), pstrlen(string));
 
-    pf_assert_ok(pstream_seek(&stream, -3, PSTR_SEEK_CUR));
-    pf_assert(1 == pstream_tell(&stream));
-    pf_assert_ok(pstream_seek(&stream, 0, PSTR_SEEK_END));
-    pf_assert(pstrlen(string) == pstream_tell(&stream));
+    pf_assert_ok(pf_stream_seek(&stream, -3, PSTR_SEEK_CUR));
+    pf_assert(1 == pf_stream_tell(&stream));
+    pf_assert_ok(pf_stream_seek(&stream, 0, PSTR_SEEK_END));
+    pf_assert(pstrlen(string) == pf_stream_tell(&stream));
 
-    pstream_close(&stream);
+    pf_stream_close(&stream);
     return 0;
 }
 
@@ -134,9 +135,9 @@ int test_io_json(int seed, int rep) {
     struct example dst = { 0 };
 
     pstring_t str = { 0 };
-    pstream_t base;
+    pf_stream_t base;
 
-    pf_assert_ok(pstream_string(&base, &str));
+    pf_assert_ok(pf_stream_pstring(&base, &str));
     pf_assert_ok(pstream_save_json(&base, &src, &model));
 
     pf_assert_true(pstrequals(
@@ -146,7 +147,7 @@ int test_io_json(int seed, int rep) {
         0
     ));
 
-    pf_assert_ok(pstream_seek(&base, 0, SEEK_SET));
+    pf_assert_ok(pf_stream_seek(&base, 0, SEEK_SET));
     pf_assert_ok(pstream_load_json(&base, &dst, &model));
 
     pf_assert(dst.i == 13);
@@ -158,7 +159,7 @@ int test_io_json(int seed, int rep) {
     pstrfree(&dst.pstr);
     free((void *)dst.str);
 
-    pstream_close(&base);
+    pf_stream_close(&base);
     pstrfree(&str);
     return 0;
 }

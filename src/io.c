@@ -19,9 +19,9 @@
 */
 
 #define PF_TYPE_HELPERS
+#include <pf_io.h>
 #include <pf_macro.h>
 #include <pf_typeid.h>
-#include <pstring/dictionary.h>
 #include <pstring/encoding.h>
 #include <pstring/io.h>
 #include <pstring/pstring.h>
@@ -80,28 +80,17 @@ int pstrwrite(const pstring_t *str, const char *path) {
     return PSTRING_OK;
 }
 
-int pstream_puts(pstream_t *stream, const char *str) {
-    if (!stream || !str)
-        return PSTRTHROW_EINVAL;
-    size_t length = strlen(str);
-    if (length == 0)
-        return PSTRING_OK;
-
-    size_t written = pstream_write(stream, str, length);
-    return length != written ? PSTRTHROW_EIO : PSTRING_OK;
-}
-
-int pstream_putp(pstream_t *stream, const pstring_t *str) {
+int pf_stream_putp(pf_stream_t *stream, const pstring_t *str) {
     if (!stream || !str)
         return PSTRTHROW_EINVAL;
     if (pstrlen(str) == 0)
         return PSTRING_OK;
 
-    size_t written = pstream_write(stream, pstrbuf(str), pstrlen(str));
+    size_t written = pf_stream_write(stream, pstrbuf(str), pstrlen(str));
     return pstrlen(str) != written ? PSTRTHROW_EIO : PSTRING_OK;
 }
 
-static int format_next(pstream_t *dst, const char **esc, va_list args);
+static int format_next(pf_stream_t *dst, const char **esc, va_list args);
 
 static char format_parse(const char **esc, char *buffer) {
     const char *start = *esc;
@@ -215,12 +204,12 @@ static int format_parse_enc(const char **esc, char *out, int max) {
 
 static int format_encoded(pstring_t *dst, const char **esc, va_list args) {
     pstring_t buf = { 0 };
-    pstream_t stream;
+    pf_stream_t stream;
     char format[32];
 
     if (format_parse_enc(esc, format, 32))
         return PSTRING_EINVAL;
-    pstream_string(&stream, &buf);
+    pf_stream_pstring(&stream, &buf);
 
     const char *encoding = format;
     if (0 == strcmp(format, "*"))
@@ -232,7 +221,9 @@ static int format_encoded(pstring_t *dst, const char **esc, va_list args) {
     return result;
 }
 
-static int format_std(pstream_t *dst, const char *fmt, int len, va_list args) {
+static int format_std(
+    pf_stream_t *dst, const char *fmt, int len, va_list args
+) {
     /*
         Calling `vprintf` consumes the `va_list`, causing undefined behaviour.
         To solve this, we call printf by manually passing arguments.
@@ -258,11 +249,11 @@ static int format_std(pstream_t *dst, const char *fmt, int len, va_list args) {
     /* clang-format off */
 
 #define PRINTF_2(TYPE) \
-    result = pstream__printf(dst, fmt, width, prec, va_arg(args, TYPE))
+    result = pf_stream_printf(dst, fmt, width, prec, va_arg(args, TYPE))
 #define PRINTF_1(TYPE) \
-    result = pstream__printf(dst, fmt, width, va_arg(args, TYPE))
+    result = pf_stream_printf(dst, fmt, width, va_arg(args, TYPE))
 #define PRINTF_0(TYPE) \
-    result = pstream__printf(dst, fmt, va_arg(args, TYPE))
+    result = pf_stream_printf(dst, fmt, va_arg(args, TYPE))
 
 #define SWITCH(X)                           \
     switch (type) {                         \
@@ -309,14 +300,14 @@ static int format_std(pstream_t *dst, const char *fmt, int len, va_list args) {
     return result;
 }
 
-static int format_next(pstream_t *dst, const char **esc, va_list args) {
+static int format_next(pf_stream_t *dst, const char **esc, va_list args) {
     char format[32];
     int len = format_parse(esc, format);
 
     switch (format[len - 1]) {
     case 'P': {
         pstring_t *arg = va_arg(args, pstring_t *);
-        size_t written = pstream_write(dst, pstrbuf(arg), pstrlen(arg));
+        size_t written = pf_stream_write(dst, pstrbuf(arg), pstrlen(arg));
         return written == pstrlen(arg) ? PSTRING_OK : PSTRING_EIO;
     }
 
@@ -333,7 +324,7 @@ static int format_next(pstream_t *dst, const char **esc, va_list args) {
 
         int result = format_encoded(&enc, esc, args);
         if (result == PSTRING_OK)
-            pstream_putp(dst, &enc);
+            pf_stream_putp(dst, &enc);
 
         pstrfree(&enc);
         return result;
@@ -348,7 +339,7 @@ static int format_next(pstream_t *dst, const char **esc, va_list args) {
             return PSTRING_EINVAL;
 
         size_t fmtlen = pstr__nlen(buffer, 256);
-        size_t written = pstream_write(dst, buffer, fmtlen);
+        size_t written = pf_stream_write(dst, buffer, fmtlen);
         return written == fmtlen ? PSTRING_OK : PSTRING_EIO;
     }
 
@@ -363,7 +354,7 @@ static int format_next(pstream_t *dst, const char **esc, va_list args) {
         format[len - 1] = 'l';
         format[len] = 'l';
         format[len + 1] = 'u';
-        return pstream__printf(dst, format, value);
+        return pf_stream_printf(dst, format, value);
     }
 
     case 'I': {
@@ -377,7 +368,7 @@ static int format_next(pstream_t *dst, const char **esc, va_list args) {
         format[len - 1] = 'l';
         format[len] = 'l';
         format[len + 1] = 'd';
-        return pstream__printf(dst, format, value);
+        return pf_stream_printf(dst, format, value);
     }
 
     default:
@@ -391,14 +382,14 @@ int pstrfmtv(pstring_t *dst, const char *fmt, va_list args) {
     if (!dst || !fmt)
         return PSTRTHROW_EINVAL;
 
-    pstream_t stream;
-    if (pstream_string(&stream, dst))
+    pf_stream_t stream;
+    if (pf_stream_pstring(&stream, dst))
         return PSTRTHROW_EINVAL;
 
     size_t original = pstrlen(dst);
     int rc;
 
-    if ((rc = pstream_vprintf(&stream, fmt, args))) {
+    if ((rc = pstrvfprintf(&stream, fmt, args))) {
         pstr__setlen(dst, original);
         return PSTRTHROW(rc, NULL);
     }
@@ -423,12 +414,12 @@ int pstrprintf(const char *fmt, ...) {
 }
 
 int pstrvprintf(const char *fmt, va_list args) {
-    pstream_t stream;
+    pf_stream_t stream;
 
-    if (pstream_file(&stream, stdout))
+    if (pf_stream_file(&stream, stdout))
         return PSTRTHROW_EINVAL;
 
-    return pstream_vprintf(&stream, fmt, args);
+    return pstrvfprintf(&stream, fmt, args);
 }
 
 int pstrerrorf(const char *fmt, ...) {
@@ -440,30 +431,30 @@ int pstrerrorf(const char *fmt, ...) {
 }
 
 int pstrverrorf(const char *fmt, va_list args) {
-    pstream_t stream;
+    pf_stream_t stream;
 
-    if (pstream_file(&stream, stderr))
+    if (pf_stream_file(&stream, stderr))
         return PSTRTHROW_EINVAL;
 
-    return pstream_vprintf(&stream, fmt, args);
+    return pstrvfprintf(&stream, fmt, args);
 }
 
-int pstream_printf(pstream_t *stream, const char *fmt, ...) {
+int pstrfprintf(pf_stream_t *stream, const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
-    int result = pstream_vprintf(stream, fmt, args);
+    int result = pstrvfprintf(stream, fmt, args);
     va_end(args);
     return result;
 }
 
-int pstream_vprintf(pstream_t *stream, const char *fmt, va_list args) {
+int pstrvfprintf(pf_stream_t *stream, const char *fmt, va_list args) {
     if (!stream || !fmt)
         return PSTRTHROW_EINVAL;
 
     const char *prev = fmt;
     const char *match = fmt;
     while ((match = strchr(prev, '%'))) {
-        pstream_write(stream, prev, match - prev);
+        pf_stream_write(stream, prev, match - prev);
 
         if (format_next(stream, &match, args))
             return PSTRTHROW_EINVAL;
@@ -471,7 +462,7 @@ int pstream_vprintf(pstream_t *stream, const char *fmt, va_list args) {
         prev = match;
     }
 
-    pstream_write(stream, prev, strlen(prev));
+    pf_stream_write(stream, prev, strlen(prev));
     return PSTRING_OK;
 }
 
@@ -513,109 +504,7 @@ int pstrio_printf(pstring_t *dst, const char *fmt, ...) {
     return result;
 }
 
-int pstream__printf(pstream_t *stream, const char *fmt, ...) {
-    va_list args;
-
-    va_start(args, fmt);
-    int res = pstream__vprintf(stream, fmt, args);
-    va_end(args);
-
-    return res;
-}
-
-int pstream__vprintf(pstream_t *stream, const char *fmt, va_list args) {
-    if (!stream || !fmt)
-        return PSTRTHROW_EINVAL;
-
-    char buffer[PRINTF_BUFFER_SIZE];
-
-    int res = vsnprintf(buffer, PRINTF_BUFFER_SIZE, fmt, args);
-
-    if (res >= PRINTF_BUFFER_SIZE)
-        return PSTRTHROW_ENOMEM;
-
-    if (res < 0 || res != pstream_write(stream, buffer, res))
-        return PSTRTHROW_EIO;
-
-    return PSTRING_OK;
-}
-
-int pstream_init(pstream_t *out, const struct pstream_vt *vtable) {
-    if (!out || !vtable)
-        return PSTRTHROW_EINVAL;
-
-    int fail = PSTRING_FALSE;
-    fail |= !vtable->read;
-    fail |= !vtable->write;
-    fail |= !vtable->tell;
-    fail |= !vtable->seek;
-    fail |= !vtable->flush;
-    fail |= !vtable->close;
-
-    out->vtable = vtable;
-    return fail ? PSTRTHROW_EINVAL : PSTRING_OK;
-}
-
-int pstream_open(pstream_t *out, const char *path, const char *mode) {
-    if (!out || !path || !mode)
-        return PSTRTHROW_EINVAL;
-
-    FILE *file = fopen(path, mode);
-    if (pstream_file(out, file))
-        return PSTRING_EIO;
-
-    return PSTRING_OK;
-}
-
-static size_t file_read(pstream_t *stream, void *buffer, size_t size) {
-    FILE *file = stream->state.ptr[0];
-    return fread(buffer, 1, size, file);
-}
-
-static size_t file_write(pstream_t *stream, const void *buffer, size_t size) {
-    FILE *file = stream->state.ptr[0];
-    return fwrite(buffer, 1, size, file);
-}
-
-static int file_seek(pstream_t *stream, long offset, int origin) {
-    FILE *file = stream->state.ptr[0];
-    return fseek(file, offset, origin);
-}
-
-static size_t file_tell(pstream_t *stream) {
-    FILE *file = stream->state.ptr[0];
-    return ftell(file);
-}
-
-static void file_flush(pstream_t *stream) {
-    FILE *file = stream->state.ptr[0];
-    fflush(file);
-}
-
-static void file_close(pstream_t *stream) {
-    FILE *file = stream->state.ptr[0];
-    fclose(file);
-}
-
-int pstream_file(pstream_t *out, FILE *file) {
-    if (!out || !file)
-        return PSTRTHROW_EINVAL;
-
-    static const struct pstream_vt vtable = {
-        .read = file_read,
-        .write = file_write,
-        .tell = file_tell,
-        .seek = file_seek,
-        .flush = file_flush,
-        .close = file_close,
-    };
-
-    out->vtable = &vtable;
-    out->state.ptr[0] = file;
-    return PSTRING_OK;
-}
-
-static size_t str_read(pstream_t *stream, void *buffer, size_t size) {
+static size_t str_read(pf_stream_t *stream, void *buffer, size_t size) {
     pstring_t *str = stream->state.ptr[0];
     size_t index = (uintptr_t)stream->state.ptr[1];
 
@@ -630,7 +519,7 @@ static size_t str_read(pstream_t *stream, void *buffer, size_t size) {
     return size;
 }
 
-static size_t str_write(pstream_t *stream, const void *buffer, size_t size) {
+static size_t str_write(pf_stream_t *stream, const void *buffer, size_t size) {
     pstring_t *str = stream->state.ptr[0];
     size_t index = (uintptr_t)stream->state.ptr[1];
     size_t left = pstrcap(str) - index;
@@ -649,7 +538,7 @@ static size_t str_write(pstream_t *stream, const void *buffer, size_t size) {
     return size;
 }
 
-static int str_seek(pstream_t *stream, long offset, int origin) {
+static int str_seek(pf_stream_t *stream, long offset, int origin) {
     pstring_t *str = stream->state.ptr[0];
     size_t index = (uintptr_t)stream->state.ptr[1];
     size_t result;
@@ -679,20 +568,20 @@ static int str_seek(pstream_t *stream, long offset, int origin) {
     return PSTRING_OK;
 }
 
-static size_t str_tell(pstream_t *stream) {
+static size_t str_tell(pf_stream_t *stream) {
     return (uintptr_t)stream->state.ptr[1];
 }
 
-static void str_flush(pstream_t *stream) {
+static void str_flush(pf_stream_t *stream) {
     /* nothing to flush or close */
     return;
 }
 
-int pstream_string(pstream_t *out, pstring_t *str) {
+int pf_stream_pstring(pf_stream_t *out, pstring_t *str) {
     if (!out || !str)
         return PSTRTHROW_EINVAL;
 
-    static const struct pstream_vt vtable = {
+    static const struct pf_stream_vt vtable = {
         .read = str_read,
         .write = str_write,
         .tell = str_tell,
@@ -701,7 +590,9 @@ int pstream_string(pstream_t *out, pstring_t *str) {
         .close = str_flush,
     };
 
-    out->vtable = &vtable;
+    if (pf_stream_init(out, &vtable))
+        return PSTRTHROW_ENOSYS;
+
     out->state.ptr[0] = str;
     out->state.ptr[1] = (void *)(uintptr_t)pstrlen(str);
     return PSTRING_OK;
@@ -725,7 +616,7 @@ static int find_format(const char *name) {
 
 int pstream_save(
     const char *format,
-    pstream_t *stream,
+    pf_stream_t *stream,
     const void *obj,
     const struct pstrmodel *model
 ) {
@@ -743,7 +634,7 @@ int pstream_save(
 
 int pstream_load(
     const char *format,
-    pstream_t *stream,
+    pf_stream_t *stream,
     void *obj,
     const struct pstrmodel *model
 ) {

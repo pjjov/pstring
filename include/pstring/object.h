@@ -51,8 +51,8 @@ extern "C" {
 #include <stddef.h>
 typedef struct allocator_t allocator_t;
 typedef struct pstring_t pstring_t;
-typedef struct pstream_t pstream_t;
 typedef struct pstrobj_t pstrobj_t;
+typedef struct pf_stream_t pf_stream_t;
 
 /* Copied to avoid header inclusion for inline functions */
 enum pstrobj_error {
@@ -99,8 +99,8 @@ struct pstrobj_t {
     } as;
 };
 
-typedef pstrobj_t *(pstrobj_load_fn)(pstream_t * stream, allocator_t *alloc);
-typedef int(pstrobj_save_fn)(pstrobj_t *obj, pstream_t *stream);
+typedef pstrobj_t *(pstrobj_load_fn)(pf_stream_t * stream, allocator_t *alloc);
+typedef int(pstrobj_save_fn)(pstrobj_t *obj, pf_stream_t *stream);
 
 /** Allocates a new object with NULL type. **/
 PSTR_API pstrobj_t *pstrobj_new(allocator_t *allocator);
@@ -112,12 +112,14 @@ PSTR_API pstrobj_t *pstrobj_from_buffer(
 
 /** Loads an object in `format` by reading from `stream`. **/
 PSTR_API pstrobj_t *pstrobj_from_stream(
-    const char *format, pstream_t *stream, allocator_t *allocator
+    const char *format, pf_stream_t *stream, allocator_t *allocator
 );
 PSTR_API pstrobj_t *pstrobj_load_json(
-    pstream_t *stream, allocator_t *allocator
+    pf_stream_t *stream, allocator_t *allocator
 );
-PSTR_API pstrobj_t *pstrobj_load_xml(pstream_t *stream, allocator_t *allocator);
+PSTR_API pstrobj_t *pstrobj_load_xml(
+    pf_stream_t *stream, allocator_t *allocator
+);
 
 /** Loads an object in `format` by reading from the file at `path`. **/
 PSTR_API pstrobj_t *pstrobj_from_path(
@@ -131,9 +133,9 @@ PSTR_API int pstrobj_to_buffer(
 
 /** Saves an object in `format` by writing to `stream`. **/
 PSTR_API int pstrobj_to_stream(
-    pstrobj_t *obj, const char *format, pstream_t *stream
+    pstrobj_t *obj, const char *format, pf_stream_t *stream
 );
-PSTR_API int pstrobj_save_json(pstrobj_t *obj, pstream_t *stream);
+PSTR_API int pstrobj_save_json(pstrobj_t *obj, pf_stream_t *stream);
 
 /** Saves an object as an XML document by writing to `stream`.
 
@@ -145,7 +147,7 @@ PSTR_API int pstrobj_save_json(pstrobj_t *obj, pstream_t *stream);
     element. This is the same convention most JSON&lt;-&gt;XML converters
     use, and is reversed exactly by `pstrobj_load_xml`.
 **/
-PSTR_API int pstrobj_save_xml(pstrobj_t *obj, pstream_t *stream);
+PSTR_API int pstrobj_save_xml(pstrobj_t *obj, pf_stream_t *stream);
 
 /** Frees object and it's children if it's detached. **/
 PSTR_API void pstrobj_free(pstrobj_t *obj);

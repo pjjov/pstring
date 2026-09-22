@@ -24,6 +24,7 @@
 
 #include <allocator.h>
 #include <allocator_std.h>
+#include <pf_io.h>
 #include <pf_macro.h>
 
 #define PSTROBJ_BUFFER(x, NAME)                            \
@@ -86,13 +87,13 @@ pstrobj_t *pstrobj_from_buffer(
     if (!format || !source)
         return PSTRTHROW_NULL(PSTRING_EINVAL);
 
-    pstream_t stream;
-    if (pstream_string(&stream, source))
+    pf_stream_t stream;
+    if (pf_stream_pstring(&stream, source))
         return NULL;
 
-    pstream_seek(&stream, 0, PSTR_SEEK_SET);
+    pf_stream_seek(&stream, 0, PSTR_SEEK_SET);
     pstrobj_t *res = pstrobj_from_stream(format, &stream, allocator);
-    pstream_close(&stream);
+    pf_stream_close(&stream);
 
     return res;
 }
@@ -100,12 +101,12 @@ pstrobj_t *pstrobj_from_buffer(
 pstrobj_t *pstrobj_from_path(
     const char *format, const char *path, allocator_t *allocator
 ) {
-    pstream_t stream;
-    if (pstream_open(&stream, path, "rb"))
+    pf_stream_t stream;
+    if (pf_stream_open(&stream, path, "rb"))
         return NULL;
 
     pstrobj_t *res = pstrobj_from_stream(format, &stream, allocator);
-    pstream_close(&stream);
+    pf_stream_close(&stream);
     return res;
 }
 
@@ -113,12 +114,12 @@ int pstrobj_to_buffer(pstrobj_t *obj, const char *format, pstring_t *source) {
     if (!obj || !format || !source)
         return PSTRTHROW_EINVAL;
 
-    pstream_t stream;
-    if (pstream_string(&stream, source))
+    pf_stream_t stream;
+    if (pf_stream_pstring(&stream, source))
         return PSTRING_EINVAL;
 
     int res = pstrobj_to_stream(obj, format, &stream);
-    pstream_close(&stream);
+    pf_stream_close(&stream);
 
     return res;
 }
@@ -141,7 +142,7 @@ static int find_format(const char *name) {
 }
 
 pstrobj_t *pstrobj_from_stream(
-    const char *format, pstream_t *stream, allocator_t *allocator
+    const char *format, pf_stream_t *stream, allocator_t *allocator
 ) {
     if (!format || !stream)
         return PSTRTHROW_NULL(PSTRING_EINVAL);
@@ -155,7 +156,7 @@ pstrobj_t *pstrobj_from_stream(
     return result ? result : PSTRTHROW_NULL(PSTRING_EOBJECT);
 }
 
-int pstrobj_to_stream(pstrobj_t *obj, const char *format, pstream_t *stream) {
+int pstrobj_to_stream(pstrobj_t *obj, const char *format, pf_stream_t *stream) {
     if (!format || !obj || !stream)
         return PSTRTHROW_EINVAL;
 
