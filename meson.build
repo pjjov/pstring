@@ -24,7 +24,6 @@ src = [
     'src/global.c',
     'src/io.c',
     'src/object.c',
-    'src/pattern.c',
     'src/search.c',
     'src/simd.c',
     'src/transform.c',
@@ -72,7 +71,6 @@ install_headers(
     'include/pstring/glob.h',
     'include/pstring/io.h',
     'include/pstring/object.h',
-    'include/pstring/pattern.h',
     'include/pstring/pstring.h',
     'include/pstring/search.h',
     'include/pstring/transform.h',
@@ -95,7 +93,6 @@ if not meson.is_subproject()
             'test/encoding.c',
             'test/io.c',
             'test/main.c',
-            'test/pattern.c',
             'test/pstring.c',
         ]
     )

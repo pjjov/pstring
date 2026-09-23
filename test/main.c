@@ -25,7 +25,6 @@
 extern const pf_test_t suite_pstring[];
 extern const pf_test_t suite_encoding[];
 extern const pf_test_t suite_io[];
-extern const pf_test_t suite_pattern[];
 
 /* clang-format on */
 
@@ -34,7 +33,6 @@ int main(int argc, char *argv[]) {
         { "core", 1, suite_pstring },
         { "encoding", 1, suite_encoding },
         { "io", 1, suite_io },
-        { "pattern", 1, suite_pattern },
         { 0 },
     };
 
