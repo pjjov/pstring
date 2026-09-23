@@ -329,6 +329,7 @@ void pstrobj__set_string(pstrobj_t *obj, pstring_t *str) {
     if (!obj || !str)
         return;
 
+    obj->type = PSTROBJ_STRING;
     obj->as.string = PSTROBJ_BUFFER(obj, str);
     *obj->as.string = *str;
 }

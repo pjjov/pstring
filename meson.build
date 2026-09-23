@@ -91,9 +91,13 @@ if not meson.is_subproject()
         dependencies: [pstring_dep, cpolyfill_dep],
         sources: [
             'test/encoding.c',
+            'test/eval.c',
+            'test/glob.c',
             'test/io.c',
             'test/main.c',
+            'test/object.c',
             'test/pstring.c',
+            'test/wordexp.c',
         ]
     )
 
