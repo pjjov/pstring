@@ -1,4 +1,11 @@
-#include <pstring/pstring.h>
+/*  pstring - fully-featured string library for C
+
+    Copyright 2025-2026 Предраг Јовановић
+    SPDX-FileCopyrightText: 2025-2026 Предраг Јовановић
+    SPDX-License-Identifier: Apache-2.0
+*/
+
+#include <pstring/core.h>
 
 #if __STDC_VERSION__ >= 201112L && !defined(__STDC_NO_THREADS__)
     #define THREADS_STD

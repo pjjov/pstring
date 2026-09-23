@@ -18,9 +18,13 @@
     limitations under the License.
 */
 
+#include <pstring/core.h>
 #include <pstring/eval.h>
+#include <pstring/format.h>
 #include <pstring/glob.h>
-#include <pstring/pstring.h>
+#include <pstring/search.h>
+#include <pstring/transform.h>
+#include <pstring/wordexp.h>
 
 #include <stdalign.h>
 #include <stdio.h>

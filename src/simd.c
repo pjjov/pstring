@@ -18,7 +18,8 @@
     limitations under the License.
 */
 
-#include <pstring/pstring.h>
+#include <pstring/core.h>
+#include <pstring/search.h>
 
 #include <pf_bitwise.h>
 #include <pf_macro.h>

@@ -8,17 +8,13 @@
 #ifndef PSTRING_GLOB_H
 #define PSTRING_GLOB_H
 
-#include <pstring/pstring.h>
+#include <pstring/core.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/** ## NAME
-
-    **pstring-glob** - cross-platform filename globbing.
-
-    ## DESCRIPTION
+/** Module: Cross-platform filename globbing.
 
     `pstrglob_match` implements POSIX `fnmatch(3)` style matching of a single
     name against a pattern (`*`, `?`, `[...]`, and `[!...]`/`[^...]`), with
@@ -32,10 +28,6 @@ extern "C" {
     are collected depth-first, so a pattern with multiple wildcard segments
     (e.g. `src` then `*` then `*.c`) works the same way it would in a
     POSIX shell.
-
-    [TOC]
-
-    ## REFERENCE
 **/
 
 enum pstrglob_flag {

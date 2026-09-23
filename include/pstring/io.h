@@ -29,6 +29,9 @@
     #define PSTR_API
 #endif
 
+#include <stddef.h>
+#include <stdio.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -52,14 +55,10 @@ extern "C" {
     ## REFERENCE
 **/
 
-#include <stdarg.h>
-#include <stddef.h>
-#include <stdio.h>
+/* Forward declarations */
 typedef struct allocator_t allocator_t;
 typedef struct pstring_t pstring_t;
 typedef struct pf_stream_t pf_stream_t;
-
-#define PSTREAM_STATE_SIZE 24
 
 enum pstream_origin {
     PSTR_SEEK_SET,
@@ -79,6 +78,16 @@ enum pstring_typeid {
     PSTRMODEL__END,
 };
 
+/** Concatenates the contents of the file onto the end of `out`.
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM, PSTRING_EIO.
+**/
+PSTR_API int pstrreadall(pstring_t *out, const char *path);
+
+/** Writes the entire string `out` to the file at `path`.
+    Possible error codes: PSTRING_EINVAL, PSTRING_EIO.
+**/
+PSTR_API int pstrwriteall(const pstring_t *str, const char *path);
+
 /** Concatenates string formated by standard library functions to `dst`.
     Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM, PSTRING_EIO.
 **/
@@ -89,9 +98,6 @@ PSTR_API int pstrio_printf(pstring_t *dst, const char *fmt, ...);
     Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM, PSTRING_EIO.
 **/
 PSTR_API int pstrio_vprintf(pstring_t *dst, const char *fmt, va_list args);
-
-PSTR_API int pstrfprintf(pf_stream_t *stream, const char *fmt, ...);
-PSTR_API int pstrvfprintf(pf_stream_t *stream, const char *fmt, va_list args);
 
 struct pstrmodel_array {
     size_t stride;

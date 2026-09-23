@@ -5,8 +5,8 @@
     SPDX-License-Identifier: Apache-2.0
 */
 
+#include <pstring/core.h>
 #include <pstring/glob.h>
-#include <pstring/pstring.h>
 
 #include <stdio.h>
 #include <stdlib.h>

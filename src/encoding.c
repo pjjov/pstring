@@ -18,8 +18,8 @@
     limitations under the License.
 */
 
+#include <pstring/core.h>
 #include <pstring/encoding.h>
-#include <pstring/pstring.h>
 
 #include <string.h>
 

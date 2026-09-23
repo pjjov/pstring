@@ -16,15 +16,18 @@ src = [
     'src/encoding/xml.c',
     'src/format/json.c',
     'src/format/xml.c',
+    'src/core.c',
     'src/encoding.c',
-    'src/global.c',
-    'src/glob.c',
     'src/eval.c',
+    'src/format.c',
+    'src/glob.c',
+    'src/global.c',
     'src/io.c',
     'src/object.c',
     'src/pattern.c',
-    'src/pstring.c',
+    'src/search.c',
     'src/simd.c',
+    'src/transform.c',
     'src/wordexp.c',
 ]
 
@@ -62,13 +65,18 @@ pstring_dep = declare_dependency(
 meson.override_dependency('pstring', pstring_dep)
 
 install_headers(
+    'include/pstring/core.h',
     'include/pstring/encoding.h',
     'include/pstring/eval.h',
+    'include/pstring/format.h',
     'include/pstring/glob.h',
     'include/pstring/io.h',
     'include/pstring/object.h',
     'include/pstring/pattern.h',
     'include/pstring/pstring.h',
+    'include/pstring/search.h',
+    'include/pstring/transform.h',
+    'include/pstring/wordexp.h',
     subdir: 'pstring'
 )
 

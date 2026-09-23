@@ -18,9 +18,11 @@
     limitations under the License.
 */
 
+#include <pstring/core.h>
 #include <pstring/io.h>
 #include <pstring/object.h>
-#include <pstring/pstring.h>
+#include <pstring/search.h>
+#include <pstring/transform.h>
 
 #include <allocator.h>
 #include <allocator_std.h>

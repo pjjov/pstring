@@ -29,12 +29,14 @@
     #define PSTR_API
 #endif
 
+#include <stddef.h>
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#include <stddef.h>
-#include <stdint.h>
+/* Forward declarations */
 typedef struct pstring_t pstring_t;
 
 /** ## NAME

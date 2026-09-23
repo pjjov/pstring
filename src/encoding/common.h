@@ -8,8 +8,9 @@
 #ifndef PSTRING_ENCODING_COMMON_H
 #define PSTRING_ENCODING_COMMON_H
 
+#include <pstring/core.h>
 #include <pstring/encoding.h>
-#include <pstring/pstring.h>
+#include <pstring/search.h>
 
 #include <stdint.h>
 #include <string.h> /* IWYU pragma: keep */

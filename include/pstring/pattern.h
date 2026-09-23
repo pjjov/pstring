@@ -21,10 +21,34 @@
 #ifndef PSTRING_PATTERN_H
 #define PSTRING_PATTERN_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct allocator_t allocator_t;
 typedef struct pstrexpr_t pstrexpr_t;
+typedef struct pstring_t pstring_t;
+
+/** ## NAME
+
+**pstring-pattern** - pattern matching functions for the **pstrings**.
+
+## DESCRIPTION
+
+[TOC]
+
+## REFERENCE
+**/
 
 pstrexpr_t *pstrexpr_new(const char *pattern, allocator_t *allocator);
 void pstrexpr_free(pstrexpr_t *expr);
+
+int pstrexpr_match(
+    const pstrexpr_t *expr, const pstring_t *string, pstring_t *capture
+);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
