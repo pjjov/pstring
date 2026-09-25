@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: 2025-2026 Предраг Јовановић
 # SPDX-License-Identifier: Apache-2.0
 
-project('pstring', 'c')
+project('pstring', 'c', version: '1.4')
 
 src = [
     'src/encoding/base32.c',
