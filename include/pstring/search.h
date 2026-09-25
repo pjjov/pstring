@@ -8,6 +8,8 @@
 #ifndef PSTRING_SEARCH_H
 #define PSTRING_SEARCH_H
 
+/** Module: Search functions for pstrings. */
+
 #ifndef PSTR_API
     #define PSTR_API
 #endif
@@ -25,7 +27,7 @@ typedef struct pstring_t pstring_t;
     returning it's address if found and `NULL` otherwise.
 
     The `pstrrchr` variant searches from the end instead.
-**/
+*/
 PSTR_API char *pstrchr(const pstring_t *str, int ch);
 PSTR_API char *pstrrchr(const pstring_t *str, int ch);
 
@@ -36,7 +38,7 @@ PSTR_API char *pstrrchr(const pstring_t *str, int ch);
 
     `pstrcpbrk` and `pstrrcpbrk` variants search for a character that is not
     found in `set` returning it's address if found and `NULL` otherwise.
-**/
+*/
 PSTR_API char *pstrpbrk(const pstring_t *str, const char *set);
 PSTR_API char *pstrcpbrk(const pstring_t *str, const char *set);
 PSTR_API char *pstrrpbrk(const pstring_t *str, const char *set);
@@ -49,7 +51,7 @@ PSTR_API char *pstrrcpbrk(const pstring_t *str, const char *set);
 
     `pstrcspn` and `pstrrcspn` variants count the number of consecutive
     characters that aren't included in `set`, from start and end respectively.
-**/
+*/
 PSTR_API size_t pstrspn(const pstring_t *str, const char *set);
 PSTR_API size_t pstrcspn(const pstring_t *str, const char *set);
 PSTR_API size_t pstrrspn(const pstring_t *str, const char *set);
@@ -57,7 +59,7 @@ PSTR_API size_t pstrrcspn(const pstring_t *str, const char *set);
 
 /** Searches for `sub` inside `str`, returning the address of the
     first character of the first match, or `NULL` if not found.
-**/
+*/
 PSTR_API char *pstrstr(const pstring_t *str, const pstring_t *sub);
 
 /** Tokenizes input string `src` into a sequence of tokens separated by
@@ -69,8 +71,8 @@ PSTR_API char *pstrstr(const pstring_t *str, const pstring_t *sub);
     The next token is started at the first character not found in `set` and
     ends in the first character that is found in `set`, or the end of `src`.
 
-    Possible error codes: PSTRING_EINVAL, PSTRING_ENOENT.
-**/
+    Errors: EINVAL, ENOENT.
+*/
 PSTR_API int pstrtok(pstring_t *dst, const pstring_t *src, const char *set);
 
 /** Tokenizes input string `src` into a sequence of tokens separated by
@@ -83,8 +85,8 @@ PSTR_API int pstrtok(pstring_t *dst, const pstring_t *src, const char *set);
     for the next token. This behaviour can be suprising when using  different
     separators between function calls.
 
-    Possible error codes: PSTRING_EINVAL, PSTRING_ENOENT.
-**/
+    Errors: EINVAL, ENOENT.
+*/
 PSTR_API int pstrsplit(
     pstring_t *dst, const pstring_t *src, const pstring_t *sep
 );

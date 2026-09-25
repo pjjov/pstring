@@ -53,7 +53,7 @@
     "quoting is on/off here" rather than as literal text, so IFS
     whitespace between the marks is no longer mistaken for a field
     separator, and strips the marks back out once a field's boundaries
-    have been decided. **/
+    have been decided. */
 #define PSTR_QUOTE_MARK '\x01'
 
 typedef PF_ARRAY(pstring_t) words_t;
@@ -278,7 +278,7 @@ static int expand_single_quote(pstring_t *dst, pstring_t *src) {
     - `'` is an ordinary character,
     - `\\` only escapes `$`, `` ` ``, `"`, `\\` and a following newline
       (which it deletes, i.e. a line continuation); any other `\\x` is
-      copied through literally, backslash included. **/
+      copied through literally, backslash included. */
 static int expand_double_quote(expand_state_t *state) {
     pstring_t *dst = state->dst;
     pstring_t *src = state->src;
@@ -578,7 +578,7 @@ static int fs_skip_ws(split_state_t *state) {
 }
 
 /** True if `c` is one of the characters in `state->ifs` (the whole set,
-    whitespace or not). **/
+    whitespace or not). */
 static int is_ifs_char(split_state_t *state, char c) {
     for (const char *p = pstrbuf(&state->ifs); *p; p++)
         if (*p == c)
@@ -592,7 +592,7 @@ static int is_ifs_char(split_state_t *state, char c) {
     ever treating a mark itself as a delimiter. Returns a pointer to
     that character, or NULL if the rest of `src` has no such
     delimiter -- meaning whatever quoted whitespace it contains, if
-    any, is protected and belongs to a single field. **/
+    any, is protected and belongs to a single field. */
 static const char *find_delim(split_state_t *state, pstring_t *src) {
     int inQuote = 0;
 
@@ -610,7 +610,7 @@ static const char *find_delim(split_state_t *state, pstring_t *src) {
 
 /** Copies [start,end) to `dst`, dropping every `PSTR_QUOTE_MARK` byte
     -- the marks have already done their job of protecting this field's
-    text from being split on, and must not leak into the final word. **/
+    text from being split on, and must not leak into the final word. */
 static int strip_marks(pstring_t *dst, const char *start, const char *end) {
     int rc = PSTRING_OK;
 
@@ -697,7 +697,7 @@ static void words_free(words_t *words) {
     0`) or a single `'...'`/`"..."` pair including its delimiters
     (`quoted == 1`). Used by `brace_expand_word` to keep brace
     expansion from reaching into quoted text, matching the shell rule
-    that `'{a,b}'` is not a brace expression. **/
+    that `'{a,b}'` is not a brace expression. */
 typedef struct {
     const char *start;
     const char *end;
@@ -711,7 +711,7 @@ typedef PF_ARRAY(word_span_t) word_spans_t;
     quoted, not decode their contents (that's `expand_string`'s job,
     which still runs on each brace alternative afterwards) -- so it
     only has to agree with `check_invalid_chars` about where quotes
-    start and end, including the same backslash-escaping rules. **/
+    start and end, including the same backslash-escaping rules. */
 static int split_quote_spans(pstring_t *src, word_spans_t *spans) {
     const char *end = pstrend(src);
     const char *segStart = pstrbuf(src);
@@ -780,7 +780,7 @@ static int split_quote_spans(pstring_t *src, word_spans_t *spans) {
     single, unexpanded alternative each -- `'{a,b}'` is not a brace
     expression -- while every unquoted span is expanded with the
     public `pstrbrace`; the whole word's alternatives are the cross
-    product of every span's alternatives, in order. **/
+    product of every span's alternatives, in order. */
 static int brace_expand_word(words_t *out, pstring_t *src, allocator_t *arena) {
     word_spans_t spans;
     PF_ARRAY_WITH_ALLOCATOR(&spans, arena);
@@ -863,7 +863,7 @@ static int brace_expand_word(words_t *out, pstring_t *src, allocator_t *arena) {
     expand_pathname, appending the results to `result`. This is what
     `expand_with` used to do directly, before brace expansion was
     inserted as a preprocessing step that can turn one raw word into
-    several of these. **/
+    several of these. */
 static int expand_one_word(
     pstrexpand_t *handler,
     allocator_t *arena,
@@ -912,7 +912,7 @@ static int expand_one_word(
 /** Brace-expands `src` (see `brace_expand_word`) and then runs each
     resulting alternative through `expand_one_word`, appending all of
     their results to `result` in order. This is the top-level per-word
-    expansion entry point `pstrexpand_with` calls. **/
+    expansion entry point `pstrexpand_with` calls. */
 static int expand_with(
     pstrexpand_t *handler, allocator_t *arena, words_t *result, pstring_t *src
 ) {
@@ -989,7 +989,7 @@ static int default_expand_pid(pstring_t *out) {
     and appends its standard output to `out`, with the trailing run of
     newlines stripped -- matching POSIX command substitution, which
     always removes trailing newlines (but nothing else) from the
-    captured output. **/
+    captured output. */
 static int default_expand_command(pstring_t *out, const pstring_t *cmd) {
     /* `cmd` is a slice into the word currently being expanded, not an
        owned string -- `pstrunwrap` hands back ownership of an existing
@@ -1035,7 +1035,7 @@ static int default_expand_command(pstring_t *out, const pstring_t *cmd) {
     allows) are intentionally not re-run here: `pstreval`'s own
     identifier resolution already covers the common case of referencing
     a variable by name, which is what shell arithmetic almost always
-    does in practice. **/
+    does in practice. */
 static int arith_get(long long *out, const pstring_t *name, void *user) {
     (void)user;
     pstring_t value;
@@ -1076,7 +1076,7 @@ static int default_expand_arithmetic(pstring_t *out, pstring_t *expr) {
     prefix-of-a-glob matcher. If nothing matches at all -- including
     the empty slice, which is what makes `${var#*}` a no-op, since `*`
     matches zero characters too -- `value` is returned unchanged, same
-    as a real shell. **/
+    as a real shell. */
 static int default_expand_trim(pstring_t *out, const pstrexpand_trim_t *req) {
     char patBuf[256];
     const char *pattern = pstrterms(req->pattern, patBuf, sizeof(patBuf));
@@ -1128,7 +1128,7 @@ static int default_expand_trim(pstring_t *out, const pstrexpand_trim_t *req) {
     `${var#pattern}`/`${var##pattern}` (strip the shortest/longest
     matching prefix) and `${var%pattern}`/`${var%%pattern}` (strip the
     shortest/longest matching suffix). Nested `$`/backtick expansion
-    inside `word`/`pattern` is deliberately not attempted. **/
+    inside `word`/`pattern` is deliberately not attempted. */
 static int default_expand_brace(pstring_t *out, pstring_t *body, int flags) {
     int wantLength = pstrget(body, 0) == '#';
     if (wantLength)

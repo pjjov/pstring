@@ -32,7 +32,7 @@ extern "C" {
 typedef struct pstring_t pstring_t;
 
 /** Concatenates `src` onto the end of `dst`.
-    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
+    Errors: EINVAL, ENOMEM.
 */
 PSTR_API int pstrcat(pstring_t *dst, const pstring_t *src);
 PSTR_API int pstrcats(pstring_t *dst, const char *src, size_t length);
@@ -42,49 +42,41 @@ PSTR_INLINE int pstrcatb(pstring_t *dst, const char *src, size_t length) {
 }
 
 /** Concatenates `src` onto the start of `dst`.
-    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
-**/
+    Errors: EINVAL, ENOMEM.
+*/
 PSTR_API int pstrrcat(pstring_t *dst, const pstring_t *src);
-PSTR_INLINE int pstrrcats(pstring_t *dst, const char *src, size_t length) {
-    pstring_t tmp;
-    pstrwrap(&tmp, (char *)src, length, length);
-    return pstrrcat(dst, &tmp);
-}
+PSTR_API int pstrrcats(pstring_t *dst, const char *src, size_t length);
 PSTR_INLINE int pstrrcatc(pstring_t *dst, char chr) {
     return pstrrcats(dst, &chr, 1);
 }
 
 /** Inserts characters from `src` into `dst` at index `at`.
-    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
-**/
+    Errors: EINVAL, ENOMEM.
+*/
 PSTR_API int pstrinsert(pstring_t *dst, size_t at, pstring_t *src);
-PSTR_INLINE int pstrinserts(
+PSTR_API int pstrinserts(
     pstring_t *dst, size_t at, const char *src, size_t length
-) {
-    pstring_t tmp;
-    pstrwrap(&tmp, (char *)src, length, length);
-    return pstrinsert(dst, at, &tmp);
-}
+);
 
 /** Inserts `chr` character `count` times into `dst` at index `at`.
-    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
-**/
+    Errors: EINVAL, ENOMEM.
+*/
 PSTR_API int pstrinsertc(pstring_t *dst, size_t at, size_t count, char chr);
 
 /** Removes characters from `str` in the specified range.
-    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
-**/
+    Errors: EINVAL, ENOMEM.
+*/
 PSTR_API int pstrremove(pstring_t *str, size_t from, size_t to);
 
 /** Concatenates `count` pstrings from `srcs` onto `dst`.
-    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
-**/
+    Errors: EINVAL, ENOMEM.
+*/
 PSTR_API int pstrjoin(pstring_t *dst, const pstring_t *srcs, size_t count);
 
 /** Replaces at most `max` instances of substring `src` with `dst`.
     If `max` is zero, all instances of `src` will be replaced.
-    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
-**/
+    Errors: EINVAL, ENOMEM.
+*/
 PSTR_API int pstrrepl(
     pstring_t *str, const pstring_t *src, const pstring_t *dst, size_t max
 );
@@ -99,8 +91,8 @@ PSTR_API int pstrreplc(pstring_t *str, char src, char dst, size_t max);
     The `pstrlstrip` variant only removes leading, while `pstrrstrip` only
     removes trailing characters from `str` that are specified in `chars`.
 
-    Possible error codes: PSTRING_EINVAL.
-**/
+    Errors: EINVAL.
+*/
 PSTR_API int pstrstrip(pstring_t *str, const char *chars);
 PSTR_API int pstrlstrip(pstring_t *str, const char *chars);
 PSTR_API int pstrrstrip(pstring_t *str, const char *chars);
@@ -109,16 +101,16 @@ PSTR_API int pstrrstrip(pstring_t *str, const char *chars);
     is equivalent to `tab` blank characters (defaults to 4 instead).
     If `count` is zero or less, all whitespace is removed.
 
-    Possible error codes: PSTRING_EINVAL.
-**/
+    Errors: EINVAL.
+*/
 PSTR_API int pstrdedent(pstring_t *str, int count, int tab);
 
 /** Inserts leading whitespace up to `count`, assuming that `\t` character
     is equivalent to `tab` blank characters (defaults to 4 instead). If `count`
     is zero or less, the minimum indentation already present is returned.
 
-    Possible error codes: PSTRING_EINVAL.
-**/
+    Errors: EINVAL.
+*/
 PSTR_API int pstrindent(pstring_t *str, int count, int tab);
 
 #ifdef __cplusplus

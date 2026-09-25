@@ -29,7 +29,7 @@
     possible expansion first and only backtracking (advancing the amount
     of text `*` consumes) when the remainder of the pattern fails, which
     keeps the common case (few wildcards) close to linear instead of
-    paying for exponential blowup on adversarial input. **/
+    paying for exponential blowup on adversarial input. */
 static int glob_match_here(
     const char *p, const char *pend, const char *s, const char *send, int flags
 ) {
@@ -161,7 +161,7 @@ static int is_separator(char c) {
     `prefix[0] ? "/" : ""` check would, since `prefix[0]` is true for a
     root of just "/") produced a "//tmp" that happened to still resolve
     correctly on POSIX but is still wrong output, and is not guaranteed
-    to resolve on every platform. **/
+    to resolve on every platform. */
 static int needs_separator(const char *prefix) {
     size_t len = strlen(prefix);
     return len > 0 && !is_separator(prefix[len - 1]);
@@ -177,7 +177,7 @@ static int has_wildcard(const char *s, size_t len) {
 /** Lists the immediate children of `dir` (an allocator-owned,
     null-terminated path; "" means the current directory) whose name
     matches `pattern`, appending `dir/name` (or just `name` for an empty
-    `dir`) to `out`. **/
+    `dir`) to `out`. */
 static int glob_list_dir(
     const char *dir,
     const char *pattern,
@@ -249,7 +249,7 @@ static int glob_cmp(const void *a, const void *b) {
     fresh, zeroed array, it just takes ownership of `words`'s backing
     storage directly; otherwise (the caller is accumulating results
     across several calls) each item is copied over one at a time and
-    `words`'s own backing storage is freed. Always consumes `words`. **/
+    `words`'s own backing storage is freed. Always consumes `words`. */
 static int merge_words_into(
     pstrarray_t *dst, pstrglob_words_t *words, allocator_t *alloc
 ) {
@@ -276,7 +276,9 @@ static int merge_words_into(
             if (!grown) {
                 for (; i < added; i++)
                     pstrfree(&slots[i]);
-                deallocate(alloc, slots, PF_ARRAY_CAP(words) * sizeof(pstring_t));
+                deallocate(
+                    alloc, slots, PF_ARRAY_CAP(words) * sizeof(pstring_t)
+                );
                 return PSTRTHROW_ENOMEM;
             }
             dst->items = grown;
@@ -297,7 +299,7 @@ static int merge_words_into(
     components are consumed directly without touching the filesystem
     unless they're the final component -- this both avoids unnecessary
     `readdir` calls and lets a pattern with no wildcards at all fall
-    through to a plain existence check. **/
+    through to a plain existence check. */
 static int glob_walk(
     const char *prefix,
     const char *pat,
@@ -472,8 +474,10 @@ typedef PF_ARRAY(brace_span_t) brace_spans_t;
 /** Copies [start,end) to `dst`, unescaping only the three characters
     that are meaningful to brace syntax (`{`, `}`, `,`); every other
     backslash is left untouched for whatever expansion stage runs
-    next. **/
-static int brace_copy_literal(pstring_t *dst, const char *start, const char *end) {
+    next. */
+static int brace_copy_literal(
+    pstring_t *dst, const char *start, const char *end
+) {
     int rc = PSTRING_OK;
 
     for (const char *p = start; !rc && p < end; p++) {
@@ -493,9 +497,10 @@ static int brace_copy_literal(pstring_t *dst, const char *start, const char *end
     `{...}` pairs and backslash escapes, and reports via `*hasComma`
     whether a `,` appears at this pair's own top nesting level (a
     comma inside a nested pair doesn't count). Returns NULL if there is
-    no matching close. **/
-static const char *
-brace_find_close(const char *open, const char *end, int *hasComma) {
+    no matching close. */
+static const char *brace_find_close(
+    const char *open, const char *end, int *hasComma
+) {
     int depth = 1;
     *hasComma = 0;
 
@@ -520,9 +525,10 @@ brace_find_close(const char *open, const char *end, int *hasComma) {
 
 /** Splits [start,end) (a brace pair's contents) into its top-level
     comma-separated segments, honoring nested `{...}` pairs and
-    backslash escapes the same way `brace_find_close` does. **/
-static int
-brace_split(const char *start, const char *end, brace_spans_t *segs) {
+    backslash escapes the same way `brace_find_close` does. */
+static int brace_split(
+    const char *start, const char *end, brace_spans_t *segs
+) {
     int depth = 0;
     const char *segStart = start;
 
@@ -572,9 +578,11 @@ static void free_words(pstrglob_words_t *words) {
     contain further groups too), and the final results are the cross
     product of (every segment's alternatives) with (every suffix
     alternative), each prefixed with the literal text before the
-    opening `{`. **/
+    opening `{`. */
 static int brace_expand_range(
-    const char *start, const char *end, allocator_t *alloc,
+    const char *start,
+    const char *end,
+    allocator_t *alloc,
     pstrglob_words_t *out
 ) {
     const char *p = start;
@@ -620,7 +628,7 @@ static int brace_expand_range(
                 rc = pstrcat(&item, PF_ARRAY_SLOT(&tail, i));
             if (!rc)
                 rc = PF_ARRAY_PUSH(out, &item, 1) ? PSTRTHROW_ENOMEM
-                                                   : PSTRING_OK;
+                                                  : PSTRING_OK;
             if (rc)
                 pstrfree(&item);
         }
@@ -667,7 +675,7 @@ static int brace_expand_range(
                     rc = pstrcat(&item, PF_ARRAY_SLOT(&suffixes, k));
                 if (!rc)
                     rc = PF_ARRAY_PUSH(out, &item, 1) ? PSTRTHROW_ENOMEM
-                                                       : PSTRING_OK;
+                                                      : PSTRING_OK;
                 if (rc)
                     pstrfree(&item);
             }
@@ -682,9 +690,7 @@ static int brace_expand_range(
     return rc;
 }
 
-int pstrbrace(
-    pstrarray_t *dst, const pstring_t *pattern, allocator_t *alloc
-) {
+int pstrbrace(pstrarray_t *dst, const pstring_t *pattern, allocator_t *alloc) {
     if (!dst || !pattern)
         return PSTRTHROW_EINVAL;
 

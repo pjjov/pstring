@@ -8,6 +8,8 @@
 #ifndef PSTRING_WORDEXP_H
 #define PSTRING_WORDEXP_H
 
+/* Module: Customizable word expansion inspired by <wordexp.h>. */
+
 #ifndef PSTR_API
     #define PSTR_API
 #endif
@@ -58,7 +60,7 @@ enum pstrexpand_error {
     value; `pattern` holds the (unexpanded) glob pattern text; `suffix`
     distinguishes `%`/`%%` (trim from the end) from `#`/`##` (trim from
     the start); `greedy` distinguishes the doubled `##`/`%%` form
-    (longest match) from the single `#`/`%` form (shortest match). **/
+    (longest match) from the single `#`/`%` form (shortest match). */
 typedef struct pstrexpand_trim_t {
     const pstring_t *value;
     pstring_t *pattern;
@@ -66,17 +68,17 @@ typedef struct pstrexpand_trim_t {
     int greedy;
 } pstrexpand_trim_t;
 
-/** Callback used for the `wordexp` shell expansion. **/
+/** Callback used for the `wordexp` shell expansion. */
 typedef int(pstrexpand_fn)(
     void *dst, void *src, int flags, int kind, void *user
 );
 
-/** Performs word expansion using the default callback. **/
+/** Performs word expansion using the default callback. */
 PSTR_API int pstrexpand(
     pstrarray_t *dst, pstring_t *src, int flags, pstrexpand_fn *cb
 );
 
-/** Performs word expansion using the provided callback. **/
+/** Performs word expansion using the provided callback. */
 PSTR_API int pstrexpand_with(
     pstrarray_t *dst, pstring_t *src, int flags, pstrexpand_fn *cb, void *user
 );

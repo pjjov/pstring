@@ -74,6 +74,12 @@ int pstrrcat(pstring_t *dst, const pstring_t *src) {
     return PSTRING_OK;
 }
 
+int pstrrcats(pstring_t *dst, const char *src, size_t length) {
+    pstring_t tmp;
+    pstrwrap(&tmp, (char *)src, length, length);
+    return pstrrcat(dst, &tmp);
+}
+
 static int pstr__move(pstring_t *dst, size_t at, size_t count) {
     if (pstrreserve(dst, count))
         return PSTRTHROW_ENOMEM;
@@ -110,6 +116,12 @@ int pstrinsertc(pstring_t *dst, size_t at, size_t count, char chr) {
 
     memset(pstrslot(dst, at), chr, count);
     return PSTRING_OK;
+}
+
+int pstrinserts(pstring_t *dst, size_t at, const char *src, size_t length) {
+    pstring_t tmp;
+    pstrwrap(&tmp, (char *)src, length, length);
+    return pstrinsert(dst, at, &tmp);
 }
 
 int pstrremove(pstring_t *str, size_t from, size_t to) {

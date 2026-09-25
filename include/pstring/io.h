@@ -8,6 +8,17 @@
 #ifndef PSTRING_IO_H
 #define PSTRING_IO_H
 
+/** Module: Streaming and serialization functions for pstrings.
+
+    The `pf_stream_t` object can be used as a generic interface for interacting
+    with byte streams. Unlike standard library `FILE`, `pf_stream_t` objects
+    can use user-defined stream implementations such as network sockets,
+    in-memory buffers, encoders and serializers.
+
+    This header also provides powerful serialization and deserialization
+    mechanisms through the `pstrmodel` and associated structures.
+*/
+
 #ifndef PSTR_INLINE
     #define PSTR_INLINE static inline
 #endif
@@ -22,25 +33,6 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-/** ## NAME
-
-    **pstring-io** - streaming and serialization functions for **pstrings**.
-
-    ## DESCRIPTION
-
-    The `pf_stream_t` object can be used as a generic interface for interacting
-    with byte streams. Unlike standard library `FILE`, `pf_stream_t` objects
-    can use user-defined stream implementations such as network sockets,
-    in-memory buffers, encoders and serializers.
-
-    This header also provides powerful serialization and deserialization
-    mechanisms through the `pstrmodel` and associated structures.
-
-    [TOC]
-
-    ## REFERENCE
-**/
 
 /* Forward declarations */
 typedef struct allocator_t allocator_t;
@@ -66,24 +58,24 @@ enum pstring_typeid {
 };
 
 /** Concatenates the contents of the file onto the end of `out`.
-    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM, PSTRING_EIO.
-**/
+    Errors: EINVAL, ENOMEM, EIO.
+*/
 PSTR_API int pstrreadall(pstring_t *out, const char *path);
 
 /** Writes the entire string `out` to the file at `path`.
-    Possible error codes: PSTRING_EINVAL, PSTRING_EIO.
-**/
+    Errors: EINVAL, EIO.
+*/
 PSTR_API int pstrwriteall(const pstring_t *str, const char *path);
 
 /** Concatenates string formated by standard library functions to `dst`.
-    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM, PSTRING_EIO.
-**/
+    Errors: EINVAL, ENOMEM, EIO.
+*/
 PSTR_API int pstrio_printf(pstring_t *dst, const char *fmt, ...);
 
 /** Concatenates string formated by standard library functions to `dst`.
     Arguments are passed as a variable arguments list from `<stdarg.h>`.
-    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM, PSTRING_EIO.
-**/
+    Errors: EINVAL, ENOMEM, EIO.
+*/
 PSTR_API int pstrio_vprintf(pstring_t *dst, const char *fmt, va_list args);
 
 struct pstrmodel_array {
@@ -123,13 +115,13 @@ typedef int(pstream_load_fn)(
     the stream when closing.
 
     Stream cursor will be at the end of the string.
-    Possible error codes: PSTRING_EINVAL, PSTRING_EIO.
-**/
+    Errors: EINVAL, EIO.
+*/
 PSTR_API int pf_stream_pstring(pf_stream_t *out, pstring_t *str);
 
 /** Writes a `pstring_t` to `stream`.
-    Possible error codes: PSTRING_EINVAL, PSTRING_EIO.
-**/
+    Errors: EINVAL, EIO.
+*/
 PSTR_API int pf_stream_putp(pf_stream_t *stream, const pstring_t *str);
 
 PSTR_API int pstream_save(

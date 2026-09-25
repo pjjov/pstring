@@ -64,7 +64,7 @@
     byte `(h << 4) | i` is a member of the set. Testing a vector of bytes is
     then two shuffles and an AND, independent of how large the set is. The
     previous implementation broadcast and compared once per set character,
-    so a 20-character set cost 20 vector compares per block. **/
+    so a 20-character set cost 20 vector compares per block. */
 typedef struct pstr_set {
     unsigned char map[32];
     unsigned char nib[16];
@@ -210,12 +210,12 @@ void pstrdetect(void) {
 #endif
 }
 
-/** Mask covering the `size` low bits, avoiding the undefined `1 << 32`. **/
+/** Mask covering the `size` low bits, avoiding the undefined `1 << 32`. */
 static inline uint32_t pstr__width_mask(size_t size) {
     return size >= 32 ? UINT32_MAX : (uint32_t)((1u << size) - 1);
 }
 
-/** Index of the lowest set bit. `x` must be non-zero. **/
+/** Index of the lowest set bit. `x` must be non-zero. */
 static inline int pstr__first_bit(uint32_t x) {
 #if defined(__GNUC__) || defined(__clang__)
     return __builtin_ctz(x);
@@ -230,7 +230,7 @@ static inline int pstr__first_bit(uint32_t x) {
 }
 
 /** Index of the highest set bit, i.e. the last matching byte in a block.
-    `x` must be non-zero. **/
+    `x` must be non-zero. */
 static inline int pstr__last_bit(uint32_t x) {
 #if defined(__GNUC__) || defined(__clang__)
     return 31 - __builtin_clz(x);
@@ -358,7 +358,7 @@ char *pstrrchr(const pstring_t *str, int ch) {
 }
 
 /** Scans forward for the first byte whose set membership equals `wanted`,
-    returning the index of that byte or `length` when there is none. **/
+    returning the index of that byte or `length` when there is none. */
 static size_t pstr__scan(
     const char *buffer, size_t length, const pstr_set_t *set, int wanted
 ) {
@@ -384,7 +384,7 @@ static size_t pstr__scan(
 }
 
 /** Reverse counterpart of `pstr__scan`. Returns the index of the last byte
-    whose membership equals `wanted`, or `length` when there is none. **/
+    whose membership equals `wanted`, or `length` when there is none. */
 static size_t pstr__rscan(
     const char *buffer, size_t length, const pstr_set_t *set, int wanted
 ) {
@@ -410,7 +410,7 @@ static size_t pstr__rscan(
     return length;
 }
 
-/** Compiles `set` and reports whether the string is usable. **/
+/** Compiles `set` and reports whether the string is usable. */
 static int pstr__set_from(pstr_set_t *out, const char *set) {
     if (!set)
         return 0;

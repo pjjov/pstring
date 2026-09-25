@@ -8,12 +8,6 @@
 #ifndef PSTRING_GLOB_H
 #define PSTRING_GLOB_H
 
-#include <pstring/core.h>
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 /** Module: Cross-platform filename globbing.
 
     `pstrglob_match` implements POSIX `fnmatch(3)` style matching of a single
@@ -28,24 +22,37 @@ extern "C" {
     are collected depth-first, so a pattern with multiple wildcard segments
     (e.g. `src` then `*` then `*.c`) works the same way it would in a
     POSIX shell.
-**/
+*/
+
+#ifndef PSTR_API
+    #define PSTR_API
+#endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* Forward declarations */
+typedef struct allocator_t allocator_t;
+typedef struct pstring_t pstring_t;
+typedef struct pstrarray_t pstrarray_t;
 
 enum pstrglob_flag {
     /** Match a leading `.` in a filename only when the pattern's
         corresponding component also starts with a literal `.` -- the same
-        convention shells use to hide dotfiles from a bare `*`. **/
+        convention shells use to hide dotfiles from a bare `*`. */
     PSTRGLOB_PERIOD = 1,
     /** Skip the final `qsort` of results within each directory. Matches
-        are still produced in directory-listing order. **/
+        are still produced in directory-listing order. */
     PSTRGLOB_NOSORT = 2,
     /** If nothing matches, append the literal pattern to the result
         instead of returning `PSTRING_ENOENT` - mirrors glibc's
-        `GLOB_NOCHECK`. **/
+        `GLOB_NOCHECK`. */
     PSTRGLOB_NOCHECK = 4,
     /** Treat `\\` as an ordinary character instead of an escape. Useful
-        on Windows, where `\\` is also the path separator. **/
+        on Windows, where `\\` is also the path separator. */
     PSTRGLOB_NOESCAPE = 8,
-    /** Append a trailing `/` to results that are themselves directories. **/
+    /** Append a trailing `/` to results that are themselves directories. */
     PSTRGLOB_MARK = 16,
 };
 
@@ -61,8 +68,8 @@ enum pstrglob_flag {
     is safe to use as a general-purpose wildcard matcher (e.g. for the
     `case` patterns during word expansion).
 
-    Returns `PSTRING_TRUE`, `PSTRING_FALSE`, or a negative `pstring_error`.
-**/
+    Returns: `PSTRING_TRUE`, `PSTRING_FALSE`, or a negative `pstring_error`.
+*/
 PSTR_API int pstrglob_match(
     const char *pattern, const pstring_t *name, int flags
 );
@@ -77,8 +84,8 @@ PSTR_API int pstrglob_match(
     `PSTRGLOB_NOCHECK` is set, in which case `pattern` itself is appended
     as the sole result.
 
-    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM, PSTRING_ENOENT.
-**/
+    Errors: EINVAL, ENOMEM, ENOENT.
+*/
 PSTR_API int pstrglob(
     pstrarray_t *dst, const pstring_t *pattern, int flags, allocator_t *alloc
 );
@@ -101,8 +108,8 @@ PSTR_API int pstrglob(
     (adjacent or nested) all expand, and the results are the cross
     product of every group's alternatives.
 
-    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
-**/
+    Errors: EINVAL, ENOMEM.
+*/
 PSTR_API int pstrbrace(
     pstrarray_t *dst, const pstring_t *pattern, allocator_t *alloc
 );

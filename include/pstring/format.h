@@ -42,8 +42,6 @@
 
         pstrfmt(str, "Bye %!*%s!", "hex", "world");
     ```
-
-    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
 */
 
 #ifndef PSTR_API
@@ -65,7 +63,7 @@ struct tm;
 
     > This function supports formatting extensions.
 
-    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
+    Errors: EINVAL, ENOMEM.
 */
 PSTR_API int pstrfmt(pstring_t *dst, const char *fmt, ...);
 PSTR_API int pstrfmtv(pstring_t *dst, const char *fmt, va_list args);
@@ -74,7 +72,7 @@ PSTR_API int pstrfmtv(pstring_t *dst, const char *fmt, va_list args);
 
     > This function supports formatting extensions.
 
-    Possible error codes: PSTRING_EINVAL, <stdio.h> error codes.
+    Errors: EINVAL, <stdio.h> error codes.
 */
 PSTR_API int pstrprintf(const char *fmt, ...);
 PSTR_API int pstrvprintf(const char *fmt, va_list args);
@@ -83,7 +81,7 @@ PSTR_API int pstrvprintf(const char *fmt, va_list args);
 
     > This function supports formatting extensions.
 
-    Possible error codes: PSTRING_EINVAL, <stdio.h> error codes.
+    Errors: EINVAL, <stdio.h> error codes.
 */
 PSTR_API int pstrerrorf(const char *fmt, ...);
 PSTR_API int pstrverrorf(const char *fmt, va_list args);
@@ -92,13 +90,13 @@ PSTR_API int pstrverrorf(const char *fmt, va_list args);
 
     > This function supports formatting extensions.
 
-    Possible error codes: PSTRING_EINVAL, stream error codes.
+    Errors: EINVAL, stream error codes.
 */
 PSTR_API int pstrfprintf(pf_stream_t *stream, const char *fmt, ...);
 PSTR_API int pstrvfprintf(pf_stream_t *stream, const char *fmt, va_list args);
 
 /** Concatenates a string formatted by `fmt` using date and time from `src`.
-    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
+    Errors: EINVAL, ENOMEM.
 */
 PSTR_API int pstrftime(pstring_t *dst, const char *fmt, struct tm *src);
 

@@ -17,7 +17,7 @@
 /** A straightforward recursive-descent parser over the token stream,
     evaluating as it goes rather than building an AST -- arithmetic
     expansions are short-lived and small, so there is no reuse to justify
-    the extra allocation a separate parse tree would need. **/
+    the extra allocation a separate parse tree would need. */
 struct eval_state {
     const char *p;
     const char *end;
@@ -75,7 +75,7 @@ static long long eval_assign(struct eval_state *e);
 
 /** Reads a bare identifier (variable name) starting at the current
     position, returning its extent. Caller has already confirmed
-    `is_ident_start` at `e->p`. **/
+    `is_ident_start` at `e->p`. */
 static void read_ident(
     struct eval_state *e, const char **start, const char **stop
 ) {
@@ -120,7 +120,7 @@ static void set_var(
 
 /** Parses a primary expression: literal, parenthesised sub-expression,
     or identifier (with an optional pre/post `++`/`--`, which shells
-    support inside arithmetic contexts). **/
+    support inside arithmetic contexts). */
 static long long eval_primary(struct eval_state *e) {
     skip_ws(e);
 
@@ -342,7 +342,7 @@ static long long eval_ternary(struct eval_state *e) {
     appear literally to the left of the operator -- `a = b = 3` and
     `a += 2` are valid, `1 = 2` is not. Because the grammar is otherwise
     only concerned with values, this peeks ahead for `ident <ws>* op=`
-    before committing to the assignment interpretation. **/
+    before committing to the assignment interpretation. */
 static long long eval_assign(struct eval_state *e) {
     const char *save = e->p;
 

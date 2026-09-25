@@ -8,6 +8,13 @@
 #ifndef PSTRING_OBJECT_H
 #define PSTRING_OBJECT_H
 
+/** Module: Dynamic object handling and serialization.
+
+    `pstrobj_t` represents a dynamically typed object which can be saved to and
+    loaded from various formats. Unlike `struct pstrmodel` which maps objects
+    directly to C structures, `pstrobj` maintains the whole object in memory.
+*/
+
 #ifndef PSTR_INLINE
     #define PSTR_INLINE static inline
 #endif
@@ -16,26 +23,13 @@
     #define PSTR_API
 #endif
 
+#include <stddef.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/** ## NAME
-
-    **pstring-object** - dynamic object handling and serialization.
-
-    ## DESCRIPTION
-
-    `pstrobj_t` represents a dynamically typed object which can be saved to and
-    loaded from various formats. Unlike `struct pstrmodel` which maps objects
-    directly to C structures, `pstrobj` maintains the whole object in memory.
-
-    [TOC]
-
-    ## REFERENCE
-**/
-
-#include <stddef.h>
+/* Forward declarations */
 typedef struct allocator_t allocator_t;
 typedef struct pstring_t pstring_t;
 typedef struct pstrobj_t pstrobj_t;
@@ -89,15 +83,15 @@ struct pstrobj_t {
 typedef pstrobj_t *(pstrobj_load_fn)(pf_stream_t * stream, allocator_t *alloc);
 typedef int(pstrobj_save_fn)(pstrobj_t *obj, pf_stream_t *stream);
 
-/** Allocates a new object with NULL type. **/
+/** Allocates a new object with NULL type. */
 PSTR_API pstrobj_t *pstrobj_new(allocator_t *allocator);
 
-/** Loads an object from `source` that is in specified `format`. **/
+/** Loads an object from `source` that is in specified `format`. */
 PSTR_API pstrobj_t *pstrobj_from_buffer(
     const char *format, pstring_t *source, allocator_t *allocator
 );
 
-/** Loads an object in `format` by reading from `stream`. **/
+/** Loads an object in `format` by reading from `stream`. */
 PSTR_API pstrobj_t *pstrobj_from_stream(
     const char *format, pf_stream_t *stream, allocator_t *allocator
 );
@@ -108,23 +102,17 @@ PSTR_API pstrobj_t *pstrobj_load_xml(
     pf_stream_t *stream, allocator_t *allocator
 );
 
-/** Loads an object in `format` by reading from the file at `path`. **/
+/** Loads an object in `format` by reading from the file at `path`. */
 PSTR_API pstrobj_t *pstrobj_from_path(
     const char *format, const char *path, allocator_t *allocator
 );
 
-/** Saves an object to `source` in specified `format`. **/
+/** Saves an object to `source` in specified `format`. */
 PSTR_API int pstrobj_to_buffer(
     pstrobj_t *obj, const char *format, pstring_t *source
 );
 
-/** Saves an object in `format` by writing to `stream`. **/
-PSTR_API int pstrobj_to_stream(
-    pstrobj_t *obj, const char *format, pf_stream_t *stream
-);
-PSTR_API int pstrobj_save_json(pstrobj_t *obj, pf_stream_t *stream);
-
-/** Saves an object as an XML document by writing to `stream`.
+/** Saves an object in `format` by writing to `stream`.
 
     Since XML has no native list/dict distinction the way JSON does, the
     mapping used is: the root object becomes a single `<root>` element;
@@ -133,13 +121,17 @@ PSTR_API int pstrobj_save_json(pstrobj_t *obj, pf_stream_t *stream);
     bool becomes the element's text content; `null` becomes an empty
     element. This is the same convention most JSON&lt;-&gt;XML converters
     use, and is reversed exactly by `pstrobj_load_xml`.
-**/
+*/
+PSTR_API int pstrobj_to_stream(
+    pstrobj_t *obj, const char *format, pf_stream_t *stream
+);
+PSTR_API int pstrobj_save_json(pstrobj_t *obj, pf_stream_t *stream);
 PSTR_API int pstrobj_save_xml(pstrobj_t *obj, pf_stream_t *stream);
 
-/** Frees object and it's children if it's detached. **/
+/** Frees object and it's children if it's detached. */
 PSTR_API void pstrobj_free(pstrobj_t *obj);
 
-/** Finds an object using the JSON Pointer format. **/
+/** Finds an object using the JSON Pointer format. */
 PSTR_API pstrobj_t *pstrobj_query(pstrobj_t *obj, const char *query);
 PSTR_API void *pstrobj_query_value(pstrobj_t *obj, const char *query);
 
@@ -147,13 +139,11 @@ PSTR_API void *pstrobj_query_value(pstrobj_t *obj, const char *query);
     for (CHILD = ((OBJ) != NULL ? (OBJ)->child : NULL); CHILD != NULL; \
          CHILD = (CHILD)->next)
 
-/** nanodoc.inline-decl on **/
-
-/** ### pstrobj_set_*
+/** Name: pstrobj_set_*
 
     Following functions set the object's value and type.
-    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
-**/
+    Errors: EINVAL, ENOMEM.
+*/
 PSTR_API int pstrobj_set_null(pstrobj_t *obj);
 PSTR_API int pstrobj_set_bool(pstrobj_t *obj, char value);
 PSTR_API int pstrobj_set_int(pstrobj_t *obj, int value);
@@ -163,11 +153,11 @@ PSTR_API int pstrobj_set_double(pstrobj_t *obj, double value);
 PSTR_API int pstrobj_set_list(pstrobj_t *obj);
 PSTR_API int pstrobj_set_dict(pstrobj_t *obj);
 
-/** ### pstrobj_expect_*
+/** Name: pstrobj_expect_*
 
     Following functions return the object's value if `obj` has a matching type.
     Otherwise a default value is returned and `status` is set to an error code.
-**/
+*/
 PSTR_API void pstrobj_expect_null(pstrobj_t *obj, int *status);
 PSTR_API int pstrobj_expect_bool(pstrobj_t *obj, int *status);
 PSTR_API int pstrobj_expect_int(pstrobj_t *obj, int *status);
@@ -179,12 +169,12 @@ PSTR_API pstring_t *pstrobj_expect_pstring(pstrobj_t *obj, int *status);
 PSTR_API pstrobj_t *pstrobj_expect_list(pstrobj_t *obj, int *status);
 PSTR_API pstrobj_t *pstrobj_expect_dict(pstrobj_t *obj, int *status);
 
-/** ### pstrobj_query_*
+/** Name: pstrobj_query_*
 
     Following functions query `obj` for a child and return the child's value
     if `obj` has a matching type. Otherwise a default value is returned and
     `status` is set to an error code.
-**/
+*/
 #define PSTROBJ__IMPL_QUERY(NAME, TYPE)                                  \
     PSTR_INLINE TYPE pstrobj_query_##NAME(                               \
         pstrobj_t *obj, const char *query, int *status                   \
@@ -202,71 +192,68 @@ PSTROBJ__IMPL_QUERY(list, pstrobj_t *);
 PSTROBJ__IMPL_QUERY(dict, pstrobj_t *);
 #undef PSTROBJ__IMPL_QUERY
 
-/** ### pstrobj_set_*
+/** Name: pstrobj_get_*
 
     Following functions return the object's value or the default value `def`,
     depending on the type of `obj`, converting between types if necessary.
-    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
-**/
+*/
 PSTR_API int pstrobj_get_int(pstrobj_t *obj, int def);
 PSTR_API long pstrobj_get_long(pstrobj_t *obj, long def);
 PSTR_API float pstrobj_get_float(pstrobj_t *obj, float def);
 PSTR_API double pstrobj_get_double(pstrobj_t *obj, double def);
 
-/** nanodoc.inline-decl off **/
-
 /** Copies the contents of `str` as the value of `obj`.
-    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
-**/
+    Errors: EINVAL, ENOMEM.
+*/
 PSTR_API int pstrobj_copy_string(pstrobj_t *obj, const char *str, size_t len);
 PSTR_API int pstrobj_copy_pstring(pstrobj_t *obj, const pstring_t *str);
 PSTR_API int pstrobj_copy_key(pstrobj_t *obj, const pstring_t *str);
 PSTR_API int pstrobj_copy_keys(pstrobj_t *obj, const char *str, size_t len);
 
 /** Wraps the contents of `str` as the value of `obj`.
-    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
-**/
+    Errors: EINVAL, ENOMEM.
+*/
 PSTR_API int pstrobj_wrap_string(pstrobj_t *obj, const char *str, size_t len);
 PSTR_API int pstrobj_wrap_pstring(pstrobj_t *obj, const pstring_t *str);
 PSTR_API int pstrobj_wrap_key(pstrobj_t *obj, const pstring_t *str);
 PSTR_API int pstrobj_wrap_keys(pstrobj_t *obj, const char *str, size_t len);
 
 /** Inserts `item` at index `i` inside `list`.
-    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
-**/
+    Errors: EINVAL, ENOMEM.
+*/
 PSTR_API int pstrobj_list_insert(pstrobj_t *list, pstrobj_t *item, size_t i);
 
-/** Removes item at index `i` in `list` and returns it. **/
+/** Removes item at index `i` in `list` and returns it. */
 PSTR_API pstrobj_t *pstrobj_list_remove(pstrobj_t *list, size_t i);
 
 /** Removes item at index `i` in `list` and frees it.
-    Possible error codes: PSTRING_EINVAL.
-**/
+    Errors: EINVAL.
+*/
 PSTR_INLINE int pstrobj_list_free(pstrobj_t *list, size_t i) {
     pstrobj_t *obj = pstrobj_list_remove(list, i);
     pstrobj_free(obj);
     return obj ? PSTROBJ_OK : PSTROBJ_EINVAL;
 }
 
-/** Finds an item in `dict` with specified `key`. **/
+/** Finds an item in `dict` with specified `key`. */
 PSTR_API pstrobj_t *pstrobj_dict_get(pstrobj_t *dict, const pstring_t *key);
 PSTR_API pstrobj_t *pstrobj_dict_gets(
     pstrobj_t *dict, const char *key, size_t length
 );
 
 /** Inserts `item` into `dict` with a previously set key.
-    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
-**/
+    Errors: EINVAL, ENOMEM.
+*/
 PSTR_API int pstrobj_dict_insert(pstrobj_t *dict, pstrobj_t *item);
 
-/** Removes item with specified key in `dict` and returns it. **/
+/** Removes item with specified key in `dict` and returns it. */
 PSTR_API pstrobj_t *pstrobj_dict_remove(
     pstrobj_t *dict, const char *key, size_t length
 );
 
 /** Removes item with specified key in `dict` and frees it.
-    Possible error codes: PSTRING_EINVAL.
-**/
+    Errors: EINVAL.
+*/
 PSTR_INLINE int pstrobj_dict_free(
     pstrobj_t *dict, const char *key, size_t length
 ) {

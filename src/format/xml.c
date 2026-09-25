@@ -167,7 +167,7 @@ static void xml_skip_until(struct xml_parser *x, const char *tok) {
     comments (`<!--...-->`), and the doctype declaration (`<!...>`,
     tracking bracket depth for an internal subset) -- anything that can
     legally appear before or between elements but isn't itself part of
-    the object model. **/
+    the object model. */
 static void xml_skip_misc(struct xml_parser *x) {
     for (;;) {
         xml_skip_ws(x);
@@ -227,7 +227,7 @@ static void xml_read_name(
     `alt=">"` doesn't end the tag early. Attribute values themselves
     aren't modelled -- pstrobj has no representation for them -- so
     they're intentionally discarded rather than parsed. Returns 1 if
-    the tag is self-closing. **/
+    the tag is self-closing. */
 static int xml_skip_attrs(struct xml_parser *x) {
     char quote = 0;
 
@@ -270,7 +270,7 @@ static pstrobj_t *xml_new(struct xml_parser *x) {
 /** Infers a scalar type from an element's trimmed text content, the
     same way `format/json.c`'s number handling does: no digits/sign/dot
     at all falls through to a plain string, so this never misclassifies
-    ordinary text as a number by accident. **/
+    ordinary text as a number by accident. */
 static int xml_set_scalar(
     struct xml_parser *x, pstrobj_t *obj, pstring_t *text
 ) {
@@ -334,7 +334,7 @@ static pstrobj_t *xml_parse_element(struct xml_parser *x, pstring_t *outName);
     found -- no children at all means a scalar leaf; every child named
     "item" means a list; anything else means a dict (a child using the
     `<field key="...">` escape from the writer contributes its `key`
-    attribute as the dict key instead of its tag name). **/
+    attribute as the dict key instead of its tag name). */
 static pstrobj_t *xml_parse_content(struct xml_parser *x) {
     pstring_t text = { 0 };
     pstrobj_t *list = NULL;
@@ -464,7 +464,7 @@ static pstrobj_t *xml_parse_content(struct xml_parser *x) {
     into `*outName` (used by the caller to recognise "item"/"field"),
     handles the `<field key="...">` escape hatch the writer uses for
     dict keys that aren't valid XML names, recurses into the element's
-    content, and consumes the matching closing tag. **/
+    content, and consumes the matching closing tag. */
 static pstrobj_t *xml_parse_element(struct xml_parser *x, pstring_t *outName) {
     x->p++; /* '<' */
 
