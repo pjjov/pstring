@@ -32,31 +32,41 @@ int test_wordexp_literal(int seed, int rep) {
 int test_wordexp_quotes(int seed, int rep) {
     pstrarray_t words = { 0 };
 
-    /* NOTE: quoting is intended to protect embedded IFS whitespace from
-       field splitting (as in a POSIX shell, where 'hello world' is one
-       word), but this implementation's expand_string() strips quote
-       characters during the initial substitution pass, before
-       field_split() ever runs -- so by the time splitting happens the
-       quoting information is already gone and the whitespace inside
-       the quotes is split on anyway. This test documents the current,
-       buggy behaviour rather than the intended one. */
     pf_assert_ok(expand_one(&words, "'hello world'", 0));
-    pf_assert(words.length == 2);
-    pf_assert_true(pstrequals(&words.items[0], "hello", 0));
-    pf_assert_true(pstrequals(&words.items[1], "world", 0));
+    pf_assert(words.length == 1);
+    pf_assert_true(pstrequals(&words.items[0], "hello world", 0));
     pstrarray_free(&words);
 
     pf_assert_ok(expand_one(&words, "\"hello world\"", 0));
-    pf_assert(words.length == 2);
-    pf_assert_true(pstrequals(&words.items[0], "hello", 0));
-    pf_assert_true(pstrequals(&words.items[1], "world", 0));
+    pf_assert(words.length == 1);
+    pf_assert_true(pstrequals(&words.items[0], "hello world", 0));
     pstrarray_free(&words);
 
-    /* quoting still works correctly when there is no embedded IFS
-       whitespace to protect */
     pf_assert_ok(expand_one(&words, "'hello'", 0));
     pf_assert(words.length == 1);
     pf_assert_true(pstrequals(&words.items[0], "hello", 0));
+    pstrarray_free(&words);
+
+    /* quoting still allows partial-word concatenation: unquoted and
+       quoted text glued together with no space between stays one
+       word, and the quoted part's internal whitespace is preserved */
+    pf_assert_ok(expand_one(&words, "a'b c'd", 0));
+    pf_assert(words.length == 1);
+    pf_assert_true(pstrequals(&words.items[0], "ab cd", 0));
+    pstrarray_free(&words);
+
+    /* two separate quoted words, actually separated by unquoted IFS
+       whitespace, still split into two fields */
+    pf_assert_ok(expand_one(&words, "'a' 'b'", 0));
+    pf_assert(words.length == 2);
+    pf_assert_true(pstrequals(&words.items[0], "a", 0));
+    pf_assert_true(pstrequals(&words.items[1], "b", 0));
+    pstrarray_free(&words);
+
+    /* an empty quoted word still produces a (single, empty) field */
+    pf_assert_ok(expand_one(&words, "''", 0));
+    pf_assert(words.length == 1);
+    pf_assert_true(pstrequals(&words.items[0], "", 0));
     pstrarray_free(&words);
 
     return 0;
@@ -180,6 +190,112 @@ int test_wordexp_glob(int seed, int rep) {
     return 0;
 }
 
+int test_wordexp_trim(int seed, int rep) {
+    setenv("PSTRING_TEST_PATH", "/path/to/file.tar.gz", 1);
+    setenv("PSTRING_TEST_UNSET_TRIM", "", 1);
+    unsetenv("PSTRING_TEST_UNSET_TRIM");
+
+    pstrarray_t words = { 0 };
+
+    /* '#' / '##': shortest / longest matching prefix removed */
+    pf_assert_ok(expand_one(&words, "${PSTRING_TEST_PATH#*/}", 0));
+    pf_assert(words.length == 1);
+    pf_assert_true(pstrequals(&words.items[0], "path/to/file.tar.gz", 0));
+    pstrarray_free(&words);
+
+    pf_assert_ok(expand_one(&words, "${PSTRING_TEST_PATH##*/}", 0));
+    pf_assert(words.length == 1);
+    pf_assert_true(pstrequals(&words.items[0], "file.tar.gz", 0));
+    pstrarray_free(&words);
+
+    /* '%' / '%%': shortest / longest matching suffix removed */
+    pf_assert_ok(expand_one(&words, "${PSTRING_TEST_PATH%.*}", 0));
+    pf_assert(words.length == 1);
+    pf_assert_true(pstrequals(&words.items[0], "/path/to/file.tar", 0));
+    pstrarray_free(&words);
+
+    pf_assert_ok(expand_one(&words, "${PSTRING_TEST_PATH%%.*}", 0));
+    pf_assert(words.length == 1);
+    pf_assert_true(pstrequals(&words.items[0], "/path/to/file", 0));
+    pstrarray_free(&words);
+
+    /* a pattern that doesn't match anything leaves the value alone */
+    pf_assert_ok(expand_one(&words, "${PSTRING_TEST_PATH#nomatch}", 0));
+    pf_assert(words.length == 1);
+    pf_assert_true(pstrequals(&words.items[0], "/path/to/file.tar.gz", 0));
+    pstrarray_free(&words);
+
+    /* '*' can match zero characters, so the shortest-match '#'/'%'
+       forms with a bare '*' pattern are a no-op */
+    setenv("PSTRING_TEST_WORD", "hello", 1);
+    pf_assert_ok(expand_one(&words, "${PSTRING_TEST_WORD#*}", 0));
+    pf_assert(words.length == 1);
+    pf_assert_true(pstrequals(&words.items[0], "hello", 0));
+    pstrarray_free(&words);
+
+    /* an unset variable trims to an empty value, not an error */
+    pf_assert_ok(expand_one(&words, "[${PSTRING_TEST_UNSET_TRIM#*}]", 0));
+    pf_assert(words.length == 1);
+    pf_assert_true(pstrequals(&words.items[0], "[]", 0));
+    pstrarray_free(&words);
+
+    return 0;
+}
+
+int test_wordexp_trim_undef_flag(int seed, int rep) {
+    unsetenv("PSTRING_TEST_UNSET_TRIM");
+
+    pstrarray_t words = { 0 };
+    pstring_t src = PSTRWRAP("${PSTRING_TEST_UNSET_TRIM#*}");
+    pf_assert(
+        PSTREXPAND_BADVAL == pstrexpand(&words, &src, PSTREXPAND_UNDEF, NULL)
+    );
+    return 0;
+}
+
+int test_wordexp_brace(int seed, int rep) {
+    pstrarray_t words = { 0 };
+
+    pf_assert_ok(expand_one(&words, "file.{c,h}", 0));
+    pf_assert(words.length == 2);
+    pf_assert_true(pstrequals(&words.items[0], "file.c", 0));
+    pf_assert_true(pstrequals(&words.items[1], "file.h", 0));
+    pstrarray_free(&words);
+
+    pf_assert_ok(expand_one(&words, "{a,b}{c,d}", 0));
+    pf_assert(words.length == 4);
+    pf_assert_true(pstrequals(&words.items[0], "ac", 0));
+    pf_assert_true(pstrequals(&words.items[1], "ad", 0));
+    pf_assert_true(pstrequals(&words.items[2], "bc", 0));
+    pf_assert_true(pstrequals(&words.items[3], "bd", 0));
+    pstrarray_free(&words);
+
+    /* a quoted brace group is not expanded */
+    pf_assert_ok(expand_one(&words, "'{a,b}'", 0));
+    pf_assert(words.length == 1);
+    pf_assert_true(pstrequals(&words.items[0], "{a,b}", 0));
+    pstrarray_free(&words);
+
+    /* each brace alternative still goes through normal field-splitting,
+       so an embedded unquoted space in one alternative still splits */
+    pf_assert_ok(expand_one(&words, "pre{a,b c}post", 0));
+    pf_assert(words.length == 3);
+    pf_assert_true(pstrequals(&words.items[0], "preapost", 0));
+    pf_assert_true(pstrequals(&words.items[1], "preb", 0));
+    pf_assert_true(pstrequals(&words.items[2], "cpost", 0));
+    pstrarray_free(&words);
+
+    /* variable expansion still runs on each brace alternative */
+    setenv("PSTRING_TEST_BRACE_VAR", "X", 1);
+    pf_assert_ok(expand_one(&words, "${PSTRING_TEST_BRACE_VAR}{1,2}", 0));
+    pf_assert(words.length == 2);
+    pf_assert_true(pstrequals(&words.items[0], "X1", 0));
+    pf_assert_true(pstrequals(&words.items[1], "X2", 0));
+    pstrarray_free(&words);
+
+    return 0;
+}
+
 int test_wordexp_errors(int seed, int rep) {
     pstrarray_t words = { 0 };
     pstring_t src = PSTRWRAP("hello");
@@ -199,6 +315,9 @@ const pf_test_t suite_wordexp[] = {
     { test_wordexp_command_sub, "/pstring/wordexp/command_sub" },
     { test_wordexp_command_sub_nocmd, "/pstring/wordexp/command_sub_nocmd" },
     { test_wordexp_glob, "/pstring/wordexp/glob" },
+    { test_wordexp_trim, "/pstring/wordexp/trim" },
+    { test_wordexp_trim_undef_flag, "/pstring/wordexp/trim_undef_flag" },
+    { test_wordexp_brace, "/pstring/wordexp/brace" },
     { test_wordexp_errors, "/pstring/wordexp/errors" },
     { 0 },
 };

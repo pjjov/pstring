@@ -83,6 +83,30 @@ PSTR_API int pstrglob(
     pstrarray_t *dst, const pstring_t *pattern, int flags, allocator_t *alloc
 );
 
+/** Expands shell-style `{a,b,c}` brace notation, appending every
+    resulting combination to `dst` (same ownership rules as `pstrglob`:
+    initialize with `{0}`, free with `pstrarray_free`). This is a purely
+    textual expansion -- it never touches the filesystem and has nothing
+    to do with `pstrglob_match`'s wildcards:
+
+        "file.{c,h}"     -> ["file.c", "file.h"]
+        "a{b,c{d,e}}f"   -> ["abf", "acdf", "acef"]
+        "img{01..03}.png"  (numeric ranges are not supported)
+
+    A `{...}` group is only expanded if it contains at least one
+    top-level comma; otherwise its braces are left as literal characters
+    (matching the shell convention that `{lonely}` is not a valid brace
+    expression). `\\{`, `\\}` and `\\,` are literal characters rather
+    than group/separator syntax. Multiple groups in the same pattern
+    (adjacent or nested) all expand, and the results are the cross
+    product of every group's alternatives.
+
+    Possible error codes: PSTRING_EINVAL, PSTRING_ENOMEM.
+**/
+PSTR_API int pstrbrace(
+    pstrarray_t *dst, const pstring_t *pattern, allocator_t *alloc
+);
+
 #ifdef __cplusplus
 }
 #endif

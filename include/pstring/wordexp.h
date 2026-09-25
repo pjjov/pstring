@@ -33,6 +33,7 @@ enum pstrexpand_hook {
     PSTREXPAND_PID,
     PSTREXPAND_IFS,
     PSTREXPAND_GLOB,
+    PSTREXPAND_TRIM,
 };
 
 /* Flags for `pstrexpand` family of functions */
@@ -50,6 +51,20 @@ enum pstrexpand_error {
     PSTREXPAND_CMDSUB = -202,
     PSTREXPAND_SYNTAX = -203,
 };
+
+/** Payload passed as `src` to a callback invoked with kind ==
+    `PSTREXPAND_TRIM`, used by the `${var#pattern}` family of
+    parameter-expansion operators. `value` holds the variable's current
+    value; `pattern` holds the (unexpanded) glob pattern text; `suffix`
+    distinguishes `%`/`%%` (trim from the end) from `#`/`##` (trim from
+    the start); `greedy` distinguishes the doubled `##`/`%%` form
+    (longest match) from the single `#`/`%` form (shortest match). **/
+typedef struct pstrexpand_trim_t {
+    const pstring_t *value;
+    pstring_t *pattern;
+    int suffix;
+    int greedy;
+} pstrexpand_trim_t;
 
 /** Callback used for the `wordexp` shell expansion. **/
 typedef int(pstrexpand_fn)(

@@ -7,6 +7,7 @@
 
 #include <pstring/core.h>
 #include <pstring/glob.h>
+#include <pstring/transform.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -243,6 +244,52 @@ static int glob_cmp(const void *a, const void *b) {
     return pstrcmp((const pstring_t *)a, (const pstring_t *)b);
 }
 
+/** Hands the (owned) contents of `words` over to `dst`, following the
+    same rule `pstrglob` and `pstrbrace` both document: if `dst` is a
+    fresh, zeroed array, it just takes ownership of `words`'s backing
+    storage directly; otherwise (the caller is accumulating results
+    across several calls) each item is copied over one at a time and
+    `words`'s own backing storage is freed. Always consumes `words`. **/
+static int merge_words_into(
+    pstrarray_t *dst, pstrglob_words_t *words, allocator_t *alloc
+) {
+    size_t added = PF_ARRAY_LEN(words);
+    pstring_t *slots = PF_ARRAY_GET(words, 0);
+
+    if (dst->items == NULL && dst->length == 0 && dst->capacity == 0) {
+        dst->items = slots;
+        dst->length = added;
+        dst->capacity = PF_ARRAY_CAP(words);
+        dst->allocator = alloc;
+        return PSTRING_OK;
+    }
+
+    for (size_t i = 0; i < added; i++) {
+        if (dst->length >= dst->capacity) {
+            size_t newCap = dst->capacity ? dst->capacity * 2 : 4;
+            pstring_t *grown = reallocate(
+                alloc,
+                dst->items,
+                dst->capacity * sizeof(pstring_t),
+                newCap * sizeof(pstring_t)
+            );
+            if (!grown) {
+                for (; i < added; i++)
+                    pstrfree(&slots[i]);
+                deallocate(alloc, slots, PF_ARRAY_CAP(words) * sizeof(pstring_t));
+                return PSTRTHROW_ENOMEM;
+            }
+            dst->items = grown;
+            dst->capacity = newCap;
+        }
+
+        dst->items[dst->length++] = slots[i];
+    }
+
+    deallocate(alloc, slots, PF_ARRAY_CAP(words) * sizeof(pstring_t));
+    return PSTRING_OK;
+}
+
 /** Recursively expands one `/`-separated component of the pattern at a
     time. `prefix` accumulates the literal directories already resolved
     ("src" while matching the "*" component in a pattern like
@@ -410,46 +457,251 @@ int pstrglob(
         return rc;
     }
 
-    size_t added = PF_ARRAY_LEN(&words);
-    pstring_t *slots = PF_ARRAY_GET(&words, 0);
+    return merge_words_into(dst, &words, alloc);
+}
 
-    /* An empty, freshly-zeroed `dst` can just take ownership of the
-       pf_array's storage directly. Otherwise (the caller is accumulating
-       results across several `pstrglob` calls, as `pstrexpand_with`'s
-       pathname-expansion step does) copy element-by-element and free the
-       now-empty pf_array storage. */
-    if (dst->items == NULL && dst->length == 0 && dst->capacity == 0) {
-        dst->items = slots;
-        dst->length = added;
-        dst->capacity = PF_ARRAY_CAP(&words);
-        dst->allocator = alloc;
-        return PSTRING_OK;
+/* ---- brace expansion ---------------------------------------------- */
+
+typedef struct {
+    const char *start;
+    const char *end;
+} brace_span_t;
+
+typedef PF_ARRAY(brace_span_t) brace_spans_t;
+
+/** Copies [start,end) to `dst`, unescaping only the three characters
+    that are meaningful to brace syntax (`{`, `}`, `,`); every other
+    backslash is left untouched for whatever expansion stage runs
+    next. **/
+static int brace_copy_literal(pstring_t *dst, const char *start, const char *end) {
+    int rc = PSTRING_OK;
+
+    for (const char *p = start; !rc && p < end; p++) {
+        if (*p == '\\' && p + 1 < end
+            && (p[1] == '{' || p[1] == '}' || p[1] == ',')) {
+            rc = pstrcatc(dst, p[1]);
+            p++;
+        } else {
+            rc = pstrcatc(dst, *p);
+        }
     }
 
-    for (size_t i = 0; i < added; i++) {
-        if (dst->length >= dst->capacity) {
-            size_t newCap = dst->capacity ? dst->capacity * 2 : 4;
-            pstring_t *grown = reallocate(
-                alloc,
-                dst->items,
-                dst->capacity * sizeof(pstring_t),
-                newCap * sizeof(pstring_t)
-            );
-            if (!grown) {
-                for (; i < added; i++)
-                    pstrfree(&slots[i]);
-                deallocate(
-                    alloc, slots, PF_ARRAY_CAP(&words) * sizeof(pstring_t)
-                );
-                return PSTRTHROW_ENOMEM;
-            }
-            dst->items = grown;
-            dst->capacity = newCap;
+    return rc;
+}
+
+/** Finds the `}` matching the `{` just before `open`, honoring nested
+    `{...}` pairs and backslash escapes, and reports via `*hasComma`
+    whether a `,` appears at this pair's own top nesting level (a
+    comma inside a nested pair doesn't count). Returns NULL if there is
+    no matching close. **/
+static const char *
+brace_find_close(const char *open, const char *end, int *hasComma) {
+    int depth = 1;
+    *hasComma = 0;
+
+    for (const char *p = open; p < end; p++) {
+        if (*p == '\\' && p + 1 < end) {
+            p++;
+            continue;
         }
 
-        dst->items[dst->length++] = slots[i];
+        if (*p == '{') {
+            depth++;
+        } else if (*p == '}') {
+            if (--depth == 0)
+                return p;
+        } else if (*p == ',' && depth == 1) {
+            *hasComma = 1;
+        }
     }
 
-    deallocate(alloc, slots, PF_ARRAY_CAP(&words) * sizeof(pstring_t));
-    return PSTRING_OK;
+    return NULL;
+}
+
+/** Splits [start,end) (a brace pair's contents) into its top-level
+    comma-separated segments, honoring nested `{...}` pairs and
+    backslash escapes the same way `brace_find_close` does. **/
+static int
+brace_split(const char *start, const char *end, brace_spans_t *segs) {
+    int depth = 0;
+    const char *segStart = start;
+
+    for (const char *p = start; p < end; p++) {
+        if (*p == '\\' && p + 1 < end) {
+            p++;
+            continue;
+        }
+
+        if (*p == '{') {
+            depth++;
+        } else if (*p == '}') {
+            depth--;
+        } else if (*p == ',' && depth == 0) {
+            brace_span_t span = { segStart, p };
+            if (PF_ARRAY_PUSH(segs, &span, 1))
+                return PSTRTHROW_ENOMEM;
+            segStart = p + 1;
+        }
+    }
+
+    brace_span_t span = { segStart, end };
+    return PF_ARRAY_PUSH(segs, &span, 1) ? PSTRTHROW_ENOMEM : PSTRING_OK;
+}
+
+static void free_words(pstrglob_words_t *words) {
+    for (size_t i = 0; i < PF_ARRAY_LEN(words); i++)
+        pstrfree(PF_ARRAY_SLOT(words, i));
+    PF_ARRAY_FREE(words);
+}
+
+/** The recursive core of `pstrbrace`: expands every brace group found
+    in [start,end), appending each resulting combination (as an owned,
+    `alloc`-allocated string) to `out`.
+
+    Scans left to right for the first unescaped `{`. If none is found,
+    the whole range is literal. Otherwise, it looks for that `{`'s
+    matching `}`: if there isn't one, or the pair has no top-level
+    comma (so it isn't a valid brace expression), the `{` itself is
+    literal and the scan simply continues right after it -- which is
+    what lets an invalid outer pair like in `"{a{b,c}}"` still fall
+    through to expanding the valid inner `{b,c}` pair, matching the
+    common shell behavior for that case. When a valid pair is found,
+    its top-level comma-separated segments are each expanded
+    recursively (a segment may itself contain further groups), the
+    text after the closing `}` is also expanded recursively (it may
+    contain further groups too), and the final results are the cross
+    product of (every segment's alternatives) with (every suffix
+    alternative), each prefixed with the literal text before the
+    opening `{`. **/
+static int brace_expand_range(
+    const char *start, const char *end, allocator_t *alloc,
+    pstrglob_words_t *out
+) {
+    const char *p = start;
+    while (p < end) {
+        if (*p == '\\' && p + 1 < end) {
+            p += 2;
+            continue;
+        }
+        if (*p == '{')
+            break;
+        p++;
+    }
+
+    if (p == end) {
+        pstring_t item = { 0 };
+        int rc = brace_copy_literal(&item, start, end);
+        if (!rc)
+            rc = PF_ARRAY_PUSH(out, &item, 1) ? PSTRTHROW_ENOMEM : PSTRING_OK;
+        if (rc)
+            pstrfree(&item);
+        return rc;
+    }
+
+    int hasComma = 0;
+    const char *close = brace_find_close(p + 1, end, &hasComma);
+
+    if (!close || !hasComma) {
+        pstrglob_words_t tail;
+        PF_ARRAY_WITH_ALLOCATOR(&tail, alloc);
+
+        int rc = brace_expand_range(p + 1, end, alloc, &tail);
+        if (rc) {
+            free_words(&tail);
+            return rc;
+        }
+
+        for (size_t i = 0; !rc && i < PF_ARRAY_LEN(&tail); i++) {
+            pstring_t item = { 0 };
+            rc = brace_copy_literal(&item, start, p);
+            if (!rc)
+                rc = pstrcatc(&item, '{');
+            if (!rc)
+                rc = pstrcat(&item, PF_ARRAY_SLOT(&tail, i));
+            if (!rc)
+                rc = PF_ARRAY_PUSH(out, &item, 1) ? PSTRTHROW_ENOMEM
+                                                   : PSTRING_OK;
+            if (rc)
+                pstrfree(&item);
+        }
+
+        free_words(&tail);
+        return rc;
+    }
+
+    brace_spans_t segs;
+    PF_ARRAY_WITH_ALLOCATOR(&segs, alloc);
+    int rc = brace_split(p + 1, close, &segs);
+    if (rc) {
+        PF_ARRAY_FREE(&segs);
+        return rc;
+    }
+
+    pstrglob_words_t suffixes;
+    PF_ARRAY_WITH_ALLOCATOR(&suffixes, alloc);
+    rc = brace_expand_range(close + 1, end, alloc, &suffixes);
+    if (rc) {
+        PF_ARRAY_FREE(&segs);
+        free_words(&suffixes);
+        return rc;
+    }
+
+    for (size_t i = 0; !rc && i < PF_ARRAY_LEN(&segs); i++) {
+        brace_span_t *seg = PF_ARRAY_SLOT(&segs, i);
+
+        pstrglob_words_t segAlts;
+        PF_ARRAY_WITH_ALLOCATOR(&segAlts, alloc);
+        rc = brace_expand_range(seg->start, seg->end, alloc, &segAlts);
+        if (rc) {
+            free_words(&segAlts);
+            break;
+        }
+
+        for (size_t j = 0; !rc && j < PF_ARRAY_LEN(&segAlts); j++) {
+            for (size_t k = 0; !rc && k < PF_ARRAY_LEN(&suffixes); k++) {
+                pstring_t item = { 0 };
+                rc = brace_copy_literal(&item, start, p);
+                if (!rc)
+                    rc = pstrcat(&item, PF_ARRAY_SLOT(&segAlts, j));
+                if (!rc)
+                    rc = pstrcat(&item, PF_ARRAY_SLOT(&suffixes, k));
+                if (!rc)
+                    rc = PF_ARRAY_PUSH(out, &item, 1) ? PSTRTHROW_ENOMEM
+                                                       : PSTRING_OK;
+                if (rc)
+                    pstrfree(&item);
+            }
+        }
+
+        free_words(&segAlts);
+    }
+
+    free_words(&suffixes);
+    PF_ARRAY_FREE(&segs); /* brace_span_t elements aren't owned */
+
+    return rc;
+}
+
+int pstrbrace(
+    pstrarray_t *dst, const pstring_t *pattern, allocator_t *alloc
+) {
+    if (!dst || !pattern)
+        return PSTRTHROW_EINVAL;
+
+    if (!alloc)
+        alloc = &standard_allocator;
+
+    pstrglob_words_t words;
+    PF_ARRAY_WITH_ALLOCATOR(&words, alloc);
+
+    int rc = brace_expand_range(
+        pstrbuf(pattern), pstrend(pattern), alloc, &words
+    );
+
+    if (rc) {
+        free_words(&words);
+        return rc;
+    }
+
+    return merge_words_into(dst, &words, alloc);
 }

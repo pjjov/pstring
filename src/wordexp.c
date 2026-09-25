@@ -44,6 +44,18 @@
 
 #define MAX_ENV_NAME_LEN 256
 
+/** A private sentinel byte, never meaningful in normal shell-word text,
+    used to bracket text that came from inside a quote. `expand_string`
+    (via `expand_single_quote`/`expand_double_quote`) writes a pair of
+    these around whatever it copies out of a quoted span -- including
+    the empty span, for `''`/`""` -- instead of just dropping the quote
+    characters as it used to. `field_split` treats a byte pair as
+    "quoting is on/off here" rather than as literal text, so IFS
+    whitespace between the marks is no longer mistaken for a field
+    separator, and strips the marks back out once a field's boundaries
+    have been decided. **/
+#define PSTR_QUOTE_MARK '\x01'
+
 typedef PF_ARRAY(pstring_t) words_t;
 
 typedef struct pstrexpand_t {
@@ -235,17 +247,24 @@ static int expand_tilde(expand_state_t *state) {
 }
 
 static int expand_single_quote(pstring_t *dst, pstring_t *src) {
-    if (pstrget(src, 0) == '\'')
-        return PSTRING_OK;
+    if (pstrget(src, 0) == '\'') {
+        pstrrshift(src, 1); /* empty '' -- still a (zero-length) quoted
+                                word, so mark it rather than writing
+                                nothing at all */
+        int rc = pstrcatc(dst, PSTR_QUOTE_MARK);
+        return rc || pstrcatc(dst, PSTR_QUOTE_MARK);
+    }
 
     const char *start = pstrbuf(src);
     const char *end = pstrend(src);
 
     const char *quote = pstrchr(src, '\'');
 
-    int rc = PSTRING_OK;
-    if (quote > start)
+    int rc = pstrcatc(dst, PSTR_QUOTE_MARK);
+    if (!rc && quote > start)
         rc = pstrcats(dst, start, quote - start);
+    if (!rc)
+        rc = pstrcatc(dst, PSTR_QUOTE_MARK);
 
     pstrrange(src, NULL, quote ? quote + 1 : end, end);
     return rc;
@@ -265,13 +284,17 @@ static int expand_double_quote(expand_state_t *state) {
     pstring_t *src = state->src;
 
     if (pstrget(src, 0) == '"') {
-        pstrrshift(src, 1); /* empty "" */
-        return PSTRING_OK;
+        pstrrshift(src, 1); /* empty "" -- same reasoning as '' above */
+        int rc = pstrcatc(dst, PSTR_QUOTE_MARK);
+        return rc || pstrcatc(dst, PSTR_QUOTE_MARK);
     }
+
+    int res = pstrcatc(dst, PSTR_QUOTE_MARK);
+    if (res)
+        return res;
 
     const char *end = pstrend(src);
     const char *prev = pstrbuf(src);
-    int res = PSTRING_OK;
     const char *special;
 
     while (!res && (special = pstrpbrk(src, "$`\"\\"))) {
@@ -280,7 +303,7 @@ static int expand_double_quote(expand_state_t *state) {
 
         if (*special == '"') {
             pstrrange(src, NULL, special + 1, end);
-            return PSTRING_OK;
+            return pstrcatc(dst, PSTR_QUOTE_MARK);
         }
 
         pstrrange(src, NULL, special + 1, end);
@@ -554,72 +577,110 @@ static int fs_skip_ws(split_state_t *state) {
     return PSTRING_OK;
 }
 
-static int field_split(split_state_t *state) {
-    if (init_ifs_tables(state)) /* empty IFS */
-        return words_push_dup(state->words, state->src);
+/** True if `c` is one of the characters in `state->ifs` (the whole set,
+    whitespace or not). **/
+static int is_ifs_char(split_state_t *state, char c) {
+    for (const char *p = pstrbuf(&state->ifs); *p; p++)
+        if (*p == c)
+            return 1;
+    return 0;
+}
 
-    pstrlstrip(state->src, state->ws);
+/** Scans [pstrbuf(src), pstrend(src)) for the first IFS character that
+    is outside a quoted span (a `PSTR_QUOTE_MARK`-delimited run left by
+    `expand_string`), toggling quote state on each mark byte without
+    ever treating a mark itself as a delimiter. Returns a pointer to
+    that character, or NULL if the rest of `src` has no such
+    delimiter -- meaning whatever quoted whitespace it contains, if
+    any, is protected and belongs to a single field. **/
+static const char *find_delim(split_state_t *state, pstring_t *src) {
+    int inQuote = 0;
 
-    pstring_t field;
-    pstring_t *src = state->src;
-    const char *ws = pstrbuf(state->src);
+    for (const char *p = pstrbuf(src); p < pstrend(src); p++) {
+        if (*p == PSTR_QUOTE_MARK) {
+            inQuote = !inQuote;
+            continue;
+        }
+        if (!inQuote && is_ifs_char(state, *p))
+            return p;
+    }
+
+    return NULL;
+}
+
+/** Copies [start,end) to `dst`, dropping every `PSTR_QUOTE_MARK` byte
+    -- the marks have already done their job of protecting this field's
+    text from being split on, and must not leak into the final word. **/
+static int strip_marks(pstring_t *dst, const char *start, const char *end) {
     int rc = PSTRING_OK;
 
-    while (!rc && ws < pstrend(src)) {
-        if (!(ws = pstrpbrk(src, pstrbuf(&state->ifs))))
-            ws = pstrend(src);
-
-        pstrrange(&field, NULL, pstrbuf(src), ws);
-        pstrrange(src, NULL, ws, pstrend(src));
-
-        pstrrstrip(&field, state->ws);
-        rc = words_push_dup(state->words, &field) || fs_skip_ws(state);
-    }
+    for (const char *p = start; !rc && p < end; p++)
+        if (*p != PSTR_QUOTE_MARK)
+            rc = pstrcatc(dst, *p);
 
     return rc;
 }
 
-static int quote_remove(pstring_t *dst, const pstring_t *src) {
-    const char *s, *end = pstrend(src);
-    char quote = '\0';
+static int field_split(split_state_t *state) {
+    if (init_ifs_tables(state)) { /* empty IFS -- the whole (expanded)
+                                      string is a single field, but it
+                                      may still carry quote marks that
+                                      need to come out first */
+        pstring_t clean = { 0 };
+        int rc = strip_marks(&clean, pstrbuf(state->src), pstrend(state->src));
+        if (!rc)
+            rc = words_push_dup(state->words, &clean);
+        pstrfree(&clean);
+        return rc;
+    }
+
+    pstrlstrip(state->src, state->ws);
+
+    pstring_t *src = state->src;
+    const char *ws = pstrbuf(src);
     int rc = PSTRING_OK;
 
-    for (s = pstrbuf(src); !rc && s < end; s++) {
-        if (quote != '"' && *s == '\'')
-            quote = quote == '\'' ? '\0' : '\'';
-        else if (quote != '\'' && *s == '\"')
-            quote = quote == '\"' ? '\0' : '\"';
-        else if (quote != '\'' && *s == '\\' && &s[1] < end)
-            rc = pstrcatc(dst, *(++s));
-        else
-            rc = pstrcatc(dst, *s);
+    while (!rc && ws < pstrend(src)) {
+        if (!(ws = find_delim(state, src)))
+            ws = pstrend(src);
+
+        pstring_t field;
+        pstrrange(&field, NULL, pstrbuf(src), ws);
+        pstrrange(src, NULL, ws, pstrend(src));
+
+        pstrrstrip(&field, state->ws);
+
+        pstring_t clean = { 0 };
+        rc = strip_marks(&clean, pstrbuf(&field), pstrend(&field));
+        if (!rc)
+            rc = words_push_dup(state->words, &clean);
+        pstrfree(&clean);
+
+        if (!rc)
+            rc = fs_skip_ws(state);
     }
 
     return rc;
 }
 
 static int expand_pathname(path_state_t *state) {
-    pstring_t clean = { 0 };
-
     for (size_t i = 0; i < PF_ARRAY_LEN(state->words); i++) {
-        if (quote_remove(&clean, PF_ARRAY_SLOT(state->words, i)))
-            return PSTRING_EINVAL;
+        pstring_t *word = PF_ARRAY_SLOT(state->words, i);
 
-        int hasGlob = pstrpbrk(&clean, "*?[") != NULL;
+        int hasGlob = pstrpbrk(word, "*?[") != NULL;
 
         if (hasGlob) {
             int rc = call_handler(
-                state->handler, PSTREXPAND_GLOB, &clean, state->result
+                state->handler, PSTREXPAND_GLOB, word, state->result
             );
-
-            pstrfree(&clean);
-            clean = (pstring_t) { 0 };
 
             if (rc != PSTRING_OK)
                 return rc;
         } else {
+            pstring_t clean;
+            if (pstrdup(&clean, word, NULL))
+                return PSTRING_ENOMEM;
             PF_ARRAY_PUSH(state->result, &clean, 1);
-            clean = (pstring_t) { 0 };
         }
     }
 
@@ -632,15 +693,189 @@ static void words_free(words_t *words) {
     PF_ARRAY_FREE(words);
 }
 
-static int expand_with(
-    pstrexpand_t *handler, allocator_t *arena, words_t *result, pstring_t *src
+/** A run of `src` that is either entirely outside quotes (`quoted ==
+    0`) or a single `'...'`/`"..."` pair including its delimiters
+    (`quoted == 1`). Used by `brace_expand_word` to keep brace
+    expansion from reaching into quoted text, matching the shell rule
+    that `'{a,b}'` is not a brace expression. **/
+typedef struct {
+    const char *start;
+    const char *end;
+    int quoted;
+} word_span_t;
+
+typedef PF_ARRAY(word_span_t) word_spans_t;
+
+/** Splits `src` into alternating quoted/unquoted spans for
+    `brace_expand_word`. This only needs to track *which* regions are
+    quoted, not decode their contents (that's `expand_string`'s job,
+    which still runs on each brace alternative afterwards) -- so it
+    only has to agree with `check_invalid_chars` about where quotes
+    start and end, including the same backslash-escaping rules. **/
+static int split_quote_spans(pstring_t *src, word_spans_t *spans) {
+    const char *end = pstrend(src);
+    const char *segStart = pstrbuf(src);
+    const char *p = segStart;
+
+    while (p < end) {
+        char c = *p;
+
+        if (c == '\\' && p + 1 < end) {
+            p += 2;
+            continue;
+        }
+
+        if (c == '\'' || c == '"') {
+            if (p > segStart) {
+                word_span_t unquoted = { segStart, p, 0 };
+                if (PF_ARRAY_PUSH(spans, &unquoted, 1))
+                    return PSTRING_ENOMEM;
+            }
+
+            const char *qstart = p++;
+
+            if (c == '\'') {
+                while (p < end && *p != '\'')
+                    p++;
+            } else {
+                while (p < end) {
+                    if (*p == '\\' && p + 1 < end) {
+                        p += 2;
+                        continue;
+                    }
+                    if (*p == '"')
+                        break;
+                    p++;
+                }
+            }
+
+            if (p < end)
+                p++; /* consume the closing quote */
+
+            word_span_t quoted = { qstart, p, 1 };
+            if (PF_ARRAY_PUSH(spans, &quoted, 1))
+                return PSTRING_ENOMEM;
+
+            segStart = p;
+            continue;
+        }
+
+        p++;
+    }
+
+    if (p > segStart) {
+        word_span_t unquoted = { segStart, p, 0 };
+        if (PF_ARRAY_PUSH(spans, &unquoted, 1))
+            return PSTRING_ENOMEM;
+    }
+
+    return PSTRING_OK;
+}
+
+/** Brace-expands `src` into one or more raw (still-quoted,
+    still-otherwise-unexpanded) alternatives in `out`, which
+    `expand_with` then runs through the normal
+    expand_string/field_split/expand_pathname pipeline once per
+    alternative. Quoted spans (see `split_quote_spans`) are kept as a
+    single, unexpanded alternative each -- `'{a,b}'` is not a brace
+    expression -- while every unquoted span is expanded with the
+    public `pstrbrace`; the whole word's alternatives are the cross
+    product of every span's alternatives, in order. **/
+static int brace_expand_word(words_t *out, pstring_t *src, allocator_t *arena) {
+    word_spans_t spans;
+    PF_ARRAY_WITH_ALLOCATOR(&spans, arena);
+
+    int rc = split_quote_spans(src, &spans);
+    if (rc) {
+        PF_ARRAY_FREE(&spans);
+        return rc;
+    }
+
+    words_t acc;
+    PF_ARRAY_WITH_ALLOCATOR(&acc, arena);
+
+    pstring_t empty;
+    pstrwrap(&empty, "", 0, 0);
+    if ((rc = words_push_dup(&acc, &empty))) {
+        PF_ARRAY_FREE(&spans);
+        words_free(&acc);
+        return rc;
+    }
+
+    for (size_t i = 0; !rc && i < PF_ARRAY_LEN(&spans); i++) {
+        word_span_t *sp = PF_ARRAY_SLOT(&spans, i);
+        pstring_t spanText;
+        pstrrange(&spanText, src, sp->start, sp->end);
+
+        words_t spanAlts;
+        PF_ARRAY_WITH_ALLOCATOR(&spanAlts, arena);
+
+        if (sp->quoted) {
+            rc = words_push_dup(&spanAlts, &spanText);
+        } else {
+            pstrarray_t braced = { 0 };
+            rc = pstrbrace(&braced, &spanText, NULL);
+            for (size_t k = 0; !rc && k < braced.length; k++)
+                rc = words_push_dup(&spanAlts, &braced.items[k]);
+            pstrarray_free(&braced);
+        }
+
+        if (rc) {
+            words_free(&spanAlts);
+            break;
+        }
+
+        words_t next;
+        PF_ARRAY_WITH_ALLOCATOR(&next, arena);
+
+        for (size_t a = 0; !rc && a < PF_ARRAY_LEN(&acc); a++) {
+            for (size_t b = 0; !rc && b < PF_ARRAY_LEN(&spanAlts); b++) {
+                pstring_t combined;
+                rc = pstrdup(&combined, PF_ARRAY_SLOT(&acc, a), NULL);
+                if (!rc)
+                    rc = pstrcat(&combined, PF_ARRAY_SLOT(&spanAlts, b));
+                if (!rc)
+                    rc = PF_ARRAY_PUSH(&next, &combined, 1) ? PSTRING_ENOMEM
+                                                            : PSTRING_OK;
+                if (rc)
+                    pstrfree(&combined);
+            }
+        }
+
+        words_free(&acc);
+        words_free(&spanAlts);
+        acc = next;
+    }
+
+    PF_ARRAY_FREE(&spans); /* word_span_t elements aren't owned */
+
+    if (rc) {
+        words_free(&acc);
+        return rc;
+    }
+
+    *out = acc;
+    return PSTRING_OK;
+}
+
+/** Runs one already brace-resolved word through expand_string (`$`,
+    backtick, arithmetic, tilde, quote removal), then field_split, then
+    expand_pathname, appending the results to `result`. This is what
+    `expand_with` used to do directly, before brace expansion was
+    inserted as a preprocessing step that can turn one raw word into
+    several of these. **/
+static int expand_one_word(
+    pstrexpand_t *handler,
+    allocator_t *arena,
+    words_t *result,
+    pstring_t *rawWord
 ) {
     pstring_t expanded = { 0 };
     if (pstralloc(&expanded, 4096, arena))
         return PSTRING_ENOMEM;
 
     pstring_t srcSlice;
-    pstrslice(&srcSlice, src, 0, pstrlen(src));
+    pstrslice(&srcSlice, rawWord, 0, pstrlen(rawWord));
 
     expand_state_t expandState;
     expandState.handler = handler;
@@ -671,10 +906,26 @@ static int expand_with(
     pathState.words = &splitWords;
     pathState.result = result;
 
-    if ((rc = expand_pathname(&pathState)))
+    return expand_pathname(&pathState);
+}
+
+/** Brace-expands `src` (see `brace_expand_word`) and then runs each
+    resulting alternative through `expand_one_word`, appending all of
+    their results to `result` in order. This is the top-level per-word
+    expansion entry point `pstrexpand_with` calls. **/
+static int expand_with(
+    pstrexpand_t *handler, allocator_t *arena, words_t *result, pstring_t *src
+) {
+    words_t alts;
+    int rc = brace_expand_word(&alts, src, arena);
+    if (rc)
         return rc;
 
-    return PSTRING_OK;
+    for (size_t i = 0; !rc && i < PF_ARRAY_LEN(&alts); i++)
+        rc = expand_one_word(handler, arena, result, PF_ARRAY_SLOT(&alts, i));
+
+    words_free(&alts);
+    return rc;
 }
 
 int pstrexpand_with(
@@ -814,15 +1065,70 @@ static int default_expand_arithmetic(pstring_t *out, pstring_t *expr) {
     return pstrfmt(out, "%lld", value);
 }
 
+/** The actual pattern-removal logic behind `${var#pattern}` and its
+    three siblings, and the default implementation of the
+    `PSTREXPAND_TRIM` hook. `pstrglob_match` is a whole-string matcher,
+    so "does the pattern match a prefix/suffix of length n" is checked
+    by matching it against just that slice of `value`; trying every
+    length from empty up to the whole string (or the other way around
+    for the greedy `##`/`%%` forms) finds the shortest/longest matching
+    prefix or suffix directly, with no need for a dedicated
+    prefix-of-a-glob matcher. If nothing matches at all -- including
+    the empty slice, which is what makes `${var#*}` a no-op, since `*`
+    matches zero characters too -- `value` is returned unchanged, same
+    as a real shell. **/
+static int default_expand_trim(pstring_t *out, const pstrexpand_trim_t *req) {
+    char patBuf[256];
+    const char *pattern = pstrterms(req->pattern, patBuf, sizeof(patBuf));
+    if (!pattern)
+        return PSTRING_ENOMEM;
+
+    const pstring_t *value = req->value;
+    long len = (long)pstrlen(value);
+    long best = -1;
+
+    long start = req->greedy ? len : 0;
+    long stop = req->greedy ? -1 : len + 1;
+    long step = req->greedy ? -1 : 1;
+
+    for (long n = start; n != stop; n += step) {
+        pstring_t piece;
+        if (req->suffix)
+            pstrrange(&piece, value, pstrend(value) - n, pstrend(value));
+        else
+            pstrrange(&piece, value, pstrbuf(value), pstrbuf(value) + n);
+
+        int rc = pstrglob_match(pattern, &piece, 0);
+        if (rc < 0)
+            return rc;
+        if (rc == PSTRING_TRUE) {
+            best = n;
+            break;
+        }
+    }
+
+    pstring_t remaining;
+    if (best < 0) {
+        remaining = *value;
+    } else if (req->suffix) {
+        pstrrange(&remaining, value, pstrbuf(value), pstrend(value) - best);
+    } else {
+        pstrrange(&remaining, value, pstrbuf(value) + best, pstrend(value));
+    }
+
+    return pstrcat(out, &remaining);
+}
+
 /** Implements the common POSIX `${...}` parameter-expansion operators:
     `${var}` (plain), `${var:-word}` (use default), `${var:=word}`
     (assign default -- accepted syntactically, but since pstring has no
     variable *store* to write back to, this behaves like `:-`),
     `${var:+word}` (use alternate value), `${var:?word}` (error if
-    unset), and `${#var}` (length). Nested `$`/backtick expansion inside
-    `word` is deliberately not attempted -- pattern-removal operators
-    (`${var#pattern}`, `${var%pattern}`) are not implemented and fall
-    through to PSTRING_ENOSYS. **/
+    unset), `${#var}` (length), and the pattern-removal family
+    `${var#pattern}`/`${var##pattern}` (strip the shortest/longest
+    matching prefix) and `${var%pattern}`/`${var%%pattern}` (strip the
+    shortest/longest matching suffix). Nested `$`/backtick expansion
+    inside `word`/`pattern` is deliberately not attempted. **/
 static int default_expand_brace(pstring_t *out, pstring_t *body, int flags) {
     int wantLength = pstrget(body, 0) == '#';
     if (wantLength)
@@ -854,9 +1160,29 @@ static int default_expand_brace(pstring_t *out, pstring_t *body, int flags) {
     }
 
     char op = *nameEnd;
+
+    if (op == '#' || op == '%') {
+        if (!isSet)
+            return (flags & PSTREXPAND_UNDEF) ? PSTREXPAND_BADVAL : PSTRING_OK;
+
+        pstring_t pattern;
+        pstrrange(&pattern, NULL, nameEnd + 1, pstrend(body));
+
+        int greedy = pstrget(&pattern, 0) == op;
+        if (greedy)
+            pstrrshift(&pattern, 1);
+
+        pstrexpand_trim_t req = {
+            .value = &value,
+            .pattern = &pattern,
+            .suffix = (op == '%'),
+            .greedy = greedy,
+        };
+        return default_expand_trim(out, &req);
+    }
+
     if (op != ':') {
-        /* only the ${var#pattern}/${var%pattern} family starts without
-           a colon, and those aren't implemented */
+        /* unrecognised ${var<op>...} */
         return PSTRING_ENOSYS;
     }
 
@@ -944,6 +1270,8 @@ int pstrexpand_default_cb(
         return default_expand_arithmetic(dst, src);
     case PSTREXPAND_GLOB:
         return default_expand_glob(dst, src);
+    case PSTREXPAND_TRIM:
+        return default_expand_trim(dst, src);
     }
 
     return PSTRTHROW_EINVAL;
