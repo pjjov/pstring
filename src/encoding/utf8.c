@@ -59,7 +59,7 @@ static int utf8_length(char c) {
 }
 
 const char *pstr_read_utf8(const char *chr, const char *end, uint32_t *out) {
-    if (!chr || !end || !out || (chr >= end))
+    if (!chr || !end || (chr >= end))
         return PSTRTHROW_NULL(PSTRING_EINVAL);
 
     int left = utf8_length(*chr);

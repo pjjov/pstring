@@ -15,6 +15,7 @@
 #include <pstring/glob.h>
 #include <pstring/io.h>
 #include <pstring/object.h>
+#include <pstring/pattern.h>
 #include <pstring/search.h>
 #include <pstring/transform.h>
 #include <pstring/wordexp.h>
