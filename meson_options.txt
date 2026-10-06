@@ -1,0 +1,13 @@
+# Copyright 2026 Предраг Јовановић
+# SPDX-FileCopyrightText: 2026 Предраг Јовановић
+# SPDX-License-Identifier: Apache-2.0
+
+# Oniguruma exports its own POSIX-compatible regcomp()/regexec(), which
+# replace the C library's in any program that links both. The test suite
+# therefore can't exercise the "posix" and "onig" adapters in one binary.
+option(
+    'test_onig',
+    type: 'feature',
+    value: 'disabled',
+    description: 'Test the Oniguruma adapter (replaces the posix adapter test)'
+)
