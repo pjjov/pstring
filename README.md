@@ -17,7 +17,7 @@ for dealing with strings in C.
 #include <pstring/io.h>
 #include <pstring/pstring.h>
 
-void example(pstream_t *out) {
+void example(pf_stream_t *out) {
     pstring_t *str = { 0 };
     pstrnew(&str, "Hi", 0, NULL)
 
@@ -27,7 +27,7 @@ void example(pstream_t *out) {
     pstring_t encoded = { 0 };
     pstrenc_base64(&encoded, &str);
 
-    pstream_write(out, pstrbuf(&encoded), pstrlen(&encoded));
+    pf_stream_putp(out, &encoded);
     pstrfree(&str);
 }
 ```
