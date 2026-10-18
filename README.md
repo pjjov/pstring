@@ -52,12 +52,26 @@ Shorter strings can be stored directly in the `pstring_t` using SSO,
 provided they have been allocated using the default allocator. This mechanism
 is not noticable most of the time, but can cause obscure bugs if misused.
 
-String functions are grouped in separate header files:
-- `pstring.h` - common string operations.
-- `encoding.h` - encoding and decoding functions.
-- `io.h` - file, memory and custom streams.
-- `dictionary.h` - hash map that stores key-value pairs.
-- `object.h` - dynamically typed serializable objects.
+String functions are grouped in separate header files, each documented below.
+
+## Documentation
+
+Reference documentation for each module (manual pages are in `docs/manual`):
+- [Common string operations](./docs/reference/pstring.md)
+- [Core types and functions](./docs/reference/pstring-core.md)
+- [Searching](./docs/reference/pstring-search.md)
+- [Transformations](./docs/reference/pstring-transform.md)
+- [Formatting](./docs/reference/pstring-format.md)
+- [Encoding and decoding](./docs/reference/pstring-encoding.md)
+- [Streams and serialization](./docs/reference/pstring-io.md)
+- [Dynamic objects](./docs/reference/pstring-object.md)
+- [Arithmetic expansion](./docs/reference/pstring-eval.md)
+- [Filename globbing](./docs/reference/pstring-glob.md)
+- [Word expansion](./docs/reference/pstring-wordexp.md)
+- [Pattern matching](./docs/reference/pstring-pattern.md)
+- [POSIX regex engine](./docs/reference/pstring-pattern-posix.md)
+- [PCRE2 engine](./docs/reference/pstring-pattern-pcre2.md)
+- [Oniguruma engine](./docs/reference/pstring-pattern-onig.md)
 
 ## Building
 
