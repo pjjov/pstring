@@ -1,0 +1,3 @@
+Enable-declaration-variants: yes
+Enable-macro-generics: yes
+Strip-declaration: PSTR_API

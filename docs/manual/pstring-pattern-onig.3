@@ -1,0 +1,30 @@
+.TH "ONIG" "3" "" "pstring 1.5" "pstring manual"
+.SH NAME
+onig \- API reference
+.SH SYNOPSIS
+.nf
+\fB#include <onig.h>\fR
+.fi
+.PP
+.nf
+\fBstatic const struct pstrexpr_vt pstrexpr_onig_vt;\fR
+.fi
+.PP
+.nf
+\fBPSTR_INLINE int pstrexpr_register_onig(const char *prefix);\fR
+.fi
+.SH REFERENCE
+.SS pstrexpr_onig_vt
+.PP
+The vtable, in case you want to register it under a different name.
+.SS pstrexpr_register_onig
+.PP
+Initializes Oniguruma for UTF\-8 and registers it under \fBprefix\fR,
+"onig" if it's \fBNULL\fR. Errors: see \fBpstrexpr_register\fR.
+.RS 4
+.PP
+libonig exports its own POSIX\-style \fBregcomp\fR and \fBregexec\fR. In a program
+that links it, these replace the C library's, which silently breaks
+\fB<pstring/pattern/posix.h>\fR (it would run Oniguruma's BRE/ERE emulation).
+Don't use the two adapters in the same program.
+.RE

@@ -1,0 +1,101 @@
+.TH "SEARCH FUNCTIONS FOR PSTRINGS." "3" "" "pstring 1.5" "pstring manual"
+.SH NAME
+Search functions for pstrings. \- API reference
+.SH SYNOPSIS
+.nf
+\fB#include <search.h>\fR
+.fi
+.PP
+.nf
+\fBchar *pstrchr(const pstring_t *str, int ch);
+char *pstrrchr(const pstring_t *str, int ch);\fR
+.fi
+.PP
+.nf
+\fBchar *pstrpbrk(const pstring_t *str, const char *set);
+char *pstrcpbrk(const pstring_t *str, const char *set);
+char *pstrrpbrk(const pstring_t *str, const char *set);
+char *pstrrcpbrk(const pstring_t *str, const char *set);\fR
+.fi
+.PP
+.nf
+\fBsize_t pstrspn(const pstring_t *str, const char *set);
+size_t pstrcspn(const pstring_t *str, const char *set);
+size_t pstrrspn(const pstring_t *str, const char *set);
+size_t pstrrcspn(const pstring_t *str, const char *set);\fR
+.fi
+.PP
+.nf
+\fBchar *pstrstr(const pstring_t *str, const pstring_t *sub);\fR
+.fi
+.PP
+.nf
+\fBint pstrtok(pstring_t *dst, const pstring_t *src, const char *set);\fR
+.fi
+.PP
+.nf
+\fBint pstrsplit(
+    pstring_t *dst, const pstring_t *src, const pstring_t *sep
+);
+int pstrsplits(
+    pstring_t *dst, const pstring_t *src, const char *sep, size_t length
+);\fR
+.fi
+.SH REFERENCE
+.SS pstrchr
+.PP
+Searches for character \fBch\fR from the start of \fBstr\fR,
+returning it's address if found and \fBNULL\fR otherwise.
+.PP
+The \fBpstrrchr\fR variant searches from the end instead.
+.SS pstrpbrk
+.PP
+Searches for a character in \fBstr\fR that is also found in \fBset\fR,
+returning it's address if found and \fBNULL\fR otherwise.
+.PP
+The \fBpstrrpbrk\fR and \fBpstrrcpbrk\fR variants search from the end instead.
+.PP
+\fBpstrcpbrk\fR and \fBpstrrcpbrk\fR variants search for a character that is not
+found in \fBset\fR returning it's address if found and \fBNULL\fR otherwise.
+.SS pstrspn
+.PP
+Returns the number of consecutive characters that appear
+at the start of \fBstr\fR that are included in the \fBset\fR.
+.PP
+The \fBpstrrspn\fR and \fBpstrrcspn\fR variants count from the end instead.
+.PP
+\fBpstrcspn\fR and \fBpstrrcspn\fR variants count the number of consecutive
+characters that aren't included in \fBset\fR, from start and end respectively.
+.SS pstrstr
+.PP
+Searches for \fBsub\fR inside \fBstr\fR, returning the address of the
+first character of the first match, or \fBNULL\fR if not found.
+.SS pstrtok
+.PP
+Tokenizes input string \fBsrc\fR into a sequence of tokens separated by
+a character inside \fBset\fR. If not found, \fBPSTRING_ENOENT\fR is returned.
+.PP
+Tokens and state are stored in \fBdst\fR. To initialize \fBdst\fR,
+call this function with \fBNULL\fR passed for \fBset\fR.
+.PP
+The next token is started at the first character not found in \fBset\fR and
+ends in the first character that is found in \fBset\fR, or the end of \fBsrc\fR.
+.PP
+\fBErrors\fR
+.PP
+EINVAL, ENOENT.
+.SS pstrsplit
+.PP
+Tokenizes input string \fBsrc\fR into a sequence of tokens separated by
+a substring \fBsep\fR. If not found, \fBPSTRING_ENOENT\fR is returned.
+.PP
+Tokens and state are stored in \fBdst\fR. To initialize \fBdst\fR,
+call this function with \fBNULL\fR passed for \fBsep\fR.
+.PP
+If \fBsep\fR comes right after the end of \fBdst\fR, it is skipped before searching
+for the next token. This behaviour can be suprising when using  different
+separators between function calls.
+.PP
+\fBErrors\fR
+.PP
+EINVAL, ENOENT.

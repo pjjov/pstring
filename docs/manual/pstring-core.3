@@ -1,0 +1,554 @@
+.TH "CORE FUNCTIONS FOR INTERACTING WITH PSTRINGS" "3" "" "pstring 1.5" "pstring manual"
+.SH NAME
+Core functions for interacting with pstrings \- The pstring_t structure describes strings using 4 variables: \- string's character buffer (pstrbuf), \- the number of characters inside the buffer (pstrlen), \- buffer's size/capacity (pstrcap), \- allocator which owns the buffer's memory (pstrallocator).
+.SH SYNOPSIS
+.nf
+\fB#include <core.h>\fR
+.fi
+.PP
+.nf
+\fBenum pstring_error {
+    PSTRING_OK = 0,
+    PSTRING_ENOENT = \-2,
+    PSTRING_EINTR = \-4,
+    PSTRING_EIO = \-5,
+    PSTRING_ENOMEM = \-12,
+    PSTRING_EEXIST = \-17,
+    PSTRING_EINVAL = \-22,
+    PSTRING_EDOM = \-33,
+    PSTRING_ERANGE = \-34,
+    PSTRING_ENOSYS = \-38,
+    PSTRING_ENODATA = \-61,
+    PSTRING_EENCODE = \-192,
+    PSTRING_EDECODE = \-193,
+    PSTRING_EOBJECT = \-194,
+};\fR
+.fi
+.PP
+.nf
+\fBpf_exception_t *pstrcatch(int error);\fR
+.fi
+.PP
+.nf
+\fB#define PSTRTHROW(code, msg)
+#define PSTRTHROWF(code, fmt, ...)
+#define PSTRVTHROWF(code, fmt, args)
+#define PSTRTHROW_NULL(code)
+#define PSTRTHROW_ENOENT PSTRTHROW(PSTRING_ENOENT, NULL)
+#define PSTRTHROW_EINTR PSTRTHROW(PSTRING_EINTR, NULL)
+#define PSTRTHROW_EIO PSTRTHROW(PSTRING_EIO, NULL)
+#define PSTRTHROW_ENOMEM PSTRTHROW(PSTRING_ENOMEM, NULL)
+#define PSTRTHROW_EEXIST PSTRTHROW(PSTRING_EEXIST, NULL)
+#define PSTRTHROW_EINVAL PSTRTHROW(PSTRING_EINVAL, NULL)
+#define PSTRTHROW_EDOM PSTRTHROW(PSTRING_EDOM, NULL)
+#define PSTRTHROW_ERANGE PSTRTHROW(PSTRING_ERANGE, NULL)
+#define PSTRTHROW_ENOSYS PSTRTHROW(PSTRING_ENOSYS, NULL)
+#define PSTRTHROW_ENODATA PSTRTHROW(PSTRING_ENODATA, NULL)
+#define PSTRTHROW_EENCODE PSTRTHROW(PSTRING_EENCODE, NULL)
+#define PSTRTHROW_EDECODE PSTRTHROW(PSTRING_EDECODE, NULL)
+#define PSTRTHROW_EOBJECT PSTRTHROW(PSTRING_EOBJECT, NULL)\fR
+.fi
+.PP
+.nf
+\fBPSTR_NORETURN   int pstrthrow(
+    int code, const char *func, const char *msg
+);\fR
+.fi
+.PP
+.nf
+\fBPSTR_NORETURN   int pstrthrowf(
+    int code, const char *func, const char *fmt, ...
+);\fR
+.fi
+.PP
+.nf
+\fBPSTR_NORETURN   int pstrvthrowf(
+    int code, const char *func, const char *fmt, va_list args
+);\fR
+.fi
+.PP
+.nf
+\fBPSTR_NORETURN   int pstrrethrow(pf_exception_t *e);\fR
+.fi
+.PP
+.nf
+\fBvoid pstrdetect(void);\fR
+.fi
+.PP
+.nf
+\fBPSTR_INLINE char *pstrbuf(const pstring_t *str);\fR
+.fi
+.PP
+.nf
+\fBPSTR_INLINE size_t pstrlen(const pstring_t *str);\fR
+.fi
+.PP
+.nf
+\fBPSTR_INLINE size_t pstrcap(const pstring_t *str);\fR
+.fi
+.PP
+.nf
+\fBPSTR_INLINE allocator_t *pstrallocator(const pstring_t *str);\fR
+.fi
+.PP
+.nf
+\fBPSTR_INLINE int pstrsso(const pstring_t *str);\fR
+.fi
+.PP
+.nf
+\fBPSTR_INLINE int pstrowned(const pstring_t *str);\fR
+.fi
+.PP
+.nf
+\fBPSTR_INLINE char *pstrend(const pstring_t *str);\fR
+.fi
+.PP
+.nf
+\fBPSTR_INLINE char pstrget(const pstring_t *str, size_t i);\fR
+.fi
+.PP
+.nf
+\fBPSTR_INLINE char *pstrslot(const pstring_t *str, size_t i);\fR
+.fi
+.PP
+.nf
+\fBint pstrnew(
+    pstring_t *out, const char *str, size_t len, allocator_t *alloc
+);\fR
+.fi
+.PP
+.nf
+\fBint pstrdup(
+    pstring_t *out, const pstring_t *str, allocator_t *allocator
+);\fR
+.fi
+.PP
+.nf
+\fBint pstralloc(pstring_t *out, size_t capacity, allocator_t *alloc);\fR
+.fi
+.PP
+.nf
+\fBvoid pstrfree(pstring_t *str);\fR
+.fi
+.PP
+.nf
+\fBvoid pstrarray_free(pstrarray_t *array);\fR
+.fi
+.PP
+.nf
+\fBint pstrdump(const pstring_t *str, char *buffer, size_t size);\fR
+.fi
+.PP
+.nf
+\fBint pstrterm(pstring_t *str, allocator_t *allocator);\fR
+.fi
+.PP
+.nf
+\fBchar *pstrterms(pstring_t *str, char *buffer, size_t size);\fR
+.fi
+.PP
+.nf
+\fBPSTR_INLINE int pstristerm(pstring_t *str);\fR
+.fi
+.PP
+.nf
+\fBchar *pstrunwrap(const pstring_t *str, allocator_t *allocator);\fR
+.fi
+.PP
+.nf
+\fBint pstrwrap(
+    pstring_t *out, char *buffer, size_t length, size_t capacity
+);\fR
+.fi
+.PP
+.nf
+\fBint pstrwrapb(
+    pstring_t *out, char *buffer, size_t length, size_t capacity
+);\fR
+.fi
+.PP
+.nf
+\fBint pstrslice(
+    pstring_t *out, const pstring_t *str, size_t from, size_t to
+);\fR
+.fi
+.PP
+.nf
+\fBint pstrcut(pstring_t *str, size_t from, size_t to);\fR
+.fi
+.PP
+.nf
+\fBint pstrrange(
+    pstring_t *out, const pstring_t *str, const char *from, const char *to
+);\fR
+.fi
+.PP
+.nf
+\fB#define PSTRWRAP(str)\fR
+.fi
+.PP
+.nf
+\fB#define PSTR(str)\fR
+.fi
+.PP
+.nf
+\fBint pstrreserve(pstring_t *str, size_t count);\fR
+.fi
+.PP
+.nf
+\fBint pstrgrow(pstring_t *str, size_t count);\fR
+.fi
+.PP
+.nf
+\fBint pstrshrink(pstring_t *str);\fR
+.fi
+.PP
+.nf
+\fB#define pstrclear(str)\fR
+.fi
+.PP
+.nf
+\fBint pstrequal(const pstring_t *left, const pstring_t *right);
+int pstrequalb(
+    const pstring_t *left, const char *right, size_t length
+);\fR
+.fi
+.PP
+.nf
+\fBint pstrequals(
+    const pstring_t *left, const char *right, size_t length
+);\fR
+.fi
+.PP
+.nf
+\fBint pstrcmp(const pstring_t *left, const pstring_t *right);
+int pstrcmps(const pstring_t *left, const char *right, size_t length);\fR
+.fi
+.PP
+.nf
+\fBint pstrcpy(pstring_t *dst, const pstring_t *src);\fR
+.fi
+.PP
+.nf
+\fBsize_t pstrhash(const pstring_t *str);\fR
+.fi
+.PP
+.nf
+\fBint pstrdistance(const pstring_t *left, const pstring_t *right);\fR
+.fi
+.PP
+.nf
+\fBPSTR_INLINE int pstrshift(pstring_t *str, size_t left, size_t right);
+PSTR_INLINE int pstrlshift(pstring_t *str, size_t count);
+PSTR_INLINE int pstrrshift(pstring_t *str, size_t count);\fR
+.fi
+.PP
+.nf
+\fBint pstrprefix(
+    const pstring_t *str, const char *prefix, size_t length
+);\fR
+.fi
+.PP
+.nf
+\fBint pstrsuffix(
+    const pstring_t *str, const char *suffix, size_t length
+);\fR
+.fi
+.PP
+.nf
+\fBint pstrenv(pstring_t *out, const pstring_t *name);\fR
+.fi
+.PP
+.nf
+\fBPSTR_INLINE void pstr__setlen(pstring_t *str, size_t length);\fR
+.fi
+.SH DESCRIPTION
+.PP
+The \fBpstring_t\fR structure describes strings using 4 variables:
+.IP \(bu 2
+string's character buffer (\fBpstrbuf\fR),
+.IP \(bu 2
+the number of characters inside the buffer (\fBpstrlen\fR),
+.IP \(bu 2
+buffer's size/capacity (\fBpstrcap\fR),
+.IP \(bu 2
+allocator which owns the buffer's memory (\fBpstrallocator\fR).
+.PP
+Strings initialized with \fB{0}\fR or created using \fBpstrnew\fR, \fBpstralloc\fR,
+\fBpstrdup\fR and others, own their buffers and can be resized and expanded,
+but require calling \fBpstrfree\fR to free memory resources.
+.PP
+Strings can also be initialized as slices using \fBpstrwrap\fR, \fBpstrslice\fR and
+\fBpstrrange\fR. Since slices represent chunks of other strings, they don't
+need to be freed, but their buffer needs to be valid during their usage.
+.PP
+Shorter strings can be stored directly in the \fBpstring_t\fR using SSO,
+provided they have been allocated using the default allocator. This mechanism
+is not noticable most of the time, but can cause obscure bugs if misused.
+.SH REFERENCE
+.SS pstring_error
+.PP
+Error codes are negated versions of POSIX ones.
+.SS pstrcatch
+.PP
+This function set's up the exception handler for the \fB<pf_exception.h>\fR
+exception handling interface. The first call will return \fBNULL\fR, after
+which exception\-throwing code can be executed.
+.PP
+The second return value will represent the emitted exception.
+.RS 4
+.PP
+The global exception stack is thread local.
+.RE
+.SS PSTRTHROW
+.PP
+These macros emit an exception with the given error code and message.
+.SS pstrthrow
+.PP
+Emits an exception with given message.
+.SS pstrthrowf
+.PP
+Emits an exception with given formatting.
+.SS pstrvthrowf
+.PP
+Emits an exception with given formatting.
+.SS pstrrethrow
+.PP
+Emits the exception \fBe\fR for the next catcher.
+.SS pstrdetect
+.PP
+When \fBPSTRING_DETECT\fR is defined, this function detects the
+SIMD capabilities of the CPU at runtime. Otherwise, the function
+immediately exits, while the SIMD detection occurs at compile\-time.
+.SS pstrbuf
+.PP
+Returns the character buffer of \fBstr\fR. If \fBstr\fR is resized after calling
+this function, the returned pointer should be considered invalid.
+.SS pstrlen
+.PP
+Returns the length, number of bytes, of \fBstr\fR.
+.SS pstrcap
+.PP
+Returns the number of bytes allocated by \fBstr\fR.
+.SS pstrallocator
+.PP
+Returns the allocator used by \fBstr\fR or \fBNULL\fR if it's a slice.
+.SS pstrsso
+.PP
+Checks if \fBstr\fR is stored on the stack.
+.SS pstrowned
+.PP
+Checks if \fBstr\fR can be resized (not a slice).
+.SS pstrend
+.PP
+Returns the address pointing to the end of the character buffer,
+which, if \fBstr\fR is owned, points to a \fB\e0\fR character.
+.SS pstrget
+.PP
+Returns the character at index \fBi\fR or \fB'\e0'\fR if out of bounds
+.SS pstrslot
+.PP
+Returns the pointer to the slot \fBi\fR or \fBNULL\fR if out of bounds
+.SS pstrnew
+.PP
+Initializes \fBout\fR by copying the contents of \fBstr\fR.
+If \fBlen\fR is \fB0\fR and \fBstr\fR is not empty, \fBstrlen\fR is called.
+If \fBalloc\fR is \fBNULL\fR, the standard allocator is used.
+.PP
+\fBErrors\fR
+.PP
+EINVAL, ENOMEM.
+.SS pstrdup
+.PP
+Copies the contents of \fBstr\fR into \fBout\fR, like \fBpstrnew\fR.
+You can use this function to turn slices into owned pstrings.
+.PP
+\fBErrors\fR
+.PP
+EINVAL, ENOMEM.
+.SS pstralloc
+.PP
+Initializes \fBout\fR and reserves \fBcapacity\fR bytes.
+.PP
+\fBErrors\fR
+.PP
+EINVAL, ENOMEM.
+.SS pstrfree
+.PP
+Frees all resources used by \fBstr\fR, if it is owned.
+.SS pstrarray_free
+.PP
+Frees all strings in array \fBa\fR, if they are owned.
+.SS pstrdump
+.PP
+Copies the contents of \fBstr\fR to \fBbuffer\fR as a null\-terminated string.
+.PP
+\fBErrors\fR
+.PP
+EINVAL, ENOMEM.
+.SS pstrterm
+.PP
+Ensures that \fBstr\fR is null\-terminated by copying it's content to a new
+buffer and appending '\e0', if it's not currently null\-terminated.
+.PP
+\fBErrors\fR
+.PP
+EINVAL, ENOMEM.
+.SS pstrterms
+.PP
+Ensures that \fBstr\fR is null\-terminated by copying it's content to the given
+buffer and appending '\e0', if it's not currently null\-terminated.
+Returned string is either \fBbuffer\fR or \fBpstrbuf(str)\fR.
+.SS pstristerm
+.PP
+Checks if \fBstr\fR is null\-terminated.
+.SS pstrunwrap
+.PP
+Returns the character buffer of \fBstr\fR. If \fBstr\fR is using SSO,
+the contents of \fBstr\fR will be copied to a brand new buffer.
+.SS pstrwrap
+.PP
+Initializes \fBout\fR as a slice, using the \fBbuffer\fR for storage.
+If \fBlength\fR is \fB0\fR, \fBstrlen\fR is used to calculate it's length.
+If \fBlength\fR is \fB0\fR and capacity is not, \fBstrnlen\fR is used instead.
+If \fBcapacity\fR is \fB0\fR it is set to the computed length.
+.PP
+\fBErrors\fR
+.PP
+EINVAL.
+.SS pstrwrapb
+.PP
+Initializes \fBout\fR as a slice, using the \fBbuffer\fR for storage.
+No \fBstrlen\fR is performed by this variant.
+.PP
+\fBErrors\fR
+.PP
+EINVAL.
+.SS pstrslice
+.PP
+Initializes \fBout\fR as a slice of bytes from \fBstr\fR, starting at \fBfrom\fR
+(inclusive) and ending at \fBto\fR (exclusive). Both indices are set to
+the length of \fBstr\fR if they are larger. If \fBto\fR is smaller than
+\fBfrom\fR, a zero\-length slice at \fBto\fR is taken.
+.PP
+\fBErrors\fR
+.PP
+EINVAL.
+.SS pstrcut
+.PP
+Removes characters around the specified slice of bytes from \fBstr\fR,
+starting at \fBfrom\fR (inclusive) and ending at \fBto\fR (exclusive).
+Both indices are set to the length of \fBstr\fR if they are larger.
+If \fBto\fR is smaller than \fBfrom\fR, the length of \fBstr\fR is set to zero.
+.RS 4
+.PP
+If \fBstr\fR is a slice, it is repositioned instead.
+.RE
+.PP
+\fBErrors\fR
+.PP
+EINVAL.
+.SS pstrrange
+.PP
+Initializes \fBout\fR as a range of bytes from \fBstr\fR, starting
+at \fBfrom\fR (inclusive) and ending at \fBto\fR (exclusive).
+If \fBfrom\fR is \fBNULL\fR or invalid, it's set to the start of the pstring.
+If \fBto\fR is \fBNULL\fR or invalid, it's set to the end of the pstring.
+.PP
+\fBErrors\fR
+.PP
+EINVAL.
+.SS PSTRWRAP
+.PP
+Initializes a \fBpstring_t\fR as a slice of \fBstr\fR, which is assumed
+to be a null\-terminated statically allocated string/array.
+.SS PSTR
+.PP
+Returns a reference to \fBpstring_t\fR that is initialized as a slice of \fBstr\fR,
+which is assumed to be a null\-terminated statically allocated string/array.
+.SS pstrreserve
+.PP
+Reserves space to fit additional \fBcount\fR items in \fBstr\fR
+.PP
+\fBErrors\fR
+.PP
+EINVAL, ENOMEM.
+.SS pstrgrow
+.PP
+Extends \fBstr\fR's buffer by at least \fBcount\fR bytes.
+.PP
+\fBErrors\fR
+.PP
+EINVAL, ENOMEM.
+.SS pstrshrink
+.PP
+Shrinks \fBstr\fR's buffer to use as little space as possible.
+.PP
+\fBErrors\fR
+.PP
+EINVAL, ENOMEM.
+.SS pstrclear
+.PP
+Removes all characters from \fBstr\fR, setting it's length to 0.
+.SS pstrequal
+.PP
+Checks if \fBleft\fR and \fBright\fR pstring are equal.
+.SS pstrequals
+.PP
+Checks if \fBleft\fR pstring and \fBright\fR string are equal.
+If \fBlength\fR is zero, \fBright\fR is treated as a null\-terminated string.
+.SS pstrcmp
+.PP
+Compares \fBleft\fR and \fBright\fR lexicographically, returning:
+.IP \(bu 2
+a positive number if \fBleft\fR should appear before \fBright\fR.
+.IP \(bu 2
+a negative number if \fBleft\fR should appear after \fBright\fR.
+.IP \(bu 2
+\fB0\fR if they are equal.
+.SS pstrcpy
+.PP
+Copies the contents of \fBsrc\fR into \fBdst\fR
+.PP
+\fBErrors\fR
+.PP
+EINVAL, ENOMEM.
+.SS pstrhash
+.PP
+Returns a non\-unique integer value representing the contents of \fBstr\fR.
+.PP
+\fBErrors\fR
+.PP
+EINVAL, ENOMEM.
+.SS pstrdistance
+.PP
+Returns Damerau–Levenshtein distance between \fBleft\fR and \fBright\fR.
+.PP
+\fBErrors\fR
+.PP
+EINVAL, ENOMEM.
+.SS pstrshift
+.PP
+This function slices \fBstr\fR by moving the starting index by \fBright\fR and
+the ending index by \fBleft\fR number of characters. (\fBstr\fR must be a slice)
+.PP
+\fBErrors\fR
+.PP
+EINVAL.
+.SS pstrprefix
+.PP
+Checks if \fBstr\fR starts with a \fBprefix\fR.
+.SS pstrsuffix
+.PP
+Checks if \fBstr\fR ends with a \fBsuffix\fR.
+.SS pstrenv
+.PP
+Gets the value of the environment variable \fBname\fR and slices it as \fBout\fR.
+Object \fBname\fR can be a slice, i.e. null termination is not required.
+.PP
+\fBErrors\fR
+.PP
+EINVAL, ENOENT, ENOMEM.
+.SS pstr__setlen
+.PP
+Naively sets the length of \fBstr\fR to \fBlength\fR

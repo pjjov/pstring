@@ -1,0 +1,26 @@
+.TH "PCRE2" "3" "" "pstring 1.5" "pstring manual"
+.SH NAME
+pcre2 \- API reference
+.SH SYNOPSIS
+.nf
+\fB#include <pcre2.h>\fR
+.fi
+.PP
+.nf
+\fBstatic const struct pstrexpr_vt pstrexpr_pcre2_vt;\fR
+.fi
+.PP
+.nf
+\fBPSTR_INLINE int pstrexpr_register_pcre2(const char *prefix);\fR
+.fi
+.SH REFERENCE
+.SS pstrexpr_pcre2_vt
+.PP
+The vtable, in case you want to register it under a different name.
+.SS pstrexpr_register_pcre2
+.PP
+Registers PCRE2 under \fBprefix\fR, "pcre" if it's \fBNULL\fR.
+.PP
+\fBErrors\fR
+.PP
+see \fBpstrexpr_register\fR.

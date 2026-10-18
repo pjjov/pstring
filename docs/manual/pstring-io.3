@@ -1,0 +1,88 @@
+.TH "STREAMING AND SERIALIZATION FUNCTIONS FOR PSTRINGS." "3" "" "pstring 1.5" "pstring manual"
+.SH NAME
+Streaming and serialization functions for pstrings. \- The pf_stream_t object can be used as a generic interface for interacting with byte streams.
+.SH SYNOPSIS
+.nf
+\fB#include <io.h>\fR
+.fi
+.PP
+.nf
+\fBint pstrreadall(pstring_t *out, const char *path);\fR
+.fi
+.PP
+.nf
+\fBint pstrwriteall(const pstring_t *str, const char *path);\fR
+.fi
+.PP
+.nf
+\fBint pstrio_printf(pstring_t *dst, const char *fmt, ...);\fR
+.fi
+.PP
+.nf
+\fBint pstrio_vprintf(pstring_t *dst, const char *fmt, va_list args);\fR
+.fi
+.PP
+.nf
+\fBint pf_stream_pstring(pf_stream_t *out, pstring_t *str);\fR
+.fi
+.PP
+.nf
+\fBint pf_stream_putp(pf_stream_t *stream, const pstring_t *str);\fR
+.fi
+.SH DESCRIPTION
+.PP
+The \fBpf_stream_t\fR object can be used as a generic interface for interacting
+with byte streams. Unlike standard library \fBFILE\fR, \fBpf_stream_t\fR objects
+can use user\-defined stream implementations such as network sockets,
+in\-memory buffers, encoders and serializers.
+.PP
+This header also provides powerful serialization and deserialization
+mechanisms through the \fBpstrmodel\fR and associated structures.
+.SH REFERENCE
+.SS pstrreadall
+.PP
+Concatenates the contents of the file onto the end of \fBout\fR.
+.PP
+\fBErrors\fR
+.PP
+EINVAL, ENOMEM, EIO.
+.SS pstrwriteall
+.PP
+Writes the entire string \fBout\fR to the file at \fBpath\fR.
+.PP
+\fBErrors\fR
+.PP
+EINVAL, EIO.
+.SS pstrio_printf
+.PP
+Concatenates string formated by standard library functions to \fBdst\fR.
+.PP
+\fBErrors\fR
+.PP
+EINVAL, ENOMEM, EIO.
+.SS pstrio_vprintf
+.PP
+Concatenates string formated by standard library functions to \fBdst\fR.
+Arguments are passed as a variable arguments list from \fB<stdarg.h>\fR.
+.PP
+\fBErrors\fR
+.PP
+EINVAL, ENOMEM, EIO.
+.SS pf_stream_pstring
+.PP
+Initializes a stream that will read and write to the buffer
+of \fBstr\fR, expanding it if needed. \fBstr\fR will NOT be freed by
+the stream when closing.
+.PP
+Stream cursor will be at the end of the string.
+.PP
+\fBErrors\fR
+.PP
+EINVAL, EIO.
+.SS pf_stream_putp
+.PP
+Writes a \fBpstring_t\fR to \fBstream\fR.
+.PP
+\fBErrors\fR
+.PP
+EINVAL, EIO.

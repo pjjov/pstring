@@ -1,0 +1,260 @@
+.TH "DYNAMIC OBJECT HANDLING AND SERIALIZATION." "3" "" "pstring 1.5" "pstring manual"
+.SH NAME
+Dynamic object handling and serialization. \- pstrobj_t represents a dynamically typed object which can be saved to and loaded from various formats.
+.SH SYNOPSIS
+.nf
+\fB#include <object.h>\fR
+.fi
+.PP
+.nf
+\fBpstrobj_t *pstrobj_new(allocator_t *allocator);\fR
+.fi
+.PP
+.nf
+\fBpstrobj_t *pstrobj_from_buffer(
+    const char *format, pstring_t *source, allocator_t *allocator
+);\fR
+.fi
+.PP
+.nf
+\fBpstrobj_t *pstrobj_from_stream(
+    const char *format, pf_stream_t *stream, allocator_t *allocator
+);
+pstrobj_t *pstrobj_load_json(
+    pf_stream_t *stream, allocator_t *allocator
+);
+pstrobj_t *pstrobj_load_xml(
+    pf_stream_t *stream, allocator_t *allocator
+);\fR
+.fi
+.PP
+.nf
+\fBpstrobj_t *pstrobj_from_path(
+    const char *format, const char *path, allocator_t *allocator
+);\fR
+.fi
+.PP
+.nf
+\fBint pstrobj_to_buffer(
+    pstrobj_t *obj, const char *format, pstring_t *source
+);\fR
+.fi
+.PP
+.nf
+\fBint pstrobj_to_stream(
+    pstrobj_t *obj, const char *format, pf_stream_t *stream
+);
+int pstrobj_save_json(pstrobj_t *obj, pf_stream_t *stream);
+int pstrobj_save_xml(pstrobj_t *obj, pf_stream_t *stream);\fR
+.fi
+.PP
+.nf
+\fBvoid pstrobj_free(pstrobj_t *obj);\fR
+.fi
+.PP
+.nf
+\fBpstrobj_t *pstrobj_query(pstrobj_t *obj, const char *query);
+void *pstrobj_query_value(pstrobj_t *obj, const char *query);\fR
+.fi
+.PP
+.nf
+\fBint pstrobj_set_null(pstrobj_t *obj);
+int pstrobj_set_bool(pstrobj_t *obj, char value);
+int pstrobj_set_int(pstrobj_t *obj, int value);
+int pstrobj_set_long(pstrobj_t *obj, long value);
+int pstrobj_set_float(pstrobj_t *obj, float value);
+int pstrobj_set_double(pstrobj_t *obj, double value);
+int pstrobj_set_list(pstrobj_t *obj);
+int pstrobj_set_dict(pstrobj_t *obj);\fR
+.fi
+.PP
+.nf
+\fBvoid pstrobj_expect_null(pstrobj_t *obj, int *status);
+int pstrobj_expect_bool(pstrobj_t *obj, int *status);
+int pstrobj_expect_int(pstrobj_t *obj, int *status);
+long pstrobj_expect_long(pstrobj_t *obj, int *status);
+float pstrobj_expect_float(pstrobj_t *obj, int *status);
+double pstrobj_expect_double(pstrobj_t *obj, int *status);
+const char *pstrobj_expect_string(pstrobj_t *obj, int *status);
+pstring_t *pstrobj_expect_pstring(pstrobj_t *obj, int *status);
+pstrobj_t *pstrobj_expect_list(pstrobj_t *obj, int *status);
+pstrobj_t *pstrobj_expect_dict(pstrobj_t *obj, int *status);\fR
+.fi
+.PP
+.nf
+\fB#define PSTROBJ__IMPL_QUERY(NAME, TYPE)
+PSTROBJ__IMPL_QUERY(bool, int);
+PSTROBJ__IMPL_QUERY(int, int);
+PSTROBJ__IMPL_QUERY(long, long);
+PSTROBJ__IMPL_QUERY(float, float);
+PSTROBJ__IMPL_QUERY(double, double);
+PSTROBJ__IMPL_QUERY(string, const char *);
+PSTROBJ__IMPL_QUERY(pstring, pstring_t *);
+PSTROBJ__IMPL_QUERY(list, pstrobj_t *);
+PSTROBJ__IMPL_QUERY(dict, pstrobj_t *);\fR
+.fi
+.PP
+.nf
+\fBint pstrobj_get_int(pstrobj_t *obj, int def);
+long pstrobj_get_long(pstrobj_t *obj, long def);
+float pstrobj_get_float(pstrobj_t *obj, float def);
+double pstrobj_get_double(pstrobj_t *obj, double def);\fR
+.fi
+.PP
+.nf
+\fBint pstrobj_copy_string(pstrobj_t *obj, const char *str, size_t len);
+int pstrobj_copy_pstring(pstrobj_t *obj, const pstring_t *str);
+int pstrobj_copy_key(pstrobj_t *obj, const pstring_t *str);
+int pstrobj_copy_keys(pstrobj_t *obj, const char *str, size_t len);\fR
+.fi
+.PP
+.nf
+\fBint pstrobj_wrap_string(pstrobj_t *obj, const char *str, size_t len);
+int pstrobj_wrap_pstring(pstrobj_t *obj, const pstring_t *str);
+int pstrobj_wrap_key(pstrobj_t *obj, const pstring_t *str);
+int pstrobj_wrap_keys(pstrobj_t *obj, const char *str, size_t len);\fR
+.fi
+.PP
+.nf
+\fBint pstrobj_list_insert(pstrobj_t *list, pstrobj_t *item, size_t i);\fR
+.fi
+.PP
+.nf
+\fBpstrobj_t *pstrobj_list_remove(pstrobj_t *list, size_t i);\fR
+.fi
+.PP
+.nf
+\fBPSTR_INLINE int pstrobj_list_free(pstrobj_t *list, size_t i);\fR
+.fi
+.PP
+.nf
+\fBpstrobj_t *pstrobj_dict_get(pstrobj_t *dict, const pstring_t *key);
+pstrobj_t *pstrobj_dict_gets(
+    pstrobj_t *dict, const char *key, size_t length
+);\fR
+.fi
+.PP
+.nf
+\fBint pstrobj_dict_insert(pstrobj_t *dict, pstrobj_t *item);\fR
+.fi
+.PP
+.nf
+\fBpstrobj_t *pstrobj_dict_remove(
+    pstrobj_t *dict, const char *key, size_t length
+);\fR
+.fi
+.PP
+.nf
+\fBPSTR_INLINE int pstrobj_dict_free(
+    pstrobj_t *dict, const char *key, size_t length
+);\fR
+.fi
+.SH DESCRIPTION
+.PP
+\fBpstrobj_t\fR represents a dynamically typed object which can be saved to and
+loaded from various formats. Unlike \fBstruct pstrmodel\fR which maps objects
+directly to C structures, \fBpstrobj\fR maintains the whole object in memory.
+.SH REFERENCE
+.SS pstrobj_new
+.PP
+Allocates a new object with NULL type.
+.SS pstrobj_from_buffer
+.PP
+Loads an object from \fBsource\fR that is in specified \fBformat\fR.
+.SS pstrobj_from_stream
+.PP
+Loads an object in \fBformat\fR by reading from \fBstream\fR.
+.SS pstrobj_from_path
+.PP
+Loads an object in \fBformat\fR by reading from the file at \fBpath\fR.
+.SS pstrobj_to_buffer
+.PP
+Saves an object to \fBsource\fR in specified \fBformat\fR.
+.SS pstrobj_to_stream
+.PP
+Saves an object in \fBformat\fR by writing to \fBstream\fR.
+.PP
+Since XML has no native list/dict distinction the way JSON does, the
+mapping used is: the root object becomes a single \fB<root>\fR element;
+a dict's members become child elements named after their keys; a
+list's items become repeated \fB<item>\fR elements; a string/long/double/
+bool becomes the element's text content; \fBnull\fR becomes an empty
+element. This is the same convention most JSON<\->XML converters
+use, and is reversed exactly by \fBpstrobj_load_xml\fR.
+.SS pstrobj_free
+.PP
+Frees object and it's children if it's detached.
+.SS pstrobj_query
+.PP
+Finds an object using the JSON Pointer format.
+.SS pstrobj_set_*
+.PP
+Following functions set the object's value and type.
+.PP
+\fBErrors\fR
+.PP
+EINVAL, ENOMEM.
+.SS pstrobj_expect_*
+.PP
+Following functions return the object's value if \fBobj\fR has a matching type.
+Otherwise a default value is returned and \fBstatus\fR is set to an error code.
+.SS pstrobj_query_*
+.PP
+Following functions query \fBobj\fR for a child and return the child's value
+if \fBobj\fR has a matching type. Otherwise a default value is returned and
+\fBstatus\fR is set to an error code.
+.SS pstrobj_get_*
+.PP
+Following functions return the object's value or the default value \fBdef\fR,
+depending on the type of \fBobj\fR, converting between types if necessary.
+.SS pstrobj_copy_string
+.PP
+Copies the contents of \fBstr\fR as the value of \fBobj\fR.
+.PP
+\fBErrors\fR
+.PP
+EINVAL, ENOMEM.
+.SS pstrobj_wrap_string
+.PP
+Wraps the contents of \fBstr\fR as the value of \fBobj\fR.
+.PP
+\fBErrors\fR
+.PP
+EINVAL, ENOMEM.
+.SS pstrobj_list_insert
+.PP
+Inserts \fBitem\fR at index \fBi\fR inside \fBlist\fR.
+.PP
+\fBErrors\fR
+.PP
+EINVAL, ENOMEM.
+.SS pstrobj_list_remove
+.PP
+Removes item at index \fBi\fR in \fBlist\fR and returns it.
+.SS pstrobj_list_free
+.PP
+Removes item at index \fBi\fR in \fBlist\fR and frees it.
+.PP
+\fBErrors\fR
+.PP
+EINVAL.
+.SS pstrobj_dict_get
+.PP
+Finds an item in \fBdict\fR with specified \fBkey\fR.
+.SS pstrobj_dict_insert
+.PP
+Inserts \fBitem\fR into \fBdict\fR with a previously set key.
+.PP
+\fBErrors\fR
+.PP
+EINVAL, ENOMEM.
+.SS pstrobj_dict_remove
+.PP
+Removes item with specified key in \fBdict\fR and returns it.
+.SS pstrobj_dict_free
+.PP
+Removes item with specified key in \fBdict\fR and frees it.
+.PP
+\fBErrors\fR
+.PP
+EINVAL.

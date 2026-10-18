@@ -1,0 +1,62 @@
+.TH "WORDEXP" "3" "" "pstring 1.5" "pstring manual"
+.SH NAME
+wordexp \- API reference
+.SH SYNOPSIS
+.nf
+\fB#include <wordexp.h>\fR
+.fi
+.PP
+.nf
+\fBtypedef struct pstrexpand_trim_t {
+    const pstring_t *value;
+    pstring_t *pattern;
+    int suffix;
+    int greedy;
+} pstrexpand_trim_t;\fR
+.fi
+.PP
+.nf
+\fBtypedef int(pstrexpand_fn)(
+    void *dst, void *src, int flags, int kind, void *user
+);\fR
+.fi
+.PP
+.nf
+\fBint pstrexpand(
+    pstrarray_t *dst, pstring_t *src, int flags, pstrexpand_fn *cb
+);\fR
+.fi
+.PP
+.nf
+\fBint pstrexpand_with(
+    pstrarray_t *dst, pstring_t *src, int flags, pstrexpand_fn *cb, void *user
+);\fR
+.fi
+.PP
+.nf
+\fBint pstrexpand_default_cb(
+    void *dst, void *src, int flags, int kind, void *user
+);\fR
+.fi
+.SH REFERENCE
+.SS pstrexpand_trim_t
+.PP
+Payload passed as \fBsrc\fR to a callback invoked with kind ==
+\fBPSTREXPAND_TRIM\fR, used by the \fB${var#pattern}\fR family of
+parameter\-expansion operators. \fBvalue\fR holds the variable's current
+value; \fBpattern\fR holds the (unexpanded) glob pattern text; \fBsuffix\fR
+distinguishes \fB%\fR/\fB%%\fR (trim from the end) from \fB#\fR/\fB##\fR (trim from
+the start); \fBgreedy\fR distinguishes the doubled \fB##\fR/\fB%%\fR form
+(longest match) from the single \fB#\fR/\fB%\fR form (shortest match).
+.SS pstrexpand_fn
+.PP
+Callback used for the \fBwordexp\fR shell expansion.
+.SS pstrexpand
+.PP
+Performs word expansion using the default callback.
+.SS pstrexpand_with
+.PP
+Performs word expansion using the provided callback.
+.SS pstrexpand_default_cb
+.PP
+Default callback used for \fBwordexp\fR shell expansion.

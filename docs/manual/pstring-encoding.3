@@ -1,0 +1,280 @@
+.TH "ENCODING AND DECODING FUNCTIONS FOR PSTRINGS." "3" "" "pstring 1.5" "pstring manual"
+.SH NAME
+Encoding and decoding functions for pstrings. \- The pstring library supports encoding and decoding many common formats out of the box.
+.SH SYNOPSIS
+.nf
+\fB#include <encoding.h>\fR
+.fi
+.PP
+.nf
+\fBtypedef int(pstrenc_fn)(pstring_t *dst, const pstring_t *src);\fR
+.fi
+.PP
+.nf
+\fBint pstrenc(pstring_t *dst, const pstring_t *src, const char *enc);
+int pstrdec(pstring_t *dst, const pstring_t *src, const char *enc);\fR
+.fi
+.PP
+.nf
+\fBint pstrenc_hex(pstring_t *dst, const pstring_t *src);
+int pstrdec_hex(pstring_t *dst, const pstring_t *src);\fR
+.fi
+.PP
+.nf
+\fBint pstrenc_url(pstring_t *dst, const pstring_t *src);
+int pstrdec_url(pstring_t *dst, const pstring_t *src);\fR
+.fi
+.PP
+.nf
+\fBint pstrenc_base32(pstring_t *dst, const pstring_t *src);
+int pstrdec_base32(pstring_t *dst, const pstring_t *src);\fR
+.fi
+.PP
+.nf
+\fBint pstrenc_base64(pstring_t *dst, const pstring_t *src);
+int pstrdec_base64(pstring_t *dst, const pstring_t *src);\fR
+.fi
+.PP
+.nf
+\fBint pstrenc_base64url(pstring_t *dst, const pstring_t *src);
+int pstrdec_base64url(pstring_t *dst, const pstring_t *src);\fR
+.fi
+.PP
+.nf
+\fBint pstrenc_base64table(
+    pstring_t *dst, const pstring_t *src, const pstring_t *table
+);
+int pstrdec_base64table(
+    pstring_t *dst, const pstring_t *src, const pstring_t *table
+);\fR
+.fi
+.PP
+.nf
+\fBint pstrenc_cstring(pstring_t *dst, const pstring_t *src);
+int pstrdec_cstring(pstring_t *dst, const pstring_t *src);\fR
+.fi
+.PP
+.nf
+\fBint pstrenc_utf8(pstring_t *dst, const uint32_t *src, size_t length);
+int pstrdec_utf8(uint32_t *dst, size_t *length, const pstring_t *src);\fR
+.fi
+.PP
+.nf
+\fBint pstrenc_utf16(
+    pstring_t *dst, const uint32_t *src, size_t length, int endian
+);\fR
+.fi
+.PP
+.nf
+\fBint pstrdec_utf16(
+    uint32_t *dst, size_t *length, const pstring_t *src, int endian
+);\fR
+.fi
+.PP
+.nf
+\fBint pstrenc_json(pstring_t *dst, const pstring_t *src);
+int pstrdec_json(pstring_t *dst, const pstring_t *src);\fR
+.fi
+.PP
+.nf
+\fBint pstrenc_xml(pstring_t *dst, const pstring_t *src);
+int pstrdec_xml(pstring_t *dst, const pstring_t *src);\fR
+.fi
+.PP
+.nf
+\fBPSTR_INLINE int pstrenc_html(pstring_t *dst, const pstring_t *src);
+PSTR_INLINE int pstrdec_html(pstring_t *dst, const pstring_t *src);\fR
+.fi
+.PP
+.nf
+\fBconst char *pstr_read_utf8(
+    const char *chr, const char *end, uint32_t *out
+);\fR
+.fi
+.PP
+.nf
+\fBchar *pstr_write_utf8(char *out, uint32_t c);\fR
+.fi
+.PP
+.nf
+\fBconst char *pstr_read_utf16(
+    const char *chr, const char *end, uint32_t *out, int endian
+);\fR
+.fi
+.PP
+.nf
+\fBchar *pstr_write_utf16(char *out, uint32_t c, int endian);\fR
+.fi
+.SH DESCRIPTION
+.PP
+The \fBpstring\fR library supports encoding and decoding many common
+formats out of the box. Since strings are assumed to be UTF\-8 encoded,
+the encoding functions are divided into two groups:
+.IP \(bu 2
+pstrenc \- for encoding UTF\-8 to a particular format.
+.IP \(bu 2
+pstrdec \- for decoding from a particular format to UTF\-8.
+.PP
+Both of those groups use the same function prototype, where the contents
+of parameter \fBsrc\fR are encoded and concatenated to parameter \fBdst\fR:
+.PP
+.RS 4
+.nf
+int pstrenc_*(pstring_t *dst, const pstring_t *src);
+.fi
+.RE
+.PP
+This way of handling parameters allows for encoding a stream of data.
+.PP
+Many operations on pstrings are encoding\-agnostic, while others assume
+an ASCII or UTF\-8 encoding. For those, UTF\-16 support is not explicitly
+supported and pstrings need to be converted to UTF\-8 for them to work.
+.SH REFERENCE
+.SS pstrenc_fn
+.PP
+Encoding/decoding function prototype.
+.SS pstrenc
+.PP
+Encodes/decodes \fBsrc\fR using the requested encoding format.
+.PP
+\fBErrors\fR
+.PP
+EINVAL, ENOMEM, EENCODE, EDECODE.
+.SS pstrenc_hex
+.PP
+Encodes/Decodes the bytes from \fBsrc\fR as a string of hexadecimal numbers.
+.PP
+For decoding, the source string should have an even length and contain only
+hexadecimal digits ('0123456789abcdefABCDEF').
+.PP
+\fBErrors\fR
+.PP
+EINVAL, ENOMEM, EENCODE, EDECODE.
+.SS pstrenc_url
+.PP
+Encodes/decodes \fBsrc\fR as a URL compatible string.
+.PP
+\fBErrors\fR
+.PP
+EINVAL, ENOMEM, EENCODE, EDECODE.
+.SS pstrenc_base32
+.PP
+Encodes/decodes RFC 4648 base32 (the \fBA\-Z2\-7\fR alphabet, \fB=\fR padding).
+Unlike base64, base32's alphabet avoids visually ambiguous characters
+(no \fB0\fR/\fBO\fR, \fB1\fR/\fBI\fR/\fBl\fR) and is case\-insensitive on decode, which is
+why it shows up in things meant to be typed by hand: TOTP/2FA secret
+keys, DNSSEC/DANE record encodings, and Crockford\-style IDs (though
+Crockford's own variant uses a different alphabet, not this one).
+.PP
+\fBErrors\fR
+.PP
+EINVAL, ENOMEM, EENCODE, EDECODE.
+.SS pstrenc_base64
+.PP
+Encodes/decodes \fBsrc\fR as a Base64\-encoded string.
+.PP
+\fBErrors\fR
+.PP
+EINVAL, ENOMEM, EENCODE, EDECODE.
+.SS pstrenc_base64url
+.PP
+Encodes/decodes \fBsrc\fR as a URL\-safe Base64\-encoded string.
+.PP
+\fBErrors\fR
+.PP
+EINVAL, ENOMEM, EENCODE, EDECODE.
+.SS pstrenc_base64table
+.PP
+Encodes/decodes \fBsrc\fR as a Base64\-encoded string using the provided
+translation table. \fBtable\fR must be exactly 64 characters long.
+.PP
+\fBErrors\fR
+.PP
+EINVAL, ENOMEM, EENCODE, EDECODE.
+.SS pstrenc_cstring
+.PP
+Encodes/decodes an escaped version of \fBsrc\fR into \fBdst\fR, which, if surrounded
+by quotes, is safe to use as a string literal in C source code.
+.PP
+\fBErrors\fR
+.PP
+EINVAL, ENOMEM, EENCODE, EDECODE.
+.SS pstrenc_utf8
+.PP
+Encodes/decodes codepoints from \fBsrc\fR as UTF8 characters.
+.PP
+For decoding variant, parameter \fBlength\fR should point to the maximum length
+of the buffer \fBdst\fR, which will be changed by the function to the number of
+codepoints decoded.
+.PP
+\fBErrors\fR
+.PP
+EINVAL, ENOMEM, EENCODE, EDECODE.
+.SS pstrenc_utf16
+.PP
+Encodes codepoints from \fBsrc\fR as UTF\-16 code units into \fBdst\fR, using
+\fBendian\fR byte order. Codepoints above \fB0xFFFF\fR are encoded as a
+surrogate pair (four bytes); a codepoint in the surrogate range
+(\fB0xD800\fR\-\fB0xDFFF\fR) or above \fB0x10FFFF\fR is invalid UTF\-16 and is
+replaced with the replacement character \fBU+FFFD\fR, matching how
+\fBpstrdec_utf8\fR already handles invalid input rather than failing.
+.PP
+\fBErrors\fR
+.PP
+EINVAL, ENOMEM, EENCODE, EDECODE.
+.SS pstrdec_utf16
+.PP
+Decodes UTF\-16 code units from \fBsrc\fR (byte order \fBendian\fR) into
+Unicode codepoints in \fBdst\fR. \fBlength\fR should point to the capacity of
+\fBdst\fR in codepoints (not code units); it is updated to the number of
+codepoints actually decoded. An unpaired or out\-of\-order surrogate
+decodes to \fBU+FFFD\fR and consumes just the one code unit, so decoding
+never gets permanently stuck on malformed input.
+.PP
+\fBErrors\fR
+.PP
+EINVAL, ENOMEM, EENCODE, EDECODE.
+.SS pstrenc_json
+.PP
+Encodes/decodes \fBsrc\fR as a JSON string into \fBdst\fR.
+.PP
+\fBErrors\fR
+.PP
+EINVAL, ENOMEM, EENCODE, EDECODE.
+.SS pstrenc_xml
+.PP
+Encodes/decodes \fBsrc\fR as a XML string into \fBdst\fR.
+.PP
+\fBErrors\fR
+.PP
+EINVAL, ENOMEM, ENOENT, EENCODE, EDECODE.
+.SS pstrenc_html
+.PP
+Encodes/decodes \fBsrc\fR as a HTML string into \fBdst\fR.
+.PP
+\fBErrors\fR
+.PP
+EINVAL, ENOMEM, ENOENT, EENCODE, EDECODE.
+.SS pstr_read_utf8
+.PP
+Reads a UTF\-8 character and stores it in \fBout\fR if it's not \fBNULL\fR.
+Returns a pointer to the first byte after the read character.
+.SS pstr_write_utf8
+.PP
+Writes a UTF\-8 character and stores it in \fBout\fR, returning the
+end of the written byte sequence. The output buffer should
+be big enough to store at least 4 bytes.
+.SS pstr_read_utf16
+.PP
+Reads one UTF\-16 code unit sequence (one code unit, or a surrogate
+pair) starting at \fBchr\fR and stores the decoded codepoint in \fBout\fR if
+it's not \fBNULL\fR. Returns a pointer to the first byte after the
+sequence read, which is always \fBchr + 2\fR (a lone/invalid code unit)
+or \fBchr + 4\fR (a valid surrogate pair).
+.SS pstr_write_utf16
+.PP
+Writes codepoint \fBc\fR as one or two UTF\-16 code units (four bytes for
+a surrogate pair), returning the end of the written sequence. The
+output buffer should be big enough to store at least 4 bytes. A
+codepoint that cannot be represented in UTF\-16 (in the surrogate
+range, or above \fB0x10FFFF\fR) is replaced with \fBU+FFFD\fR.

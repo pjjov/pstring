@@ -1,0 +1,147 @@
+.TH "STRING TRANSFORMATION FUNCTIONS" "3" "" "pstring 1.5" "pstring manual"
+.SH NAME
+String transformation functions \- This module provides function for inserting, removing and replacing parts of the string.
+.SH SYNOPSIS
+.nf
+\fB#include <transform.h>\fR
+.fi
+.PP
+.nf
+\fBint pstrcat(pstring_t *dst, const pstring_t *src);
+int pstrcats(pstring_t *dst, const char *src, size_t length);
+int pstrcatc(pstring_t *dst, char chr);
+PSTR_INLINE int pstrcatb(pstring_t *dst, const char *src, size_t length);\fR
+.fi
+.PP
+.nf
+\fBint pstrrcat(pstring_t *dst, const pstring_t *src);
+int pstrrcats(pstring_t *dst, const char *src, size_t length);
+PSTR_INLINE int pstrrcatc(pstring_t *dst, char chr);\fR
+.fi
+.PP
+.nf
+\fBint pstrinsert(pstring_t *dst, size_t at, pstring_t *src);
+int pstrinserts(
+    pstring_t *dst, size_t at, const char *src, size_t length
+);\fR
+.fi
+.PP
+.nf
+\fBint pstrinsertc(pstring_t *dst, size_t at, size_t count, char chr);\fR
+.fi
+.PP
+.nf
+\fBint pstrremove(pstring_t *str, size_t from, size_t to);\fR
+.fi
+.PP
+.nf
+\fBint pstrjoin(pstring_t *dst, const pstring_t *srcs, size_t count);\fR
+.fi
+.PP
+.nf
+\fBint pstrrepl(
+    pstring_t *str, const pstring_t *src, const pstring_t *dst, size_t max
+);
+int pstrrepls(
+    pstring_t *str, const char *src, const char *dst, size_t max
+);
+int pstrreplc(pstring_t *str, char src, char dst, size_t max);\fR
+.fi
+.PP
+.nf
+\fBint pstrstrip(pstring_t *str, const char *chars);
+int pstrlstrip(pstring_t *str, const char *chars);
+int pstrrstrip(pstring_t *str, const char *chars);\fR
+.fi
+.PP
+.nf
+\fBint pstrdedent(pstring_t *str, int count, int tab);\fR
+.fi
+.PP
+.nf
+\fBint pstrindent(pstring_t *str, int count, int tab);\fR
+.fi
+.SH DESCRIPTION
+.PP
+This module provides function for inserting, removing and replacing
+parts of the string.
+.SH REFERENCE
+.SS pstrcat
+.PP
+Concatenates \fBsrc\fR onto the end of \fBdst\fR.
+.PP
+\fBErrors\fR
+.PP
+EINVAL, ENOMEM.
+.SS pstrrcat
+.PP
+Concatenates \fBsrc\fR onto the start of \fBdst\fR.
+.PP
+\fBErrors\fR
+.PP
+EINVAL, ENOMEM.
+.SS pstrinsert
+.PP
+Inserts characters from \fBsrc\fR into \fBdst\fR at index \fBat\fR.
+.PP
+\fBErrors\fR
+.PP
+EINVAL, ENOMEM.
+.SS pstrinsertc
+.PP
+Inserts \fBchr\fR character \fBcount\fR times into \fBdst\fR at index \fBat\fR.
+.PP
+\fBErrors\fR
+.PP
+EINVAL, ENOMEM.
+.SS pstrremove
+.PP
+Removes characters from \fBstr\fR in the specified range.
+.PP
+\fBErrors\fR
+.PP
+EINVAL, ENOMEM.
+.SS pstrjoin
+.PP
+Concatenates \fBcount\fR pstrings from \fBsrcs\fR onto \fBdst\fR.
+.PP
+\fBErrors\fR
+.PP
+EINVAL, ENOMEM.
+.SS pstrrepl
+.PP
+Replaces at most \fBmax\fR instances of substring \fBsrc\fR with \fBdst\fR.
+If \fBmax\fR is zero, all instances of \fBsrc\fR will be replaced.
+.PP
+\fBErrors\fR
+.PP
+EINVAL, ENOMEM.
+.SS pstrstrip
+.PP
+Removes leading and trailing characters from \fBstr\fR that are specified in
+\fBchars\fR. If \fBstr\fR is a slice, it will be resliced to omit them instead.
+.PP
+The \fBpstrlstrip\fR variant only removes leading, while \fBpstrrstrip\fR only
+removes trailing characters from \fBstr\fR that are specified in \fBchars\fR.
+.PP
+\fBErrors\fR
+.PP
+EINVAL.
+.SS pstrdedent
+.PP
+Removes leading whitespace up to \fBcount\fR, assuming that \fB\et\fR character
+is equivalent to \fBtab\fR blank characters (defaults to 4 instead).
+If \fBcount\fR is zero or less, all whitespace is removed.
+.PP
+\fBErrors\fR
+.PP
+EINVAL.
+.SS pstrindent
+.PP
+Inserts leading whitespace up to \fBcount\fR, assuming that \fB\et\fR character
+is equivalent to \fBtab\fR blank characters (defaults to 4 instead). If \fBcount\fR
+is zero or less, the minimum indentation already present is returned.
+.PP
+\fBErrors\fR
+.PP
+EINVAL.

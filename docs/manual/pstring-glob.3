@@ -1,0 +1,105 @@
+.TH "CROSS\-PLATFORM FILENAME GLOBBING." "3" "" "pstring 1.5" "pstring manual"
+.SH NAME
+Cross\-platform filename globbing. \- pstrglob_match implements POSIX fnmatch(3) style matching of a single name against a pattern (, ?, [...], and [!...]/[^...]), with no filesystem access at all \- it's a pure string predicate and behaves identically on every platform.
+.SH SYNOPSIS
+.nf
+\fB#include <glob.h>\fR
+.fi
+.PP
+.nf
+\fBint pstrglob_match(
+    const char *pattern, const pstring_t *name, int flags
+);\fR
+.fi
+.PP
+.nf
+\fBint pstrglob(
+    pstrarray_t *dst, const pstring_t *pattern, int flags, allocator_t *alloc
+);\fR
+.fi
+.PP
+.nf
+\fBint pstrbrace(
+    pstrarray_t *dst, const pstring_t *pattern, allocator_t *alloc
+);\fR
+.fi
+.SH DESCRIPTION
+.PP
+\fBpstrglob_match\fR implements POSIX \fBfnmatch(3)\fR style matching of a single
+name against a pattern (\fB*\fR, \fB?\fR, \fB[...]\fR, and \fB[!...]\fR/\fB[^...]\fR), with
+no filesystem access at all \- it's a pure string predicate and behaves
+identically on every platform.
+.PP
+\fBpstrglob\fR walks a path pattern component by component (splitting on
+\fB/\fR), listing directories with \fB<dirent.h>\fR on POSIX and
+\fBFindFirstFile\fR/\fBFindNextFile\fR on Windows, and matching each component
+against the corresponding pattern segment with \fBpstrglob_match\fR. Matches
+are collected depth\-first, so a pattern with multiple wildcard segments
+(e.g. \fBsrc\fR then \fB*\fR then \fB*.c\fR) works the same way it would in a
+POSIX shell.
+.SH REFERENCE
+.SS pstrglob_match
+.PP
+Tests whether \fBname\fR matches the shell\-style wildcard \fBpattern\fR:
+.IP \(bu 2
+\fB*\fR matches any run of characters (including none),
+.IP \(bu 2
+\fB?\fR matches exactly one character,
+.IP \(bu 2
+\fB[abc]\fR matches one of \fBa\fR, \fBb\fR, or \fBc\fR,
+.IP \(bu 2
+\fB[a\-z]\fR matches one character in the given range,
+.IP \(bu 2
+\fB[!...]\fR or \fB[^...]\fR matches any character NOT in the set,
+.IP \(bu 2
+\fB\e\ex\fR matches the literal character \fBx\fR (unless \fBPSTRGLOB_NOESCAPE\fR).
+.PP
+Unlike \fBpstrglob\fR, this function never touches the filesystem, so it
+is safe to use as a general\-purpose wildcard matcher (e.g. for the
+\fBcase\fR patterns during word expansion).
+.PP
+\fBReturns\fR
+.PP
+\fBPSTRING_TRUE\fR, \fBPSTRING_FALSE\fR, or a negative \fBpstring_error\fR.
+.SS pstrglob
+.PP
+Expands \fBpattern\fR into every path that exists on disk and matches it,
+appending results to \fBdst\fR (which follows the same ownership rules as
+\fBpstrarray_t\fR elsewhere in pstring: initialize with \fB{0}\fR and free with
+\fBpstrarray_free\fR). Path components are separated by \fB/\fR on every
+platform; \fB\e\e\fR is additionally accepted as a separator on Windows.
+.PP
+If no matches are found, returns \fBPSTRING_ENOENT\fR unless
+\fBPSTRGLOB_NOCHECK\fR is set, in which case \fBpattern\fR itself is appended
+as the sole result.
+.PP
+\fBErrors\fR
+.PP
+EINVAL, ENOMEM, ENOENT.
+.SS pstrbrace
+.PP
+Expands shell\-style \fB{a,b,c}\fR brace notation, appending every
+resulting combination to \fBdst\fR (same ownership rules as \fBpstrglob\fR:
+initialize with \fB{0}\fR, free with \fBpstrarray_free\fR). This is a purely
+textual expansion \-\- it never touches the filesystem and has nothing
+to do with \fBpstrglob_match\fR's wildcards:
+.PP
+.RS 4
+.nf
+"file.{c,h}"     \-> ["file.c", "file.h"]
+"a{b,c{d,e}}f"   \-> ["abf", "acdf", "acef"]
+"img{01..03}.png"  (numeric ranges are not supported)
+.fi
+.RE
+.PP
+A \fB{...}\fR group is only expanded if it contains at least one
+top\-level comma; otherwise its braces are left as literal characters
+(matching the shell convention that \fB{lonely}\fR is not a valid brace
+expression). \fB\e\e{\fR, \fB\e\e}\fR and \fB\e\e,\fR are literal characters rather
+than group/separator syntax. Multiple groups in the same pattern
+(adjacent or nested) all expand, and the results are the cross
+product of every group's alternatives.
+.PP
+\fBErrors\fR
+.PP
+EINVAL, ENOMEM.

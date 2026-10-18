@@ -1,0 +1,93 @@
+.TH "SHELL\-LIKE ARITHMETIC EXPANSION" "3" "" "pstring 1.5" "pstring manual"
+.SH NAME
+Shell\-like arithmetic expansion \- pstreval parses and evaluates a single arithmetic expression using 64\-bit signed integer arithmetic throughout (matching bash's own $((...)), which has no floating point).
+.SH SYNOPSIS
+.nf
+\fB#include <eval.h>\fR
+.fi
+.PP
+.nf
+\fBtypedef int pstreval_get_fn(long long *out, const pstring_t *name, void *user);\fR
+.fi
+.PP
+.nf
+\fBtypedef int pstreval_set_fn(const pstring_t *name, long long value, void *user);\fR
+.fi
+.PP
+.nf
+\fBint pstreval(
+    long long *out,
+    const pstring_t *expr,
+    pstreval_get_fn *get,
+    pstreval_set_fn *set,
+    void *user
+);\fR
+.fi
+.SH DESCRIPTION
+.PP
+\fBpstreval\fR parses and evaluates a single arithmetic expression using
+64\-bit signed integer arithmetic throughout (matching \fBbash\fR's own
+\fB$((...))\fR, which has no floating point). Supported grammar, from
+lowest to highest precedence:
+.IP \(bu 2
+\fB,\fR (comma, evaluates both sides, yields the right)
+.IP \(bu 2
+\fB= += \-= *= /= %= &= ^= |= <<= >>=\fR (assignment, right\-associative)
+.IP \(bu 2
+\fB?:\fR (ternary, right\-associative)
+.IP \(bu 2
+\fB||\fR
+.IP \(bu 2
+\fB&&\fR
+.IP \(bu 2
+\fB|\fR
+.IP \(bu 2
+\fB^\fR
+.IP \(bu 2
+\fB&\fR
+.IP \(bu 2
+\fB== !=\fR
+.IP \(bu 2
+\fB< <= > >=\fR
+.IP \(bu 2
+\fB<< >>\fR
+.IP \(bu 2
+\fB+ \-\fR
+.IP \(bu 2
+\fB* / %\fR
+.IP \(bu 2
+unary \fB+ \- ! ~\fR
+.IP \(bu 2
+\fB( expr )\fR
+.IP \(bu 2
+integer literals: decimal, \fB0x\fR/\fB0X\fR hex, \fB0\fR + octal digits
+.IP \(bu 2
+identifiers, resolved via the \fBresolve\fR/\fBassign\fR callbacks
+.PP
+Division and modulo by zero are reported as \fBPSTRING_ERANGE\fR rather
+than invoking undefined behaviour.
+.SH REFERENCE
+.SS long
+.PP
+Called for every bare identifier the expression references. Return
+\fBPSTRING_OK\fR and write the variable's current value to \fB*out\fR (\fB0\fR if
+unset is a reasonable default, matching shell semantics), or return an
+error to abort evaluation. May be \fBNULL\fR, in which case every
+identifier evaluates to \fB0\fR.
+.SS const
+.PP
+Called when the expression assigns to an identifier (\fBx = 1\fR, \fBx += 2\fR,
+a leading/trailing \fB++\fR/\fB\-\-\fR, ...). May be \fBNULL\fR, in which case
+assignment expressions fail with \fBPSTRING_EINVAL\fR.
+.SS pstreval
+.PP
+Evaluates \fBexpr\fR and writes the result to \fB*out\fR. \fBget\fR/\fBset\fR resolve
+and store variable references; either may be \fBNULL\fR per their
+documentation above. \fBuser\fR is passed through to both unchanged.
+.PP
+no \fBset\fR callback), ERANGE (division or modulo by zero), plus
+whatever \fBget\fR/\fBset\fR themselves return.
+.PP
+\fBErrors\fR
+.PP
+EINVAL (parse error, or assignment with

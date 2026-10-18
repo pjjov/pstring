@@ -1,0 +1,26 @@
+.TH "POSIX" "3" "" "pstring 1.5" "pstring manual"
+.SH NAME
+posix \- API reference
+.SH SYNOPSIS
+.nf
+\fB#include <posix.h>\fR
+.fi
+.PP
+.nf
+\fBstatic const struct pstrexpr_vt pstrexpr_posix_vt;\fR
+.fi
+.PP
+.nf
+\fBPSTR_INLINE int pstrexpr_register_posix(const char *prefix);\fR
+.fi
+.SH REFERENCE
+.SS pstrexpr_posix_vt
+.PP
+The vtable, in case you want to register it under a different name.
+.SS pstrexpr_register_posix
+.PP
+Registers POSIX regex under \fBprefix\fR, "posix" if it's \fBNULL\fR.
+.PP
+\fBErrors\fR
+.PP
+see \fBpstrexpr_register\fR.

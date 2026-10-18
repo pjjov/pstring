@@ -1,0 +1,129 @@
+.TH "STRING FORMATTING FUNCTIONS" "3" "" "pstring 1.5" "pstring manual"
+.SH NAME
+String formatting functions \- This module provides time and string formatting functions.
+.SH SYNOPSIS
+.nf
+\fB#include <format.h>\fR
+.fi
+.PP
+.nf
+\fBint pstrfmt(pstring_t *dst, const char *fmt, ...);
+int pstrfmtv(pstring_t *dst, const char *fmt, va_list args);\fR
+.fi
+.PP
+.nf
+\fBint pstrprintf(const char *fmt, ...);
+int pstrvprintf(const char *fmt, va_list args);\fR
+.fi
+.PP
+.nf
+\fBint pstrerrorf(const char *fmt, ...);
+int pstrverrorf(const char *fmt, va_list args);\fR
+.fi
+.PP
+.nf
+\fBint pstrfprintf(pf_stream_t *stream, const char *fmt, ...);
+int pstrvfprintf(pf_stream_t *stream, const char *fmt, va_list args);\fR
+.fi
+.PP
+.nf
+\fBint pstrftime(pstring_t *dst, const char *fmt, struct tm *src);\fR
+.fi
+.SH DESCRIPTION
+.PP
+This module provides time and string formatting functions.
+.PP
+Alongside standard formatting options, formatting functions offer extensions
+for commonly used types that are missing from the standard library and
+additional encoding support:
+.IP \(bu 2
+\fB%P\fR \- prints the passed \fBpstring_t *\fR argument.
+.IP \(bu 2
+\fB%D\fR \- prints calendar time using the passed format.
+.IP \(bu 2
+\fB%?\fR \- serializes a pointer to a type indicated by the passed \fBint\fR id.
+.IP \(bu 2
+\fB%!\fR \- encodes the following format option using the specified encoding.
+.IP \(bu 2
+\fB%Ib\fR, \fB%Ub\fR \- prints \fBint8_t\fR and \fBuint8_t\fR respectively.
+.IP \(bu 2
+\fB%Iw\fR, \fB%Uw\fR \- prints \fBint16_t\fR and \fBuint16_t\fR respectively.
+.IP \(bu 2
+\fB%Id\fR, \fB%Ud\fR \- prints \fBint32_t\fR and \fBuint32_t\fR respectively.
+.IP \(bu 2
+\fB%Iq\fR, \fB%Uq\fR \- prints \fBint64_t\fR and \fBuint64_t\fR respectively.
+.IP \(bu 2
+\fB%Im\fR, \fB%Um\fR \- prints \fBintmax_t\fR and \fBuintmax_t\fR respectively.
+.IP \(bu 2
+\fB%Ip\fR, \fB%Up\fR \- prints \fBintptr_t\fR and \fBuintptr_t\fR respectively.
+.IP \(bu 2
+\fB%IP\fR, \fB%Us\fR \- prints \fBptrdiff_t\fR and \fBsize_t\fR respectively.
+.PP
+.RS 4
+.nf
+    pstring_t *str, *other;
+    pstrfmt(str, "%P", other);
+
+    int num;
+    pstrfmt(str, "%?", PF_TYPE_INT, &num);
+
+    struct tm date = { .tm_mday = 30 };
+    pstrfmt(str, "%D", "%A %c", &date);
+
+    pstrfmt(str, "%!html%P world!", PSTR("<Hello>"));
+
+    pstrfmt(str, "Bye %!*%s!", "hex", "world");
+.fi
+.RE
+.SH REFERENCE
+.SS pstrfmt
+.PP
+Concatenates a string formatted according to \fBfmt\fR.
+.RS 4
+.PP
+This function supports formatting extensions.
+.RE
+.PP
+\fBErrors\fR
+.PP
+EINVAL, ENOMEM.
+.SS pstrprintf
+.PP
+Prints a formatted string to standard output.
+.RS 4
+.PP
+This function supports formatting extensions.
+.RE
+.PP
+\fBErrors\fR
+.PP
+EINVAL, <stdio.h> error codes.
+.SS pstrerrorf
+.PP
+Prints a formatted string to standard error output.
+.RS 4
+.PP
+This function supports formatting extensions.
+.RE
+.PP
+\fBErrors\fR
+.PP
+EINVAL, <stdio.h> error codes.
+.SS pstrfprintf
+.PP
+Prints a formatted string to given character stream.
+.RS 4
+.PP
+This function supports formatting extensions.
+.RE
+.PP
+\fBErrors\fR
+.PP
+EINVAL, stream error codes.
+.SS pstrftime
+.PP
+Concatenates a string formatted by \fBfmt\fR using date and time from \fBsrc\fR.
+.PP
+\fBErrors\fR
+.PP
+EINVAL, ENOMEM.

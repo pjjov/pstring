@@ -34,9 +34,21 @@ install_headers(
 )
 
 install_man(
-    'docs/pstring.3',
-    'docs/pstring-encoding.3',
-    'docs/pstring-object.3',
+    'docs/manual/pstring-core.3',
+    'docs/manual/pstring-encoding.3',
+    'docs/manual/pstring-eval.3',
+    'docs/manual/pstring-format.3',
+    'docs/manual/pstring-glob.3',
+    'docs/manual/pstring-io.3',
+    'docs/manual/pstring-object.3',
+    'docs/manual/pstring-pattern-onig.3',
+    'docs/manual/pstring-pattern-pcre2.3',
+    'docs/manual/pstring-pattern-posix.3',
+    'docs/manual/pstring-pattern.3',
+    'docs/manual/pstring-search.3',
+    'docs/manual/pstring-transform.3',
+    'docs/manual/pstring-wordexp.3',
+    'docs/manual/pstring.3',
 )
 
 if not meson.is_subproject()
