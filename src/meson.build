@@ -67,3 +67,17 @@ pstring_dep = declare_dependency(
 )
 
 meson.override_dependency('pstring', pstring_dep)
+
+pkg = import('pkgconfig')
+pkg.generate(
+    lib,
+    name: 'pstring',
+    filebase: 'pstring',
+    description: 'Fully-featured string library for C.',
+    version: meson.project_version(),
+    requires: [
+        'allocator_t',
+        'cpolyfill',
+    ],
+    extra_cflags: '-I${includedir}',
+)

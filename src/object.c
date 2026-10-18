@@ -465,7 +465,7 @@ IMPL_DEFAULT(double);
 
 #undef IMPL_DEFAULT
 
-pstrobj_t *list_get_index(pstrobj_t *head, size_t index) {
+static pstrobj_t *list_get_index(pstrobj_t *head, size_t index) {
     pstrobj_t *curr = head;
     for (size_t i = 0; i < index && curr != NULL; i++)
         curr = curr->next;
